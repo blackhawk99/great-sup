@@ -1765,69 +1765,98 @@ const App = () => {
               </div>
             </div>
 
-            {/* IMPROVED Time Range Selector - Made to match Image 1 */}
-            <div className="p-4 border-b bg-gray-50">
-              <h3 className="text-lg font-medium mb-4">Choose Date & Time Window</h3>
-              
-              <div className="mb-4">
-                <div className="flex">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Date
-                    </label>
-                    <input 
-                      type="date" 
-                      className="w-full p-2 border rounded"
-                      value={timeRange.date}
-                      onChange={(e) => handleTimeRangeChange('date', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Time
-                  </label>
-                  <select
-                    value={timeRange.startTime}
-                    onChange={(e) => handleTimeRangeChange('startTime', e.target.value)}
-                    className="w-full p-2 border rounded appearance-none bg-white"
-                  >
-                    {Array.from({ length: 24 }, (_, i) => (
-                      <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
-                        {`${String(i).padStart(2, '0')}:00`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Time
-                  </label>
-                  <select
-                    value={timeRange.endTime}
-                    onChange={(e) => handleTimeRangeChange('endTime', e.target.value)}
-                    className="w-full p-2 border rounded appearance-none bg-white"
-                  >
-                    {Array.from({ length: 24 }, (_, i) => (
-                      <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
-                        {`${String(i).padStart(2, '0')}:00`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <button 
-                onClick={handleUpdateForecast}
-                className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 flex items-center justify-center"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Update Forecast
-              </button>
-            </div>
+          {/* IMPROVED Time Range Selector - with proper date picker */}
+<div className="p-4 border-b bg-gray-50">
+  <h3 className="text-lg font-medium mb-4">Choose Date & Time Window</h3>
+  
+  <div className="mb-4">
+    <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+    <div 
+      className="relative cursor-pointer" 
+      onClick={() => setShowDatePicker(true)}
+    >
+      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <Calendar className="h-5 w-5 text-gray-400" />
+      </div>
+      <input
+        type="text"
+        value={new Date(timeRange.date).toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })}
+        readOnly
+        className="w-full pl-10 p-3 bg-white border rounded-lg cursor-pointer text-lg"
+      />
+    </div>
+  </div>
+  
+  <div className="flex space-x-4 mb-4">
+    <button 
+      onClick={() => {
+        const today = new Date().toISOString().split('T')[0];
+        handleTimeRangeChange('date', today);
+      }}
+      className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-lg text-lg font-medium hover:bg-blue-600"
+    >
+      Today
+    </button>
+    <button 
+      onClick={() => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        handleTimeRangeChange('date', tomorrow.toISOString().split('T')[0]);
+      }}
+      className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-lg text-lg font-medium hover:bg-blue-600"
+    >
+      Tomorrow
+    </button>
+  </div>
+  
+  <div className="grid grid-cols-2 gap-4 mb-4">
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Start Time
+      </label>
+      <select
+        value={timeRange.startTime}
+        onChange={(e) => handleTimeRangeChange('startTime', e.target.value)}
+        className="w-full p-2 border rounded appearance-none bg-white text-lg"
+      >
+        {Array.from({ length: 24 }, (_, i) => (
+          <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
+            {`${String(i).padStart(2, '0')}:00`}
+          </option>
+        ))}
+      </select>
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        End Time
+      </label>
+      <select
+        value={timeRange.endTime}
+        onChange={(e) => handleTimeRangeChange('endTime', e.target.value)}
+        className="w-full p-2 border rounded appearance-none bg-white text-lg"
+      >
+        {Array.from({ length: 24 }, (_, i) => (
+          <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
+            {`${String(i).padStart(2, '0')}:00`}
+          </option>
+        ))}
+      </select>
+    </div>
+  </div>
+  
+  <button 
+    onClick={handleUpdateForecast}
+    className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center text-lg"
+  >
+    <RefreshCw className="h-5 w-5 mr-2" />
+    Update Forecast
+  </button>
+</div>
 
             {/* Loading state */}
             {loading && (
