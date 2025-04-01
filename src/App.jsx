@@ -12,10 +12,10 @@ import {
   Plus,
   Map,
   ChevronLeft,
-  Calendar,
   ArrowLeft,
   ArrowRight,
-  ChevronRight,
+  ExternalLink,
+  Calendar,
 } from "lucide-react";
 
 // Geographic protection analysis
@@ -40,7 +40,7 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
       exposedToDirections: [90, 135], // Exposed to E, SE
       description: "Protected from westerly winds, but exposed to easterly"
     },
-    'Astir Beach': {
+    'Asteras Beach': {
       latitude: 37.8016,
       longitude: 23.7711,
       coastlineOrientation: 180, // S facing
@@ -48,6 +48,33 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
       protectedFromDirections: [0, 45, 90, 270, 315], // Protected from most directions
       exposedToDirections: [180], // Only directly exposed to south
       description: "Well-protected beach in a sheltered bay"
+    },
+    'Zen Beach': {
+      latitude: 37.7129, 
+      longitude: 23.9323,
+      coastlineOrientation: 130, // SE facing
+      bayEnclosure: 0.4, // Moderately open
+      protectedFromDirections: [270, 315, 0, 45], // Protected from W, NW, N, NE
+      exposedToDirections: [90, 135, 180], // Exposed to E, SE, S
+      description: "Moderate protection, exposed to southeasterly winds"
+    },
+    'Kapsali Kythira': {
+      latitude: 36.1425,
+      longitude: 22.9996,
+      coastlineOrientation: 180, // S facing
+      bayEnclosure: 0.7, // Well enclosed
+      protectedFromDirections: [270, 315, 0, 45, 90], // Protected from W, NW, N, NE, E
+      exposedToDirections: [180], // Only exposed to south
+      description: "Well-protected bay, only exposed to southern winds"
+    },
+    'Palaipoli Kythira': {
+      latitude: 36.2335,
+      longitude: 22.9644,
+      coastlineOrientation: 90, // E facing
+      bayEnclosure: 0.6, // Moderately protected
+      protectedFromDirections: [180, 225, 270, 315], // Protected from S, SW, W, NW
+      exposedToDirections: [45, 90, 135], // Exposed to NE, E, SE
+      description: "Protected from westerly winds, exposed to easterly"
     },
     'Varkiza Beach': {
       latitude: 37.8133,
@@ -140,322 +167,42 @@ const getCardinalDirection = (degrees) => {
   return directions[(val % 16)];
 };
 
-// Modern Date Range Picker Component
-const DateRangePicker = ({ initialValue, onChange }) => {
-  const [showPicker, setShowPicker] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date(initialValue.date));
-  const [startTime, setStartTime] = useState(initialValue.startTime);
-  const [endTime, setEndTime] = useState(initialValue.endTime);
+// Generate Google Maps link
+const getGoogleMapsLink = (latitude, longitude) => 
+  `https://www.google.com/maps?q=${latitude},${longitude}`;
+
+// Parse Google Maps URL
+const parseGoogleMapsUrl = (url) => {
+  if (!url) return null;
   
-  // State for calendar display
-  const [displayMonth, setDisplayMonth] = useState(selectedDate.getMonth());
-  const [displayYear, setDisplayYear] = useState(selectedDate.getFullYear());
+  // Handle @lat,lng format (what you see in the URL bar)
+  let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (match) {
+    return {
+      latitude: parseFloat(match[1]),
+      longitude: parseFloat(match[2])
+    };
+  }
   
-  // Generate calendar days for current month
-  const generateCalendarDays = () => {
-    const daysInMonth = new Date(displayYear, displayMonth + 1, 0).getDate();
-    const firstDayOfMonth = new Date(displayYear, displayMonth, 1).getDay();
-    
-    const days = [];
-    
-    // Previous month days
-    const prevMonthDays = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
-    const prevMonth = displayMonth === 0 ? 11 : displayMonth - 1;
-    const prevMonthYear = displayMonth === 0 ? displayYear - 1 : displayYear;
-    const daysInPrevMonth = new Date(prevMonthYear, prevMonth + 1, 0).getDate();
-    
-    for (let i = daysInPrevMonth - prevMonthDays + 1; i <= daysInPrevMonth; i++) {
-      days.push({ day: i, month: prevMonth, year: prevMonthYear, isCurrentMonth: false });
-    }
-    
-    // Current month days
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push({ day: i, month: displayMonth, year: displayYear, isCurrentMonth: true });
-    }
-    
-    // Next month days
-    const remainingDays = 42 - days.length; // 6 rows x 7 days
-    const nextMonth = displayMonth === 11 ? 0 : displayMonth + 1;
-    const nextMonthYear = displayMonth === 11 ? displayYear + 1 : displayYear;
-    
-    for (let i = 1; i <= remainingDays; i++) {
-      days.push({ day: i, month: nextMonth, year: nextMonthYear, isCurrentMonth: false });
-    }
-    
-    return days;
-  };
+  // Handle ?q=lat,lng format (shared links)
+  match = url.match(/\?q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (match) {
+    return {
+      latitude: parseFloat(match[1]),
+      longitude: parseFloat(match[2])
+    };
+  }
   
-  const handleSetToday = () => {
-    const today = new Date();
-    setSelectedDate(today);
-    handleDateSelection(today);
-    setShowPicker(false);
-  };
+  // Handle old format with ll=lat,lng
+  match = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (match) {
+    return {
+      latitude: parseFloat(match[1]),
+      longitude: parseFloat(match[2])
+    };
+  }
   
-  const handleSetTomorrow = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    setSelectedDate(tomorrow);
-    handleDateSelection(tomorrow);
-    setShowPicker(false);
-  };
-  
-  const handleDateSelection = (date) => {
-    const formattedDate = date.toISOString().split('T')[0];
-    onChange({
-      date: formattedDate,
-      startTime,
-      endTime
-    });
-  };
-  
-  const handlePrevMonth = () => {
-    if (displayMonth === 0) {
-      setDisplayMonth(11);
-      setDisplayYear(displayYear - 1);
-    } else {
-      setDisplayMonth(displayMonth - 1);
-    }
-  };
-  
-  const handleNextMonth = () => {
-    if (displayMonth === 11) {
-      setDisplayMonth(0);
-      setDisplayYear(displayYear + 1);
-    } else {
-      setDisplayMonth(displayMonth + 1);
-    }
-  };
-  
-  const formatDateRange = () => {
-    const dateFormatter = new Intl.DateTimeFormat('en-US', { 
-      month: '2-digit', 
-      day: '2-digit', 
-      year: 'numeric' 
-    });
-    
-    return `${dateFormatter.format(selectedDate)} ${startTime} — ${dateFormatter.format(selectedDate)} ${endTime}`;
-  };
-  
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  
-  const isCurrentDay = (day) => {
-    return day.day === selectedDate.getDate() && 
-           day.month === selectedDate.getMonth() && 
-           day.year === selectedDate.getFullYear();
-  };
-  
-  const isToday = (day) => {
-    const today = new Date();
-    return day.day === today.getDate() && 
-           day.month === today.getMonth() && 
-           day.year === today.getFullYear();
-  };
-  
-  const handleDayClick = (day) => {
-    const newDate = new Date(day.year, day.month, day.day);
-    setSelectedDate(newDate);
-    
-    // If it's a different month, update the display month
-    if (day.month !== displayMonth) {
-      setDisplayMonth(day.month);
-      setDisplayYear(day.year);
-    }
-  };
-  
-  const handleTimeChange = (type, value) => {
-    if (type === 'start') {
-      setStartTime(value);
-    } else {
-      setEndTime(value);
-    }
-  };
-  
-  const applySelection = () => {
-    handleDateSelection(selectedDate);
-    setShowPicker(false);
-  };
-  
-  return (
-    <div className="w-full">
-      <div className="flex space-x-4 mb-4">
-        <button 
-          onClick={handleSetToday}
-          className="flex-1 bg-blue-500 text-white py-3 px-6 rounded-lg text-lg font-medium hover:bg-blue-600"
-        >
-          Today
-        </button>
-        <button 
-          onClick={handleSetTomorrow}
-          className="flex-1 bg-blue-500 text-white py-3 px-6 rounded-lg text-lg font-medium hover:bg-blue-600"
-        >
-          Tomorrow
-        </button>
-      </div>
-      
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          dateTimeRange
-        </label>
-        <input
-          type="text"
-          value={formatDateRange()}
-          onClick={() => setShowPicker(true)}
-          readOnly
-          className="w-full p-4 border border-gray-300 rounded-lg text-lg cursor-pointer"
-        />
-      </div>
-      
-      {showPicker && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-4 max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Select Date and Time</h3>
-              <button 
-                onClick={() => setShowPicker(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            
-            {/* Calendar Header */}
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center">
-                <button onClick={handlePrevMonth} className="p-1">
-                  <ArrowLeft className="h-5 w-5" />
-                </button>
-                <span className="mx-2">{monthNames[displayMonth]} {displayYear}</span>
-                <button onClick={handleNextMonth} className="p-1">
-                  <ArrowRight className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Calendar Grid */}
-            <div className="mb-4">
-              <div className="grid grid-cols-7 gap-1 text-center mb-2">
-                <div className="text-gray-500 text-sm">Su</div>
-                <div className="text-gray-500 text-sm">Mo</div>
-                <div className="text-gray-500 text-sm">Tu</div>
-                <div className="text-gray-500 text-sm">We</div>
-                <div className="text-gray-500 text-sm">Th</div>
-                <div className="text-gray-500 text-sm">Fr</div>
-                <div className="text-gray-500 text-sm">Sa</div>
-              </div>
-              
-              <div className="grid grid-cols-7 gap-1">
-                {generateCalendarDays().map((day, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleDayClick(day)}
-                    className={`p-2 rounded-full text-center ${
-                      isCurrentDay(day) 
-                        ? 'bg-blue-500 text-white' 
-                        : isToday(day) 
-                          ? 'border border-blue-500 text-blue-500' 
-                          : day.isCurrentMonth 
-                            ? 'hover:bg-gray-100' 
-                            : 'text-gray-400 hover:bg-gray-100'
-                    }`}
-                  >
-                    {day.day}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            {/* Time Picker */}
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">
-                  Hour
-                </label>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <select 
-                    value={startTime.split(':')[0]} 
-                    onChange={(e) => handleTimeChange('start', `${e.target.value}:${startTime.split(':')[1]}`)}
-                    className="p-2 border rounded"
-                  >
-                    {Array.from({ length: 24 }, (_, i) => i).map(hour => (
-                      <option key={hour} value={hour.toString().padStart(2, '0')}>
-                        {hour.toString().padStart(2, '0')}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="flex items-center justify-center">:</span>
-                  <select 
-                    value={startTime.split(':')[1]} 
-                    onChange={(e) => handleTimeChange('start', `${startTime.split(':')[0]}:${e.target.value}`)}
-                    className="p-2 border rounded"
-                  >
-                    {Array.from({ length: 4 }, (_, i) => i * 15).map(minute => (
-                      <option key={minute} value={minute.toString().padStart(2, '0')}>
-                        {minute.toString().padStart(2, '0')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-center">
-                —
-              </div>
-              
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">
-                  Hour
-                </label>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <select 
-                    value={endTime.split(':')[0]} 
-                    onChange={(e) => handleTimeChange('end', `${e.target.value}:${endTime.split(':')[1]}`)}
-                    className="p-2 border rounded"
-                  >
-                    {Array.from({ length: 24 }, (_, i) => i).map(hour => (
-                      <option key={hour} value={hour.toString().padStart(2, '0')}>
-                        {hour.toString().padStart(2, '0')}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="flex items-center justify-center">:</span>
-                  <select 
-                    value={endTime.split(':')[1]} 
-                    onChange={(e) => handleTimeChange('end', `${endTime.split(':')[0]}:${e.target.value}`)}
-                    className="p-2 border rounded"
-                  >
-                    {Array.from({ length: 4 }, (_, i) => i * 15).map(minute => (
-                      <option key={minute} value={minute.toString().padStart(2, '0')}>
-                        {minute.toString().padStart(2, '0')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex justify-end">
-              <button 
-                onClick={() => setShowPicker(false)}
-                className="px-4 py-2 border rounded mr-2 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={applySelection}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  return null;
 };
 
 const App = () => {
@@ -478,6 +225,32 @@ const App = () => {
     latitude: "",
     longitude: "",
   });
+  const [mapUrl, setMapUrl] = useState("");
+  const [notification, setNotification] = useState(null);
+
+  // Greek coastal locations
+  const suggestedLocations = [
+    { name: "Kavouri Beach", latitude: 37.8207, longitude: 23.7686 },
+    { name: "Asteras Beach", latitude: 37.8016, longitude: 23.7711 },
+    { name: "Vouliagmeni Beach", latitude: 37.8179, longitude: 23.7808 },
+    { name: "Zen Beach", latitude: 37.7129, longitude: 23.9323 },
+    { name: "Kapsali Kythira", latitude: 36.1425, longitude: 22.9996 },
+    { name: "Palaipoli Kythira", latitude: 36.2335, longitude: 22.9644 },
+    { name: "Varkiza Beach", latitude: 37.8133, longitude: 23.8011 },
+    { name: "Alimos Beach", latitude: 37.9111, longitude: 23.7017 },
+  ];
+
+  // Show toast notification
+  const toast = {
+    success: (message) => {
+      setNotification({ type: "success", message });
+      setTimeout(() => setNotification(null), 3000);
+    },
+    error: (message) => {
+      setNotification({ type: "error", message });
+      setTimeout(() => setNotification(null), 3000);
+    },
+  };
 
   // Use a ref to store geographic-aware mock data for Greek beaches
   const mockDataRef = useRef({
@@ -537,7 +310,7 @@ const App = () => {
     },
 
     // Astir Beach - protected from most directions
-    "Astir Beach": {
+    "Asteras Beach": {
       hourly: {
         time: Array.from(
           { length: 24 },
@@ -590,6 +363,145 @@ const App = () => {
       daily: {
         wave_height_max: [0.2], // Lower max wave height due to protection
         wave_direction_dominant: [170], // S direction (matches afternoon wind)
+      }
+    },
+
+    // Zen Beach
+    "Zen Beach": {
+      hourly: {
+        time: Array.from(
+          { length: 24 },
+          (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`
+        ),
+        temperature_2m: Array.from(
+          { length: 24 },
+          (_, i) => 22 + Math.sin(i / 3) * 5
+        ),
+        precipitation: Array.from({ length: 24 }, (_, i) =>
+          i < 10 ? 0 : i > 16 ? 0.2 : 0
+        ),
+        cloudcover: Array.from({ length: 24 }, (_, i) =>
+          i < 11 ? 10 : 30 + (i - 11) * 5
+        ),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+        }),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          // SE winds (90-135) are stronger at Zen Beach
+          const seFactor = (direction >= 90 && direction <= 135) ? 1.4 : 0.7;
+          return (i < 9 ? 4 : 6 + (i-9) * 0.8) * seFactor;
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          const seFactor = (direction >= 90 && direction <= 135) ? 1.5 : 0.6;
+          return (i < 10 ? 0.15 : 0.2 + (i-10) * 0.03) * seFactor;
+        }),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          const seFactor = (direction >= 90 && direction <= 135) ? 1.4 : 0.5;
+          return (i < 10 ? 0.07 : 0.12 + (i-10) * 0.02) * seFactor;
+        }),
+      },
+      daily: {
+        wave_height_max: [0.3],
+        wave_direction_dominant: [130],
+      }
+    },
+
+    // Kapsali Kythira
+    "Kapsali Kythira": {
+      hourly: {
+        time: Array.from(
+          { length: 24 },
+          (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`
+        ),
+        temperature_2m: Array.from(
+          { length: 24 },
+          (_, i) => 21 + Math.sin(i / 3) * 4
+        ),
+        precipitation: Array.from({ length: 24 }, () => 0.1),
+        cloudcover: Array.from(
+          { length: 24 },
+          (_, i) => 20 + Math.sin(i / 4) * 20
+        ),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+        }),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          // Only south winds (160-200) fully affect Kapsali
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 1.0 : 0.3;
+          return (5 + Math.sin(i/2) * 4) * protectionFactor;
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 0.9 : 0.2;
+          return (0.2 + Math.sin(i/6) * 0.1) * protectionFactor;
+        }),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 0.8 : 0.2;
+          return (0.1 + Math.sin(i/6) * 0.05) * protectionFactor;
+        }),
+      },
+      daily: {
+        wave_height_max: [0.25],
+        wave_direction_dominant: [180],
+      }
+    },
+
+    // Palaipoli Kythira
+    "Palaipoli Kythira": {
+      hourly: {
+        time: Array.from(
+          { length: 24 },
+          (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`
+        ),
+        temperature_2m: Array.from(
+          { length: 24 },
+          (_, i) => 21 + Math.sin(i / 3) * 4
+        ),
+        precipitation: Array.from({ length: 24 }, () => 0.1),
+        cloudcover: Array.from(
+          { length: 24 },
+          (_, i) => 20 + Math.sin(i / 4) * 20
+        ),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+        }),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          // East winds (45-135) are stronger at Palaipoli
+          const eastFactor = (direction >= 45 && direction <= 135) ? 1.3 : 0.6;
+          return (5 + Math.sin(i/2) * 4) * eastFactor;
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          const eastFactor = (direction >= 45 && direction <= 135) ? 1.2 : 0.5;
+          return (0.2 + Math.sin(i/6) * 0.1) * eastFactor;
+        }),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          const eastFactor = (direction >= 45 && direction <= 135) ? 1.1 : 0.4;
+          return (0.1 + Math.sin(i/6) * 0.05) * eastFactor;
+        }),
+      },
+      daily: {
+        wave_height_max: [0.3],
+        wave_direction_dominant: [90],
       }
     },
 
@@ -679,17 +591,6 @@ const App = () => {
       }
     }
   });
-
-  // Greek coastal locations
-  const suggestedLocations = [
-    { name: "Kavouri Beach", latitude: 37.8207, longitude: 23.7686 },
-    { name: "Vouliagmeni Beach", latitude: 37.8179, longitude: 23.7808 },
-    { name: "Astir Beach", latitude: 37.8016, longitude: 23.7711 },
-    { name: "Varkiza Beach", latitude: 37.8133, longitude: 23.8011 },
-    { name: "Alimos Beach", latitude: 37.9111, longitude: 23.7017 },
-    { name: "Edem Beach", latitude: 37.9331, longitude: 23.7075 },
-    { name: "Schinias Beach", latitude: 38.1597, longitude: 24.0296 },
-  ];
 
   // Load saved beaches from localStorage on component mount
   useEffect(() => {
@@ -789,17 +690,25 @@ const App = () => {
     } catch (error) {
       console.error("Error fetching real weather data:", error);
       setError(
-        "Unable to fetch real-time weather data. Using geographic-aware simulated data for this location."
+        "Using simulated data with geographic protection analysis for this location."
       );
 
       // Fall back to demo data as a last resort
       let mockData;
-      if (beach.name.includes("Kavouri")) {
+      const beachNameLower = beach.name.toLowerCase();
+      
+      if (beachNameLower.includes("kavouri")) {
         mockData = mockDataRef.current["Kavouri Beach"];
-      } else if (beach.name.includes("Vouliagmeni")) {
+      } else if (beachNameLower.includes("aster") || beachNameLower.includes("astar")) {
+        mockData = mockDataRef.current["Asteras Beach"];
+      } else if (beachNameLower.includes("zen")) {
+        mockData = mockDataRef.current["Zen Beach"];
+      } else if (beachNameLower.includes("kapsali")) {
+        mockData = mockDataRef.current["Kapsali Kythira"];
+      } else if (beachNameLower.includes("palaipoli")) {
+        mockData = mockDataRef.current["Palaipoli Kythira"];
+      } else if (beachNameLower.includes("vouliagmeni")) {
         mockData = mockDataRef.current["Vouliagmeni Beach"];
-      } else if (beach.name.includes("Astir")) {
-        mockData = mockDataRef.current["Astir Beach"];
       } else {
         mockData = mockDataRef.current["default"];
       }
@@ -964,11 +873,12 @@ const App = () => {
   // Handle setting home beach
   const handleSetHomeBeach = (beach) => {
     setHomeBeach(beach);
+    toast.success(`${beach.name} set as home beach!`);
   };
 
-  // Handle time range change via the modern date picker
-  const handleTimeRangeChange = (newTimeRange) => {
-    setTimeRange(newTimeRange);
+  // Handle time range change
+  const handleTimeRangeChange = (field, value) => {
+    setTimeRange({ ...timeRange, [field]: value });
 
     // Re-fetch weather data if a beach is selected
     if (selectedBeach) {
@@ -988,7 +898,11 @@ const App = () => {
 
       setBeaches([...beaches, beachToAdd]);
       setNewBeach({ name: "", latitude: "", longitude: "" });
+      setMapUrl("");
+      toast.success(`Added ${beachToAdd.name} to your beaches!`);
       setView("dashboard");
+    } else {
+      toast.error("Please fill in all beach details");
     }
   };
 
@@ -1002,7 +916,23 @@ const App = () => {
     };
 
     setBeaches([...beaches, beachToAdd]);
+    toast.success(`Added ${location.name} to your beaches!`);
     setView("dashboard");
+  };
+
+  // Handle extracting coordinates from Google Maps URL
+  const handleExtractCoordinates = () => {
+    const coordinates = parseGoogleMapsUrl(mapUrl);
+    if (coordinates) {
+      setNewBeach({
+        ...newBeach,
+        latitude: coordinates.latitude.toString(),
+        longitude: coordinates.longitude.toString()
+      });
+      toast.success("Coordinates extracted successfully!");
+    } else {
+      toast.error("Could not extract coordinates from URL. Please check format.");
+    }
   };
 
   // Component to render geographic protection information
@@ -1018,65 +948,150 @@ const App = () => {
     
     const protection = calculateGeographicProtection(beach, avgWindDirection, waveDirection);
     
+    // Calculate the bonus points added to score from geographic protection
+    const geoBonus = Math.round((protection.protectionScore / 100) * 15);
+    
     return (
-      <div className="bg-gray-50 p-4 rounded-lg mt-4">
-        <h4 className="font-medium mb-3 flex items-center">
+      <div className="bg-blue-50 p-5 rounded-lg mt-6 border border-blue-200 shadow-inner">
+        <h4 className="font-medium mb-4 text-lg flex items-center text-blue-800">
           <MapPin className="h-5 w-5 mr-2 text-blue-600" />
           Geographic Protection Analysis
         </h4>
         
-        <ul className="space-y-2 text-sm">
-          <li className="flex justify-between">
-            <span>Bay Enclosure:</span>
-            <span className={`font-medium ${protection.bayEnclosure > 0.6 ? 'text-green-600' : protection.bayEnclosure > 0.3 ? 'text-yellow-600' : 'text-red-600'}`}>
-              {protection.bayEnclosure > 0.7 ? 'Well Protected' : protection.bayEnclosure > 0.4 ? 'Moderately Protected' : 'Exposed'}
-            </span>
-          </li>
-          <li className="flex justify-between">
-            <span>Wind Direction:</span>
-            <span className="font-medium">
-              {getCardinalDirection(avgWindDirection)} ({Math.round(avgWindDirection)}°)
-              {protection.windProtection > 0.7 ? ' - Protected' : protection.windProtection > 0.3 ? ' - Partially Exposed' : ' - Fully Exposed'}
-            </span>
-          </li>
-          <li className="flex justify-between">
-            <span>Wave Direction:</span>
-            <span className="font-medium">
-              {getCardinalDirection(waveDirection)} ({Math.round(waveDirection)}°)
-              {protection.waveProtection > 0.7 ? ' - Protected' : protection.waveProtection > 0.3 ? ' - Partially Exposed' : ' - Fully Exposed'}
-            </span>
-          </li>
-          <li className="flex justify-between">
-            <span>Overall Protection:</span>
-            <span className={`font-medium ${protection.protectionScore > 70 ? 'text-green-600' : protection.protectionScore > 40 ? 'text-yellow-600' : 'text-red-600'}`}>
-              {Math.round(protection.protectionScore)}/100
-            </span>
-          </li>
-        </ul>
+        <div className="grid md:grid-cols-2 gap-6">
+          <ul className="space-y-3">
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Bay Enclosure:</span>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                protection.bayEnclosure > 0.6 
+                  ? 'bg-green-100 text-green-800' 
+                  : protection.bayEnclosure > 0.3 
+                    ? 'bg-yellow-100 text-yellow-800' 
+                    : 'bg-red-100 text-red-800'
+              }`}>
+                {protection.bayEnclosure > 0.7 
+                  ? 'Well Protected' 
+                  : protection.bayEnclosure > 0.4 
+                    ? 'Moderately Protected' 
+                    : 'Exposed'}
+              </span>
+            </li>
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Wind Direction:</span>
+              <span className="flex items-center">
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center mr-2">
+                  <div 
+                    className="w-3 h-3 bg-blue-600" 
+                    style={{ 
+                      clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)', 
+                      transform: `rotate(${avgWindDirection}deg)` 
+                    }}
+                  />
+                </div>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  protection.windProtection > 0.7 
+                    ? 'bg-green-100 text-green-800' 
+                    : protection.windProtection > 0.3 
+                      ? 'bg-yellow-100 text-yellow-800' 
+                      : 'bg-red-100 text-red-800'
+                }`}>
+                  {getCardinalDirection(avgWindDirection)} 
+                  {protection.windProtection > 0.7 
+                    ? ' (Protected)' 
+                    : protection.windProtection > 0.3 
+                      ? ' (Partially Exposed)' 
+                      : ' (Fully Exposed)'}
+                </span>
+              </span>
+            </li>
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Overall Protection:</span>
+              <div className="flex items-center">
+                <div className="w-24 h-3 bg-gray-200 rounded-full overflow-hidden mr-2">
+                  <div 
+                    className={`h-full ${
+                      protection.protectionScore > 70 
+                        ? 'bg-green-500' 
+                        : protection.protectionScore > 40 
+                          ? 'bg-yellow-500' 
+                          : 'bg-red-500'
+                    }`}
+                    style={{ width: `${protection.protectionScore}%` }}
+                  />
+                </div>
+                <span className={`font-medium ${
+                  protection.protectionScore > 70 
+                    ? 'text-green-600' 
+                    : protection.protectionScore > 40 
+                      ? 'text-yellow-600' 
+                      : 'text-red-600'
+                }`}>
+                  {Math.round(protection.protectionScore)}/100
+                </span>
+              </div>
+            </li>
+          </ul>
+          
+          <div className="bg-white p-4 rounded border">
+            <h5 className="font-medium mb-2 text-gray-800">Impact on Score</h5>
+            <p className="text-gray-700 mb-3">
+              Geographic protection is contributing <span className="font-bold text-blue-600">
+              +{geoBonus} points</span> to your overall score.
+            </p>
+            <div className={`p-3 rounded-lg ${
+              protection.protectionScore > 60 
+                ? 'bg-green-50 border border-green-200' 
+                : protection.protectionScore > 30 
+                  ? 'bg-yellow-50 border border-yellow-200' 
+                  : 'bg-red-50 border border-red-200'
+            }`}>
+              <p className="text-sm">
+                {protection.protectionScore > 60 
+                  ? `${beach.name} is well protected from ${getCardinalDirection(avgWindDirection)} winds, making it an excellent choice today.` 
+                  : protection.protectionScore > 30 
+                    ? `${beach.name} has moderate protection from ${getCardinalDirection(avgWindDirection)} winds.` 
+                    : `${beach.name} is exposed to ${getCardinalDirection(avgWindDirection)} winds today, consider an alternative beach.`}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
 
   return (
     <div className="flex flex-col min-h-screen bg-blue-50">
+      {/* Toast notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
+          notification.type === 'success' ? 'bg-green-100 border border-green-400 text-green-800' :
+          'bg-red-100 border border-red-400 text-red-800'
+        }`}>
+          {notification.message}
+        </div>
+      )}
+      
       {/* Header */}
-      <header className="bg-blue-600 text-white p-4">
+      <header className="bg-blue-600 text-white p-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold">🌊 Paddleboard Weather Advisor</h1>
+          <h1 className="text-2xl font-bold flex items-center">
+            <div className="mr-2 text-3xl">🌊</div> 
+            Paddleboard Weather Advisor
+          </h1>
           <nav className="flex space-x-4">
             <button
               onClick={() => setView("dashboard")}
-              className={`px-3 py-1 rounded ${
+              className={`px-3 py-1 rounded-lg ${
                 view === "dashboard" ? "bg-blue-800" : "hover:bg-blue-700"
-              }`}
+              } transition-colors duration-200`}
             >
               Dashboard
             </button>
             <button
               onClick={() => setView("add")}
-              className={`px-3 py-1 rounded ${
+              className={`px-3 py-1 rounded-lg ${
                 view === "add" ? "bg-blue-800" : "hover:bg-blue-700"
-              }`}
+              } transition-colors duration-200`}
             >
               Add Beach
             </button>
@@ -1089,11 +1104,13 @@ const App = () => {
         {view === "dashboard" && (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {beaches.length === 0 ? (
-              <div className="col-span-full bg-white rounded-lg shadow p-6 text-center">
-                <p className="text-gray-600 mb-4">No beaches saved yet.</p>
+              <div className="col-span-full bg-white rounded-lg shadow-lg p-8 text-center">
+                <div className="text-blue-600 text-5xl mb-4">🏝️</div>
+                <h2 className="text-2xl font-bold mb-4 text-gray-800">No beaches saved yet</h2>
+                <p className="text-gray-600 mb-6">Add your favorite paddleboarding spots to get started!</p>
                 <button
                   onClick={() => setView("add")}
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-md"
                 >
                   Add Your First Beach
                 </button>
@@ -1102,29 +1119,39 @@ const App = () => {
               beaches.map((beach) => (
                 <div
                   key={beach.id}
-                  className={`bg-white rounded-lg shadow overflow-hidden ${
+                  className={`bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow ${
                     beach.id === homeBeach?.id ? "ring-2 ring-orange-400" : ""
                   }`}
                 >
-                  <div className="p-4 flex justify-between items-start">
-                    <div>
+                  <div className="p-4">
+                    <div className="flex justify-between items-start mb-2">
                       <h2 className="text-xl font-semibold flex items-center">
                         {beach.id === homeBeach?.id && (
                           <Home className="h-4 w-4 text-orange-500 mr-1" />
                         )}
                         {beach.name}
                       </h2>
-                      <p className="text-gray-500 text-sm">
-                        {beach.latitude.toFixed(4)},{" "}
-                        {beach.longitude.toFixed(4)}
-                      </p>
                     </div>
-                    <div className="flex">
+                    <p className="text-gray-500 text-sm mb-3 flex items-center">
+                      <MapPin className="h-3 w-3 mr-1 text-gray-400 flex-shrink-0" />
+                      {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
+                    </p>
+                    <div className="flex justify-between items-center">
+                      <a 
+                        href={getGoogleMapsLink(beach.latitude, beach.longitude)} 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Map className="h-3 w-3 mr-1" />
+                        View on Maps
+                      </a>
                       <button
                         onClick={() => handleBeachSelect(beach)}
-                        className="bg-blue-600 text-white text-sm px-3 py-1 rounded hover:bg-blue-700"
+                        className="bg-blue-600 text-white text-sm px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors"
                       >
-                        View
+                        Check Conditions
                       </button>
                     </div>
                   </div>
@@ -1135,7 +1162,7 @@ const App = () => {
         )}
 
         {view === "add" && (
-          <div className="bg-white rounded-lg shadow">
+          <div className="bg-white rounded-lg shadow-lg">
             <div className="p-4 border-b">
               <h2 className="text-xl font-semibold flex items-center">
                 <Plus className="h-5 w-5 mr-2 text-blue-500" />
@@ -1144,79 +1171,117 @@ const App = () => {
             </div>
 
             <div className="p-4">
-              <div className="mb-6">
+              <div className="mb-8">
                 <h3 className="text-lg font-medium mb-3">
-                  Enter Beach Details
+                  Add via Google Maps Link
                 </h3>
-                <div className="grid gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Beach Name
-                    </label>
+                <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                  <div className="flex items-start mb-3">
+                    <Map className="h-5 w-5 mr-2 text-blue-600 mt-1 flex-shrink-0" />
+                    <p className="text-sm text-gray-700">
+                      Paste a Google Maps link to a beach and we'll automatically extract the coordinates!
+                      <br/>
+                      <span className="text-xs text-gray-500 mt-1 block">
+                        Example: https://www.google.com/maps?q=37.8207,23.7686
+                      </span>
+                    </p>
+                  </div>
+                  <div className="flex">
                     <input
                       type="text"
-                      value={newBeach.name}
-                      onChange={(e) =>
-                        setNewBeach({ ...newBeach, name: e.target.value })
-                      }
-                      placeholder="e.g., Kavouri Beach"
-                      className="w-full p-2 border rounded"
+                      value={mapUrl || ''}
+                      onChange={(e) => setMapUrl(e.target.value)}
+                      placeholder="Paste Google Maps URL here..."
+                      className="flex-grow p-2 border rounded-l"
                     />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Latitude
-                      </label>
-                      <input
-                        type="number"
-                        step="0.0001"
-                        value={newBeach.latitude}
-                        onChange={(e) =>
-                          setNewBeach({ ...newBeach, latitude: e.target.value })
-                        }
-                        placeholder="e.g., 37.8207"
-                        className="w-full p-2 border rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Longitude
-                      </label>
-                      <input
-                        type="number"
-                        step="0.0001"
-                        value={newBeach.longitude}
-                        onChange={(e) =>
-                          setNewBeach({
-                            ...newBeach,
-                            longitude: e.target.value,
-                          })
-                        }
-                        placeholder="e.g., 23.7686"
-                        className="w-full p-2 border rounded"
-                      />
-                    </div>
+                    <button
+                      onClick={handleExtractCoordinates}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700 transition-colors"
+                    >
+                      Extract
+                    </button>
                   </div>
                 </div>
-                <div className="flex justify-end mt-4">
-                  <button
-                    onClick={handleAddBeach}
-                    disabled={
-                      !newBeach.name ||
-                      !newBeach.latitude ||
-                      !newBeach.longitude
-                    }
-                    className={`px-4 py-2 rounded ${
-                      !newBeach.name ||
-                      !newBeach.latitude ||
-                      !newBeach.longitude
-                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        : "bg-blue-600 text-white hover:bg-blue-700"
-                    }`}
-                  >
-                    Add Beach
-                  </button>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-lg font-medium mb-3">
+                  <span className="flex items-center">
+                    <Plus className="h-5 w-5 mr-2 text-blue-500" />
+                    Beach Details
+                  </span>
+                </h3>
+                <div className="bg-white p-4 rounded-lg border shadow-sm">
+                  <div className="grid gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Beach Name
+                      </label>
+                      <input
+                        type="text"
+                        value={newBeach.name}
+                        onChange={(e) =>
+                          setNewBeach({ ...newBeach, name: e.target.value })
+                        }
+                        placeholder="e.g., Kavouri Beach"
+                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Latitude
+                        </label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={newBeach.latitude}
+                          onChange={(e) =>
+                            setNewBeach({ ...newBeach, latitude: e.target.value })
+                          }
+                          placeholder="e.g., 37.8207"
+                          className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Longitude
+                        </label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={newBeach.longitude}
+                          onChange={(e) =>
+                            setNewBeach({
+                              ...newBeach,
+                              longitude: e.target.value,
+                            })
+                          }
+                          placeholder="e.g., 23.7686"
+                          className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-4">
+                    <button
+                      onClick={handleAddBeach}
+                      disabled={
+                        !newBeach.name ||
+                        !newBeach.latitude ||
+                        !newBeach.longitude
+                      }
+                      className={`px-4 py-2 rounded-lg ${
+                        !newBeach.name ||
+                        !newBeach.latitude ||
+                        !newBeach.longitude
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          : "bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                      }`}
+                    >
+                      Add Beach
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1228,30 +1293,25 @@ const App = () => {
                   {suggestedLocations.map((location, index) => (
                     <div
                       key={index}
-                      className="border rounded p-3 hover:bg-blue-50 cursor-pointer transition"
+                      className="bg-white border rounded-lg p-4 hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition shadow-sm"
                       onClick={() => handleAddSuggested(location)}
                     >
-                      <h4 className="font-medium">{location.name}</h4>
-                      <p className="text-sm text-gray-500">
-                        {location.latitude.toFixed(4)},{" "}
-                        {location.longitude.toFixed(4)}
+                      <h4 className="font-medium text-blue-700">{location.name}</h4>
+                      <p className="text-sm text-gray-500 mb-2">
+                        {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
                       </p>
+                      <a 
+                        href={getGoogleMapsLink(location.latitude, location.longitude)} 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Map className="h-3 w-3 mr-1" />
+                        View on Google Maps
+                      </a>
                     </div>
                   ))}
-                </div>
-              </div>
-
-              <div className="mt-6 bg-blue-50 p-4 rounded border border-blue-100">
-                <div className="flex items-start">
-                  <Map className="h-5 w-5 mr-2 text-blue-600 mt-1" />
-                  <div>
-                    <h4 className="font-medium">Finding Coordinates</h4>
-                    <p className="text-sm text-gray-600 mt-1">
-                      To find exact coordinates for a beach, you can use Google
-                      Maps. Right-click on the location and copy the latitude
-                      and longitude values.
-                    </p>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1259,7 +1319,7 @@ const App = () => {
         )}
 
         {view === "detail" && selectedBeach && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
             <div className="p-4 border-b flex justify-between items-center">
               <div>
                 <h2 className="text-2xl font-semibold flex items-center">
@@ -1268,69 +1328,142 @@ const App = () => {
                   )}
                   {selectedBeach.name}
                 </h2>
-                <p className="text-gray-600">
-                  {selectedBeach.latitude.toFixed(4)},{" "}
-                  {selectedBeach.longitude.toFixed(4)}
-                </p>
+                <div className="flex items-center mt-1">
+                  <p className="text-gray-600 mr-3">
+                    {selectedBeach.latitude.toFixed(4)},{" "}
+                    {selectedBeach.longitude.toFixed(4)}
+                  </p>
+                  <a 
+                    href={getGoogleMapsLink(selectedBeach.latitude, selectedBeach.longitude)} 
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline flex items-center"
+                  >
+                    <Map className="h-3 w-3 mr-1" />
+                    View on Maps
+                  </a>
+                </div>
               </div>
               <div className="flex space-x-2">
                 {selectedBeach.id !== homeBeach?.id && (
                   <button
                     onClick={() => handleSetHomeBeach(selectedBeach)}
-                    className="bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600 flex items-center"
+                    className="bg-orange-500 text-white px-3 py-1 rounded-lg hover:bg-orange-600 transition-colors flex items-center"
                   >
                     <Home className="h-4 w-4 mr-1" /> Set as Home
                   </button>
                 )}
                 <button
                   onClick={() => setView("dashboard")}
-                  className="bg-gray-200 text-gray-800 px-3 py-1 rounded hover:bg-gray-300 flex items-center"
+                  className="bg-gray-200 text-gray-800 px-3 py-1 rounded-lg hover:bg-gray-300 transition-colors flex items-center"
                 >
                   <ChevronLeft className="h-4 w-4 mr-1" /> Back
                 </button>
               </div>
             </div>
 
-            {/* Modern Date Range Picker */}
+            {/* Time Range Selector */}
             <div className="p-4 border-b">
-              <DateRangePicker 
-                initialValue={timeRange} 
-                onChange={handleTimeRangeChange} 
-              />
+              <h3 className="text-lg font-medium mb-4">Select Time Range</h3>
+              
+              <div className="flex space-x-4 mb-4">
+                <button 
+                  onClick={() => {
+                    const today = new Date().toISOString().split('T')[0];
+                    setTimeRange({...timeRange, date: today});
+                    if (selectedBeach) fetchWeatherData(selectedBeach);
+                  }}
+                  className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-600 transition-colors"
+                >
+                  Today
+                </button>
+                <button 
+                  onClick={() => {
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    setTimeRange({...timeRange, date: tomorrow.toISOString().split('T')[0]});
+                    if (selectedBeach) fetchWeatherData(selectedBeach);
+                  }}
+                  className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-600 transition-colors"
+                >
+                  Tomorrow
+                </button>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Calendar className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="date"
+                    value={timeRange.date}
+                    min={new Date().toISOString().split('T')[0]}
+                    max={new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      handleTimeRangeChange('date', e.target.value);
+                    }}
+                    className="w-full pl-10 p-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Time</label>
+                  <input
+                    type="time"
+                    value={timeRange.startTime}
+                    onChange={(e) => {
+                      handleTimeRangeChange('startTime', e.target.value);
+                    }}
+                    className="w-full p-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">End Time</label>
+                  <input
+                    type="time"
+                    value={timeRange.endTime}
+                    onChange={(e) => {
+                      handleTimeRangeChange('endTime', e.target.value);
+                    }}
+                    className="w-full p-2 border rounded-lg"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Conditions */}
             {loading && (
-              <div className="p-6 text-center">
-                <div className="inline-block animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
-                <p>Loading weather data...</p>
+              <div className="p-8 text-center">
+                <div className="inline-block animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
+                <p className="text-gray-600">Loading weather data...</p>
               </div>
             )}
 
             {error && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-md text-blue-800 mb-4">
-                <p className="flex items-center">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-md text-blue-800 mx-4 my-2">
+                <p className="flex items-center font-medium">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
                     fill="currentColor"
-                    className="w-5 h-5 mr-2"
+                    className="w-5 h-5 mr-2 text-blue-600"
                   >
                     <path d="M11.25 4.533A9.707 9.707 0 006 3a9.735 9.735 0 00-3.25.555.75.75 0 00-.5.707v14.25a.75.75 0 001 .707A8.237 8.237 0 016 18.75c1.995 0 3.823.707 5.25 1.886V4.533zM12.75 20.636A8.214 8.214 0 0118 18.75c.966 0 1.89.166 2.75.47a.75.75 0 001-.708V4.262a.75.75 0 00-.5-.707A9.735 9.735 0 0018 3a9.707 9.707 0 00-5.25 1.533v16.103z" />
                   </svg>
                   {error}
-                </p>
-                <p className="mt-1 text-xs ml-7">
-                  The app now considers geographic features like bay enclosure and coastal orientation
                 </p>
               </div>
             )}
 
             {weatherData && score !== null && !loading && (
               <div className="p-6">
-                <div className="mb-6 text-center">
+                <div className="mb-8 text-center bg-white rounded-lg shadow-md py-6 px-4">
                   <div
-                    className={`inline-block text-5xl mb-2 ${
+                    className={`inline-block text-6xl mb-3 ${
                       score >= 85
                         ? "text-green-500"
                         : score >= 70
@@ -1342,11 +1475,11 @@ const App = () => {
                   >
                     {getCondition(score).emoji}
                   </div>
-                  <h3 className="text-2xl font-bold mb-1">
+                  <h3 className="text-3xl font-bold mb-2">
                     {getCondition(score).label}
                   </h3>
-                  <p className="text-gray-600">{getCondition(score).message}</p>
-                  <div className="mt-4 bg-gray-100 rounded-full h-4 overflow-hidden">
+                  <p className="text-gray-600 text-lg mb-4">{getCondition(score).message}</p>
+                  <div className="mt-4 bg-gray-100 rounded-full h-5 overflow-hidden w-4/5 mx-auto">
                     <div
                       className={`h-full ${
                         score >= 85
@@ -1360,7 +1493,7 @@ const App = () => {
                       style={{ width: `${score}%` }}
                     ></div>
                   </div>
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-lg font-medium text-gray-700">
                     Score: {score}/100
                   </p>
                   <div className="mt-1 text-xs text-gray-500 flex items-center justify-center">
@@ -1383,10 +1516,13 @@ const App = () => {
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-medium mb-3">Weather Factors</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <Wind className="h-5 w-5 mr-2 text-blue-600" />
+                      Weather Factors
+                    </h4>
                     <ul className="space-y-4">
-                      <li className="flex items-center">
+                      <li className="flex items-center p-2 bg-white rounded border">
                         <Wind className="h-5 w-5 mr-2 text-blue-600" />
                         <span className="flex-grow">Wind</span>
                         <span
@@ -1402,7 +1538,7 @@ const App = () => {
                           km/h
                         </span>
                       </li>
-                      <li className="flex items-center">
+                      <li className="flex items-center p-2 bg-white rounded border">
                         <Waves className="h-5 w-5 mr-2 text-blue-600" />
                         <span className="flex-grow">Wave Height</span>
                         <span
@@ -1417,7 +1553,7 @@ const App = () => {
                           {weatherData.daily.wave_height_max[0].toFixed(1)} m
                         </span>
                       </li>
-                      <li className="flex items-center">
+                      <li className="flex items-center p-2 bg-white rounded border">
                         <Thermometer className="h-5 w-5 mr-2 text-blue-600" />
                         <span className="flex-grow">Temperature</span>
                         <span
@@ -1431,7 +1567,7 @@ const App = () => {
                           {Math.round(weatherData.hourly.temperature_2m[12])}°C
                         </span>
                       </li>
-                      <li className="flex items-center">
+                      <li className="flex items-center p-2 bg-white rounded border">
                         <Droplets className="h-5 w-5 mr-2 text-blue-600" />
                         <span className="flex-grow">Precipitation</span>
                         <span
@@ -1444,7 +1580,7 @@ const App = () => {
                           {weatherData.hourly.precipitation[12].toFixed(1)} mm
                         </span>
                       </li>
-                      <li className="flex items-center">
+                      <li className="flex items-center p-2 bg-white rounded border">
                         <Sun className="h-5 w-5 mr-2 text-blue-600" />
                         <span className="flex-grow">Cloud Cover</span>
                         <span
@@ -1460,7 +1596,7 @@ const App = () => {
                         </span>
                       </li>
                       {weatherData.hourly.swell_wave_height && (
-                        <li className="flex items-center">
+                        <li className="flex items-center p-2 bg-white rounded border">
                           <Waves className="h-5 w-5 mr-2 text-blue-600" />
                           <span className="flex-grow">Swell Height</span>
                           <span
@@ -1480,18 +1616,21 @@ const App = () => {
                     </ul>
                   </div>
 
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-medium mb-3">Hourly Breakdown</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <Clock className="h-5 w-5 mr-2 text-blue-600" />
+                      Hourly Breakdown
+                    </h4>
                     <div className="space-y-2">
                       {[9, 10, 11, 12, 13].map((hour) => (
                         <div
                           key={hour}
-                          className="flex items-center p-2 hover:bg-gray-100 rounded"
+                          className="flex items-center p-2 bg-white hover:bg-blue-50 rounded border"
                         >
                           <Clock className="h-4 w-4 mr-2 text-gray-500" />
                           <span className="flex-grow text-sm">{hour}:00</span>
                           <span
-                            className={`px-2 py-1 rounded text-xs font-medium ${
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
                               weatherData.hourly.windspeed_10m[hour] < 8
                                 ? "bg-green-100 text-green-800"
                                 : weatherData.hourly.windspeed_10m[hour] < 12
@@ -1511,7 +1650,7 @@ const App = () => {
                         <AlertCircle className="h-4 w-4 mr-1 text-blue-600" />
                         Tips
                       </h4>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-gray-600 p-2 bg-white rounded border">
                         {score >= 85
                           ? "Perfect conditions! Enjoy a smooth paddle."
                           : score >= 70
@@ -1529,8 +1668,8 @@ const App = () => {
 
                 {/* Beach Comparison Section */}
                 {beaches.length > 1 && (
-                  <div className="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                    <h4 className="font-medium mb-3 flex items-center">
+                  <div className="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-200 shadow-inner">
+                    <h4 className="font-medium mb-3 flex items-center text-blue-800">
                       <MapPin className="h-5 w-5 mr-2 text-blue-600" />
                       Compare with Nearby Beaches
                     </h4>
@@ -1549,17 +1688,20 @@ const App = () => {
                         
                         return (
                           <div key={otherBeach.id} 
-                              className="flex items-center justify-between p-2 bg-white rounded border cursor-pointer hover:bg-blue-50"
+                              className="flex items-center justify-between p-3 bg-white rounded-lg border shadow-sm hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors"
                               onClick={() => handleBeachSelect(otherBeach)}>
-                            <span className="font-medium">{otherBeach.name}</span>
-                            <span className={`text-sm px-2 py-1 rounded ${
+                            <div className="flex items-center">
+                              <MapPin className="h-4 w-4 mr-2 text-blue-500" />
+                              <span className="font-medium">{otherBeach.name}</span>
+                            </div>
+                            <span className={`text-sm px-3 py-1 rounded-full ${
                               comparison > 10 ? 'bg-green-100 text-green-800' : 
                               comparison < -10 ? 'bg-red-100 text-red-800' : 
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {comparison > 10 ? 'May be better today' : 
-                              comparison < -10 ? 'Likely worse today' : 
-                              'Similar conditions'}
+                              {comparison > 10 ? 'Better today' : 
+                              comparison < -10 ? 'Worse today' : 
+                              'Similar'}
                             </span>
                           </div>
                         );
@@ -1574,7 +1716,7 @@ const App = () => {
       </main>
 
       {/* Footer */}
-      <footer className="bg-blue-800 text-white p-4 mt-auto">
+      <footer className="bg-blue-800 text-white p-4 mt-auto shadow-inner">
         <div className="container mx-auto text-center text-sm">
           <p>© 2025 Paddleboard Weather Advisor | Ladi Thalassa</p>
         </div>
