@@ -12,6 +12,10 @@ import {
   Plus,
   Map,
   ChevronLeft,
+  Calendar,
+  ArrowLeft,
+  ArrowRight,
+  ChevronRight,
 } from "lucide-react";
 
 // Geographic protection analysis
@@ -134,6 +138,324 @@ const getCardinalDirection = (degrees) => {
   const val = Math.floor((degrees / 22.5) + 0.5);
   const directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
   return directions[(val % 16)];
+};
+
+// Modern Date Range Picker Component
+const DateRangePicker = ({ initialValue, onChange }) => {
+  const [showPicker, setShowPicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date(initialValue.date));
+  const [startTime, setStartTime] = useState(initialValue.startTime);
+  const [endTime, setEndTime] = useState(initialValue.endTime);
+  
+  // State for calendar display
+  const [displayMonth, setDisplayMonth] = useState(selectedDate.getMonth());
+  const [displayYear, setDisplayYear] = useState(selectedDate.getFullYear());
+  
+  // Generate calendar days for current month
+  const generateCalendarDays = () => {
+    const daysInMonth = new Date(displayYear, displayMonth + 1, 0).getDate();
+    const firstDayOfMonth = new Date(displayYear, displayMonth, 1).getDay();
+    
+    const days = [];
+    
+    // Previous month days
+    const prevMonthDays = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+    const prevMonth = displayMonth === 0 ? 11 : displayMonth - 1;
+    const prevMonthYear = displayMonth === 0 ? displayYear - 1 : displayYear;
+    const daysInPrevMonth = new Date(prevMonthYear, prevMonth + 1, 0).getDate();
+    
+    for (let i = daysInPrevMonth - prevMonthDays + 1; i <= daysInPrevMonth; i++) {
+      days.push({ day: i, month: prevMonth, year: prevMonthYear, isCurrentMonth: false });
+    }
+    
+    // Current month days
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push({ day: i, month: displayMonth, year: displayYear, isCurrentMonth: true });
+    }
+    
+    // Next month days
+    const remainingDays = 42 - days.length; // 6 rows x 7 days
+    const nextMonth = displayMonth === 11 ? 0 : displayMonth + 1;
+    const nextMonthYear = displayMonth === 11 ? displayYear + 1 : displayYear;
+    
+    for (let i = 1; i <= remainingDays; i++) {
+      days.push({ day: i, month: nextMonth, year: nextMonthYear, isCurrentMonth: false });
+    }
+    
+    return days;
+  };
+  
+  const handleSetToday = () => {
+    const today = new Date();
+    setSelectedDate(today);
+    handleDateSelection(today);
+    setShowPicker(false);
+  };
+  
+  const handleSetTomorrow = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setSelectedDate(tomorrow);
+    handleDateSelection(tomorrow);
+    setShowPicker(false);
+  };
+  
+  const handleDateSelection = (date) => {
+    const formattedDate = date.toISOString().split('T')[0];
+    onChange({
+      date: formattedDate,
+      startTime,
+      endTime
+    });
+  };
+  
+  const handlePrevMonth = () => {
+    if (displayMonth === 0) {
+      setDisplayMonth(11);
+      setDisplayYear(displayYear - 1);
+    } else {
+      setDisplayMonth(displayMonth - 1);
+    }
+  };
+  
+  const handleNextMonth = () => {
+    if (displayMonth === 11) {
+      setDisplayMonth(0);
+      setDisplayYear(displayYear + 1);
+    } else {
+      setDisplayMonth(displayMonth + 1);
+    }
+  };
+  
+  const formatDateRange = () => {
+    const dateFormatter = new Intl.DateTimeFormat('en-US', { 
+      month: '2-digit', 
+      day: '2-digit', 
+      year: 'numeric' 
+    });
+    
+    return `${dateFormatter.format(selectedDate)} ${startTime} — ${dateFormatter.format(selectedDate)} ${endTime}`;
+  };
+  
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  
+  const isCurrentDay = (day) => {
+    return day.day === selectedDate.getDate() && 
+           day.month === selectedDate.getMonth() && 
+           day.year === selectedDate.getFullYear();
+  };
+  
+  const isToday = (day) => {
+    const today = new Date();
+    return day.day === today.getDate() && 
+           day.month === today.getMonth() && 
+           day.year === today.getFullYear();
+  };
+  
+  const handleDayClick = (day) => {
+    const newDate = new Date(day.year, day.month, day.day);
+    setSelectedDate(newDate);
+    
+    // If it's a different month, update the display month
+    if (day.month !== displayMonth) {
+      setDisplayMonth(day.month);
+      setDisplayYear(day.year);
+    }
+  };
+  
+  const handleTimeChange = (type, value) => {
+    if (type === 'start') {
+      setStartTime(value);
+    } else {
+      setEndTime(value);
+    }
+  };
+  
+  const applySelection = () => {
+    handleDateSelection(selectedDate);
+    setShowPicker(false);
+  };
+  
+  return (
+    <div className="w-full">
+      <div className="flex space-x-4 mb-4">
+        <button 
+          onClick={handleSetToday}
+          className="flex-1 bg-blue-500 text-white py-3 px-6 rounded-lg text-lg font-medium hover:bg-blue-600"
+        >
+          Today
+        </button>
+        <button 
+          onClick={handleSetTomorrow}
+          className="flex-1 bg-blue-500 text-white py-3 px-6 rounded-lg text-lg font-medium hover:bg-blue-600"
+        >
+          Tomorrow
+        </button>
+      </div>
+      
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          dateTimeRange
+        </label>
+        <input
+          type="text"
+          value={formatDateRange()}
+          onClick={() => setShowPicker(true)}
+          readOnly
+          className="w-full p-4 border border-gray-300 rounded-lg text-lg cursor-pointer"
+        />
+      </div>
+      
+      {showPicker && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-4 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Select Date and Time</h3>
+              <button 
+                onClick={() => setShowPicker(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Calendar Header */}
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center">
+                <button onClick={handlePrevMonth} className="p-1">
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <span className="mx-2">{monthNames[displayMonth]} {displayYear}</span>
+                <button onClick={handleNextMonth} className="p-1">
+                  <ArrowRight className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Calendar Grid */}
+            <div className="mb-4">
+              <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                <div className="text-gray-500 text-sm">Su</div>
+                <div className="text-gray-500 text-sm">Mo</div>
+                <div className="text-gray-500 text-sm">Tu</div>
+                <div className="text-gray-500 text-sm">We</div>
+                <div className="text-gray-500 text-sm">Th</div>
+                <div className="text-gray-500 text-sm">Fr</div>
+                <div className="text-gray-500 text-sm">Sa</div>
+              </div>
+              
+              <div className="grid grid-cols-7 gap-1">
+                {generateCalendarDays().map((day, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleDayClick(day)}
+                    className={`p-2 rounded-full text-center ${
+                      isCurrentDay(day) 
+                        ? 'bg-blue-500 text-white' 
+                        : isToday(day) 
+                          ? 'border border-blue-500 text-blue-500' 
+                          : day.isCurrentMonth 
+                            ? 'hover:bg-gray-100' 
+                            : 'text-gray-400 hover:bg-gray-100'
+                    }`}
+                  >
+                    {day.day}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Time Picker */}
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">
+                  Hour
+                </label>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <select 
+                    value={startTime.split(':')[0]} 
+                    onChange={(e) => handleTimeChange('start', `${e.target.value}:${startTime.split(':')[1]}`)}
+                    className="p-2 border rounded"
+                  >
+                    {Array.from({ length: 24 }, (_, i) => i).map(hour => (
+                      <option key={hour} value={hour.toString().padStart(2, '0')}>
+                        {hour.toString().padStart(2, '0')}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="flex items-center justify-center">:</span>
+                  <select 
+                    value={startTime.split(':')[1]} 
+                    onChange={(e) => handleTimeChange('start', `${startTime.split(':')[0]}:${e.target.value}`)}
+                    className="p-2 border rounded"
+                  >
+                    {Array.from({ length: 4 }, (_, i) => i * 15).map(minute => (
+                      <option key={minute} value={minute.toString().padStart(2, '0')}>
+                        {minute.toString().padStart(2, '0')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-center">
+                —
+              </div>
+              
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">
+                  Hour
+                </label>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <select 
+                    value={endTime.split(':')[0]} 
+                    onChange={(e) => handleTimeChange('end', `${e.target.value}:${endTime.split(':')[1]}`)}
+                    className="p-2 border rounded"
+                  >
+                    {Array.from({ length: 24 }, (_, i) => i).map(hour => (
+                      <option key={hour} value={hour.toString().padStart(2, '0')}>
+                        {hour.toString().padStart(2, '0')}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="flex items-center justify-center">:</span>
+                  <select 
+                    value={endTime.split(':')[1]} 
+                    onChange={(e) => handleTimeChange('end', `${endTime.split(':')[0]}:${e.target.value}`)}
+                    className="p-2 border rounded"
+                  >
+                    {Array.from({ length: 4 }, (_, i) => i * 15).map(minute => (
+                      <option key={minute} value={minute.toString().padStart(2, '0')}>
+                        {minute.toString().padStart(2, '0')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end">
+              <button 
+                onClick={() => setShowPicker(false)}
+                className="px-4 py-2 border rounded mr-2 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={applySelection}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 const App = () => {
@@ -525,7 +847,7 @@ const App = () => {
     };
   };
 
-  // Calculate paddle score based on weather conditions and geographic protection
+  // Calculate paddle score based on weather conditions and enhanced geographic protection
   const calculatePaddleScore = (hourlyData, dailyData, beach) => {
     // Calculate average values for the time range
     const avgTemp =
@@ -566,10 +888,11 @@ const App = () => {
     // Calculate geographic protection
     const geoProtection = calculateGeographicProtection(beach, avgWindDirection, waveDirection);
 
-    // Apply geographic protection factor to wind and wave values
-    const protectedWindSpeed = avgWind * (1 - (geoProtection.windProtection * 0.8));
-    const protectedWaveHeight = waveHeight * (1 - (geoProtection.waveProtection * 0.8));
-    const protectedSwellHeight = swellHeight * (1 - (geoProtection.waveProtection * 0.7));
+    // Apply ENHANCED geographic protection factors to wind and wave values
+    // Increased from 0.8 to 0.9 for stronger geographic effect
+    const protectedWindSpeed = avgWind * (1 - (geoProtection.windProtection * 0.9));
+    const protectedWaveHeight = waveHeight * (1 - (geoProtection.waveProtection * 0.9));
+    const protectedSwellHeight = swellHeight * (1 - (geoProtection.waveProtection * 0.85));
 
     // Score calculation based on the table in the requirements
     let score = 0;
@@ -602,8 +925,8 @@ const App = () => {
     // Cloud cover (up to 10 points)
     score += avgCloud < 40 ? 10 : Math.max(0, 10 - (avgCloud - 40) / 6);
 
-    // Add geographic protection bonus (up to 10 points)
-    score += geoProtection.protectionScore / 10;
+    // Add ENHANCED geographic protection bonus (up to 15 points instead of 10)
+    score += (geoProtection.protectionScore / 100) * 15;
 
     return Math.round(Math.min(100, score)); // Cap at 100
   };
@@ -643,9 +966,9 @@ const App = () => {
     setHomeBeach(beach);
   };
 
-  // Handle time range change
-  const handleTimeRangeChange = (field, value) => {
-    setTimeRange({ ...timeRange, [field]: value });
+  // Handle time range change via the modern date picker
+  const handleTimeRangeChange = (newTimeRange) => {
+    setTimeRange(newTimeRange);
 
     // Re-fetch weather data if a beach is selected
     if (selectedBeach) {
@@ -968,62 +1291,12 @@ const App = () => {
               </div>
             </div>
 
-            {/* Time Range Selector */}
+            {/* Modern Date Range Picker */}
             <div className="p-4 border-b">
-              <h3 className="text-lg font-medium mb-2">Select Time Range</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={timeRange.date}
-                    min={new Date().toISOString().split("T")[0]}
-                    max={
-                      new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
-                        .toISOString()
-                        .split("T")[0]
-                    }
-                    onChange={(e) =>
-                      handleTimeRangeChange("date", e.target.value)
-                    }
-                    className="w-full p-2 border rounded"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Time
-                  </label>
-                  <input
-                    type="time"
-                    value={timeRange.startTime}
-                    onChange={(e) =>
-                      handleTimeRangeChange("startTime", e.target.value)
-                    }
-                    className="w-full p-2 border rounded"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Time
-                  </label>
-                  <input
-                    type="time"
-                    value={timeRange.endTime}
-                    onChange={(e) =>
-                      handleTimeRangeChange("endTime", e.target.value)
-                    }
-                    className="w-full p-2 border rounded"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={() => fetchWeatherData(selectedBeach)}
-                className="mt-3 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                Update Forecast
-              </button>
+              <DateRangePicker 
+                initialValue={timeRange} 
+                onChange={handleTimeRangeChange} 
+              />
             </div>
 
             {/* Conditions */}
