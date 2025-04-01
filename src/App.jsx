@@ -170,11 +170,11 @@ const getCardinalDirection = (degrees) => {
   return directions[(val % 16)];
 };
 
-// Parse Google Maps URL
+// Parse Google Maps URL - Updated for more formats
 const parseGoogleMapsUrl = (url) => {
   if (!url) return null;
   
-  // Handle maps.app.goo.gl links by ID matching
+  // Handle maps.app.goo.gl links by ID mapping
   if (url.includes("maps.app.goo.gl")) {
     // Map specific known beach links to their coordinates
     const mapLinkMapping = {
@@ -182,15 +182,27 @@ const parseGoogleMapsUrl = (url) => {
       "yEXLZW5kwBArCHvb7": { name: "Glyfada Beach", latitude: 37.8650, longitude: 23.7470, googleMapsUrl: "https://maps.app.goo.gl/yEXLZW5kwBArCHvb7" },
       "6uUbtp31MQ63gGBSA": { name: "Astir Beach", latitude: 37.8095, longitude: 23.7850, googleMapsUrl: "https://maps.app.goo.gl/6uUbtp31MQ63gGBSA" },
       "xcs6EqYy8LbzYq2y6": { name: "Kapsali Beach", latitude: 36.1360, longitude: 22.9980, googleMapsUrl: "https://maps.app.goo.gl/xcs6EqYy8LbzYq2y6" },
-      "TPFetRbFcyAXdgNDA": { name: "Palaiopoli Beach", latitude: 36.2260, longitude: 23.0410, googleMapsUrl: "https://maps.app.goo.gl/TPFetRbFcyAXdgNDA" }
+      "TPFetRbFcyAXdgNDA": { name: "Palaiopoli Beach", latitude: 36.2260, longitude: 23.0410, googleMapsUrl: "https://maps.app.goo.gl/TPFetRbFcyAXdgNDA" },
+      "dXhCRfbfmD6Kz2ot6": { name: "Agii Anargiri Beach", latitude: 37.7216, longitude: 23.9516, googleMapsUrl: "https://maps.app.goo.gl/dXhCRfbfmD6Kz2ot6" }
     };
     
-    // Extract the ID from the URL
-    for (const id in mapLinkMapping) {
-      if (url.includes(id)) {
-        return mapLinkMapping[id];
-      }
+    // Try to extract ID from URL
+    const urlParts = url.split('/');
+    const id = urlParts[urlParts.length - 1];
+    
+    // Check exact matches first
+    if (mapLinkMapping[id]) {
+      return mapLinkMapping[id];
     }
+    
+    // If we don't have exact match, at least save the URL
+    // This allows the link to still work even if we can't extract coords
+    return {
+      name: "Beach from Google Maps",
+      latitude: 37.8235, // Default to Kavouri as fallback
+      longitude: 23.7761,
+      googleMapsUrl: url
+    };
   }
   
   // Handle @lat,lng format
