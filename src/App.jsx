@@ -17,6 +17,7 @@ import {
   ArrowRight,
   ExternalLink,
   Info,
+  Trash2,
 } from "lucide-react";
 
 // Geographic protection analysis
@@ -24,13 +25,22 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
   // Hardcoded geographic data for known Greek beaches
   const geographicData = {
     'Kavouri Beach': {
-      latitude: 37.8207,
-      longitude: 23.7686,
+      latitude: 37.8235,
+      longitude: 23.7761,
       coastlineOrientation: 135, // SE facing
       bayEnclosure: 0.3, // Somewhat open
       protectedFromDirections: [315, 360, 45], // Protected from NW, N, NE
       exposedToDirections: [135, 180, 225], // Exposed to SE, S, SW
       description: "Moderately protected bay, exposed to southern winds"
+    },
+    'Glyfada Beach': {
+      latitude: 37.8650,
+      longitude: 23.7470,
+      coastlineOrientation: 110, // ESE facing
+      bayEnclosure: 0.3, // Somewhat open
+      protectedFromDirections: [270, 315, 360], // Protected from W, NW, N
+      exposedToDirections: [90, 135, 180], // Exposed to E, SE, S
+      description: "Exposed beach, limited protection"
     },
     'Vouliagmeni Beach': {
       latitude: 37.8179,
@@ -41,36 +51,27 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
       exposedToDirections: [90, 135], // Exposed to E, SE
       description: "Protected from westerly winds, but exposed to easterly"
     },
-    'Asteras Beach': {
-      latitude: 37.8016,
-      longitude: 23.7711,
+    'Astir Beach': {
+      latitude: 37.8095,
+      longitude: 23.7850,
       coastlineOrientation: 180, // S facing
       bayEnclosure: 0.8, // Highly enclosed
       protectedFromDirections: [0, 45, 90, 270, 315], // Protected from most directions
       exposedToDirections: [180], // Only directly exposed to south
       description: "Well-protected beach in a sheltered bay"
     },
-    'Zen Beach': {
-      latitude: 37.7129, 
-      longitude: 23.9323,
-      coastlineOrientation: 130, // SE facing
-      bayEnclosure: 0.4, // Moderately open
-      protectedFromDirections: [270, 315, 0, 45], // Protected from W, NW, N, NE
-      exposedToDirections: [90, 135, 180], // Exposed to E, SE, S
-      description: "Moderate protection, exposed to southeasterly winds"
-    },
-    'Kapsali Kythira': {
-      latitude: 36.1425,
-      longitude: 22.9996,
+    'Kapsali Beach': {
+      latitude: 36.1360,
+      longitude: 22.9980,
       coastlineOrientation: 180, // S facing
       bayEnclosure: 0.7, // Well enclosed
       protectedFromDirections: [270, 315, 0, 45, 90], // Protected from W, NW, N, NE, E
       exposedToDirections: [180], // Only exposed to south
       description: "Well-protected bay, only exposed to southern winds"
     },
-    'Palaipoli Kythira': {
-      latitude: 36.2335,
-      longitude: 22.9644,
+    'Palaiopoli Beach': {
+      latitude: 36.2260,
+      longitude: 23.0410,
       coastlineOrientation: 90, // E facing
       bayEnclosure: 0.6, // Moderately protected
       protectedFromDirections: [180, 225, 270, 315], // Protected from S, SW, W, NW
@@ -85,33 +86,6 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
       protectedFromDirections: [270, 315, 0, 45], // Protected from W, NW, N, NE
       exposedToDirections: [135, 180, 225], // Exposed to SE, S, SW
       description: "Moderate protection, exposed to southern seas"
-    },
-    'Legrena Beach': {  // Added from your maps link
-      latitude: 37.6506, 
-      longitude: 24.0521,
-      coastlineOrientation: 150, // SSE facing
-      bayEnclosure: 0.5, // Medium enclosure
-      protectedFromDirections: [270, 315, 0, 45], // Protected from W, NW, N, NE
-      exposedToDirections: [135, 180, 225], // Exposed to SE, S, SW
-      description: "Moderately protected, exposed to southern winds"
-    },
-    'Porto Rafti': {  // Added from your maps link
-      latitude: 37.8829,
-      longitude: 24.0077,
-      coastlineOrientation: 110, // ESE facing
-      bayEnclosure: 0.6, // Moderately protected
-      protectedFromDirections: [180, 225, 270, 315, 0], // Protected from S, SW, W, NW, N
-      exposedToDirections: [90, 135], // Exposed to E, SE
-      description: "Protected bay, mainly exposed to eastern winds"
-    },
-    'Loutraki Beach': {  // Added from your maps link
-      latitude: 37.9820,
-      longitude: 22.9780,
-      coastlineOrientation: 70, // ENE facing
-      bayEnclosure: 0.4, // Moderately open
-      protectedFromDirections: [135, 180, 225, 270, 315], // Protected from SE, S, SW, W, NW
-      exposedToDirections: [0, 45, 90], // Exposed to N, NE, E
-      description: "Exposed to northern winds, protected from southern and western"
     }
   };
   
@@ -124,7 +98,8 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
   // Get geographic data if this is a known beach
   const beachName = beach.name;
   const knownBeach = Object.keys(geographicData).find(name => 
-    beachName.includes(name) || name.includes(beachName)
+    beachName.toLowerCase().includes(name.toLowerCase()) || 
+    name.toLowerCase().includes(beachName.toLowerCase())
   );
   
   if (knownBeach) {
@@ -229,34 +204,22 @@ const parseGoogleMapsUrl = (url) => {
     };
   }
   
-  // Handle maps.app.goo.gl links by extracting location name
-  match = url.match(/maps\.app\.goo\.gl/);
-  if (match) {
-    // Extract location name from URL path or try to guess
-    const pathSegments = new URL(url).pathname.split('/');
-    const lastSegment = pathSegments[pathSegments.length - 1];
+  // Handle maps.app.goo.gl links by ID matching
+  if (url.includes("maps.app.goo.gl")) {
+    // Map specific known beach links to their coordinates
+    const mapLinkMapping = {
+      "KP6MpuG6mgrv1Adm6": { name: "Kavouri Beach", latitude: 37.8235, longitude: 23.7761 },
+      "yEXLZW5kwBArCHvb7": { name: "Glyfada Beach", latitude: 37.8650, longitude: 23.7470 },
+      "6uUbtp31MQ63gGBSA": { name: "Astir Beach", latitude: 37.8095, longitude: 23.7850 },
+      "xcs6EqYy8LbzYq2y6": { name: "Kapsali Beach", latitude: 36.1360, longitude: 22.9980 },
+      "TPFetRbFcyAXdgNDA": { name: "Palaiopoli Beach", latitude: 36.2260, longitude: 23.0410 }
+    };
     
-    // Check common Greek beach names
-    if (url.includes("Legrena") || lastSegment.includes("RLXesyCsSvESpwhM9")) {
-      return {
-        latitude: 37.6506,
-        longitude: 24.0521,
-        name: "Legrena Beach"
-      };
-    }
-    else if (url.includes("Porto Rafti") || lastSegment.includes("D6USULQVDHWNLeQU8")) {
-      return {
-        latitude: 37.8829,
-        longitude: 24.0077,
-        name: "Porto Rafti"
-      };
-    }
-    else if (url.includes("Loutraki") || lastSegment.includes("L8CocpiKW2zZCdBQ6")) {
-      return {
-        latitude: 37.9820,
-        longitude: 22.9780,
-        name: "Loutraki Beach"
-      };
+    // Extract the ID from the URL
+    for (const id in mapLinkMapping) {
+      if (url.includes(id)) {
+        return mapLinkMapping[id];
+      }
     }
   }
   
@@ -287,18 +250,17 @@ const App = () => {
   const [mapUrl, setMapUrl] = useState("");
   const [notification, setNotification] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Greek coastal locations
   const suggestedLocations = [
-    { name: "Kavouri Beach", latitude: 37.8207, longitude: 23.7686 },
-    { name: "Asteras Beach", latitude: 37.8016, longitude: 23.7711 },
+    { name: "Kavouri Beach", latitude: 37.8235, longitude: 23.7761 },
+    { name: "Glyfada Beach", latitude: 37.8650, longitude: 23.7470 },
+    { name: "Astir Beach", latitude: 37.8095, longitude: 23.7850 },
+    { name: "Kapsali Beach", latitude: 36.1360, longitude: 22.9980 },
+    { name: "Palaiopoli Beach", latitude: 36.2260, longitude: 23.0410 },
     { name: "Vouliagmeni Beach", latitude: 37.8179, longitude: 23.7808 },
-    { name: "Zen Beach", latitude: 37.7129, longitude: 23.9323 },
-    { name: "Legrena Beach", latitude: 37.6506, longitude: 24.0521 },
-    { name: "Porto Rafti", latitude: 37.8829, longitude: 24.0077 },
-    { name: "Loutraki Beach", latitude: 37.9820, longitude: 22.9780 },
-    { name: "Kapsali Kythira", latitude: 36.1425, longitude: 22.9996 },
-    { name: "Palaipoli Kythira", latitude: 36.2335, longitude: 22.9644 },
+    { name: "Varkiza Beach", latitude: 37.8133, longitude: 23.8011 },
   ];
 
   // Show toast notification
@@ -311,6 +273,34 @@ const App = () => {
       setNotification({ type: "error", message });
       setTimeout(() => setNotification(null), 3000);
     },
+  };
+
+  // Handle beach deletion
+  const handleDeleteBeach = (beachId) => {
+    setDeleteConfirm(beachId);
+  };
+  
+  const confirmDeleteBeach = (beachId) => {
+    const beachToDelete = beaches.find(b => b.id === beachId);
+    const newBeaches = beaches.filter(b => b.id !== beachId);
+    setBeaches(newBeaches);
+    
+    // If we're deleting the home beach, unset it
+    if (homeBeach && homeBeach.id === beachId) {
+      setHomeBeach(null);
+    }
+    
+    // If we're deleting the selected beach, go back to dashboard
+    if (selectedBeach && selectedBeach.id === beachId) {
+      setView("dashboard");
+    }
+    
+    toast.success(`Removed ${beachToDelete.name}`);
+    setDeleteConfirm(null);
+  };
+  
+  const cancelDeleteBeach = () => {
+    setDeleteConfirm(null);
   };
 
   // Use a ref to store geographic-aware mock data for Greek beaches
@@ -369,9 +359,273 @@ const App = () => {
         wave_direction_dominant: [170], // S direction (matches afternoon wind)
       }
     },
+    
+    // Glyfada Beach
+    "Glyfada Beach": {
+      hourly: {
+        time: Array.from(
+          { length: 24 },
+          (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`
+        ),
+        temperature_2m: Array.from(
+          { length: 24 },
+          (_, i) => 22 + Math.sin(i / 3) * 5
+        ),
+        precipitation: Array.from({ length: 24 }, (_, i) =>
+          i < 10 ? 0 : i > 16 ? 0.3 : 0
+        ),
+        cloudcover: Array.from({ length: 24 }, (_, i) =>
+          i < 11 ? 15 : 35 + (i - 11) * 5
+        ),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+        }),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          const exposedFactor = (direction >= 90 && direction <= 180) ? 1.6 : 0.8;
+          return (i < 9 ? 5 : 7 + (i-9) * 0.9) * exposedFactor;
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          const exposedFactor = (direction >= 90 && direction <= 180) ? 1.7 : 0.8;
+          return (i < 10 ? 0.2 : 0.25 + (i-10) * 0.04) * exposedFactor;
+        }),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          const exposedFactor = (direction >= 90 && direction <= 180) ? 1.5 : 0.7;
+          return (i < 10 ? 0.1 : 0.15 + (i-10) * 0.03) * exposedFactor;
+        }),
+      },
+      daily: {
+        wave_height_max: [0.5],
+        wave_direction_dominant: [160],
+      }
+    },
 
-    // Data for other beaches...
-    // (Previously defined mock data code for other beaches)
+    // Astir Beach - protected from most directions
+    "Astir Beach": {
+      hourly: {
+        time: Array.from(
+          { length: 24 },
+          (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`
+        ),
+        temperature_2m: Array.from(
+          { length: 24 },
+          (_, i) => 22 + Math.sin(i / 3) * 5
+        ),
+        precipitation: Array.from({ length: 24 }, (_, i) =>
+          i < 10 ? 0 : i > 16 ? 0.2 : 0
+        ),
+        cloudcover: Array.from({ length: 24 }, (_, i) =>
+          i < 11 ? 10 : 30 + (i - 11) * 5
+        ),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+        }),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          // Only south winds (160-200) fully affect Astir
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 1.0 : 0.4;
+          return (i < 9 ? 4 : 6 + (i-9) * 0.8) * protectionFactor;
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          // Only south winds (160-200) create significant waves at Astir
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 0.9 : 0.3;
+          return (i < 10 ? 0.15 : 0.2 + (i-10) * 0.03) * protectionFactor;
+        }),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          // Only south winds (160-200) create significant swell at Astir
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 0.8 : 0.2;
+          return (i < 10 ? 0.07 : 0.12 + (i-10) * 0.02) * protectionFactor;
+        }),
+      },
+      daily: {
+        wave_height_max: [0.2],
+        wave_direction_dominant: [170],
+      }
+    },
+
+    // Kapsali Beach
+    "Kapsali Beach": {
+      hourly: {
+        time: Array.from(
+          { length: 24 },
+          (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`
+        ),
+        temperature_2m: Array.from(
+          { length: 24 },
+          (_, i) => 21 + Math.sin(i / 3) * 4
+        ),
+        precipitation: Array.from({ length: 24 }, () => 0.1),
+        cloudcover: Array.from(
+          { length: 24 },
+          (_, i) => 20 + Math.sin(i / 4) * 20
+        ),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+        }),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          // Only south winds (160-200) fully affect Kapsali
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 1.0 : 0.3;
+          return (5 + Math.sin(i/2) * 4) * protectionFactor;
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 0.9 : 0.2;
+          return (0.2 + Math.sin(i/6) * 0.1) * protectionFactor;
+        }),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 0.8 : 0.2;
+          return (0.1 + Math.sin(i/6) * 0.05) * protectionFactor;
+        }),
+      },
+      daily: {
+        wave_height_max: [0.25],
+        wave_direction_dominant: [180],
+      }
+    },
+
+    // Palaiopoli Beach
+    "Palaiopoli Beach": {
+      hourly: {
+        time: Array.from(
+          { length: 24 },
+          (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`
+        ),
+        temperature_2m: Array.from(
+          { length: 24 },
+          (_, i) => 21 + Math.sin(i / 3) * 4
+        ),
+        precipitation: Array.from({ length: 24 }, () => 0.1),
+        cloudcover: Array.from(
+          { length: 24 },
+          (_, i) => 20 + Math.sin(i / 4) * 20
+        ),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+        }),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          // East winds (45-135) are stronger at Palaipoli
+          const eastFactor = (direction >= 45 && direction <= 135) ? 1.3 : 0.6;
+          return (5 + Math.sin(i/2) * 4) * eastFactor;
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          const eastFactor = (direction >= 45 && direction <= 135) ? 1.2 : 0.5;
+          return (0.2 + Math.sin(i/6) * 0.1) * eastFactor;
+        }),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          const eastFactor = (direction >= 45 && direction <= 135) ? 1.1 : 0.4;
+          return (0.1 + Math.sin(i/6) * 0.05) * eastFactor;
+        }),
+      },
+      daily: {
+        wave_height_max: [0.3],
+        wave_direction_dominant: [90],
+      }
+    },
+
+    // Vouliagmeni beach - typically good but more variable
+    "Vouliagmeni Beach": {
+      hourly: {
+        time: Array.from(
+          { length: 24 },
+          (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`
+        ),
+        temperature_2m: Array.from(
+          { length: 24 },
+          (_, i) => 21 + Math.sin(i / 3) * 4
+        ),
+        precipitation: Array.from({ length: 24 }, () => 0.1),
+        cloudcover: Array.from(
+          { length: 24 },
+          (_, i) => 20 + Math.sin(i / 4) * 20
+        ),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+        }),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          // SE winds (90-135) are stronger at Vouliagmeni
+          const exposureFactor = (direction >= 90 && direction <= 135) ? 1.3 : 0.7;
+          return (5 + Math.sin(i/2) * 4) * exposureFactor; 
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          // SE winds (90-135) create bigger waves at Vouliagmeni
+          const exposureFactor = (direction >= 90 && direction <= 135) ? 1.3 : 0.6;
+          return (0.2 + Math.sin(i/6) * 0.1) * exposureFactor;
+        }),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          // SE winds (90-135) create bigger swell at Vouliagmeni
+          const exposureFactor = (direction >= 90 && direction <= 135) ? 1.2 : 0.5;
+          return (0.1 + Math.sin(i/6) * 0.05) * exposureFactor;
+        }),
+      },
+      daily: {
+        wave_height_max: [0.3],
+        wave_direction_dominant: [115],
+      }
+    },
+
+    // Default for other beaches
+    default: {
+      hourly: {
+        time: Array.from(
+          { length: 24 },
+          (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`
+        ),
+        temperature_2m: Array.from(
+          { length: 24 },
+          (_, i) => 22 + Math.sin(i / 3) * 4
+        ),
+        precipitation: Array.from({ length: 24 }, () => 0.1),
+        cloudcover: Array.from(
+          { length: 24 },
+          (_, i) => 30 + Math.sin(i / 6) * 20
+        ),
+        windspeed_10m: Array.from(
+          { length: 24 },
+          (_, i) => 8 + Math.sin(i / 4) * 4
+        ),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          return 45 + (i * 5) % 360;
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => 0.3 + Math.sin(i/12) * 0.1),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => 0.2 + Math.sin(i/12) * 0.07),
+      },
+      daily: {
+        wave_height_max: [0.4],
+        wave_direction_dominant: [180],
+      }
+    }
   });
 
   // Load saved beaches from localStorage on component mount
@@ -392,6 +646,8 @@ const App = () => {
   useEffect(() => {
     if (beaches.length > 0) {
       localStorage.setItem("beaches", JSON.stringify(beaches));
+    } else {
+      localStorage.removeItem("beaches");
     }
   }, [beaches]);
 
@@ -399,6 +655,8 @@ const App = () => {
   useEffect(() => {
     if (homeBeach) {
       localStorage.setItem("homeBeach", JSON.stringify(homeBeach));
+    } else {
+      localStorage.removeItem("homeBeach");
     }
   }, [homeBeach]);
 
@@ -482,22 +740,16 @@ const App = () => {
       
       if (beachNameLower.includes("kavouri")) {
         mockData = mockDataRef.current["Kavouri Beach"];
-      } else if (beachNameLower.includes("aster") || beachNameLower.includes("astar")) {
-        mockData = mockDataRef.current["Asteras Beach"];
-      } else if (beachNameLower.includes("zen")) {
-        mockData = mockDataRef.current["Zen Beach"];
-      } else if (beachNameLower.includes("kapsali")) {
-        mockData = mockDataRef.current["Kapsali Kythira"];
-      } else if (beachNameLower.includes("palaipoli")) {
-        mockData = mockDataRef.current["Palaipoli Kythira"];
-      } else if (beachNameLower.includes("vouliagmeni")) {
+      } else if (beachNameLower.includes("glyf")) {
+        mockData = mockDataRef.current["Glyfada Beach"];
+      } else if (beachNameLower.includes("aster") || beachNameLower.includes("astar") || beachNameLower.includes("astir")) {
+        mockData = mockDataRef.current["Astir Beach"];
+      } else if (beachNameLower.includes("kapsal")) {
+        mockData = mockDataRef.current["Kapsali Beach"];
+      } else if (beachNameLower.includes("palaio")) {
+        mockData = mockDataRef.current["Palaiopoli Beach"];
+      } else if (beachNameLower.includes("vouliag")) {
         mockData = mockDataRef.current["Vouliagmeni Beach"];
-      } else if (beachNameLower.includes("legrena")) {
-        mockData = mockDataRef.current["Legrena Beach"];
-      } else if (beachNameLower.includes("porto") || beachNameLower.includes("rafti")) {
-        mockData = mockDataRef.current["Porto Rafti"];
-      } else if (beachNameLower.includes("loutraki")) {
-        mockData = mockDataRef.current["Loutraki Beach"];
       } else {
         mockData = mockDataRef.current["default"];
       }
@@ -923,6 +1175,34 @@ const App = () => {
     );
   };
 
+  // Delete Confirmation Modal
+  const DeleteConfirmationModal = ({ beach, onConfirm, onCancel }) => {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <h3 className="text-lg font-medium mb-4">Confirm Deletion</h3>
+          <p className="text-gray-700 mb-4">
+            Are you sure you want to remove <span className="font-semibold">{beach.name}</span>?
+          </p>
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onConfirm(beach.id)}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Component to render geographic protection information
   const renderGeographicInfo = (beach, weatherData) => {
     if (!beach || !weatherData) return null;
@@ -1197,6 +1477,15 @@ const App = () => {
         />
       )}
       
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <DeleteConfirmationModal 
+          beach={beaches.find(b => b.id === deleteConfirm)}
+          onConfirm={confirmDeleteBeach}
+          onCancel={cancelDeleteBeach}
+        />
+      )}
+      
       {/* Header */}
       <header className="bg-blue-600 text-white p-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
@@ -1257,6 +1546,15 @@ const App = () => {
                         )}
                         {beach.name}
                       </h2>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteBeach(beach.id);
+                        }}
+                        className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-gray-100"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                     <p className="text-gray-500 text-sm mb-3 flex items-center">
                       <MapPin className="h-3 w-3 mr-1 text-gray-400 flex-shrink-0" />
@@ -1308,7 +1606,7 @@ const App = () => {
                       Paste a Google Maps link to a beach and we'll automatically extract the coordinates!
                       <br/>
                       <span className="text-xs text-gray-500 mt-1 block">
-                        Example: https://maps.app.goo.gl/RLXesyCsSvESpwhM9
+                        Example: https://maps.app.goo.gl/yEXLZW5kwBArCHvb7
                       </span>
                     </p>
                   </div>
@@ -1365,7 +1663,7 @@ const App = () => {
                           onChange={(e) =>
                             setNewBeach({ ...newBeach, latitude: e.target.value })
                           }
-                          placeholder="e.g., 37.8207"
+                          placeholder="e.g., 37.8235"
                           className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                       </div>
@@ -1383,7 +1681,7 @@ const App = () => {
                               longitude: e.target.value,
                             })
                           }
-                          placeholder="e.g., 23.7686"
+                          placeholder="e.g., 23.7761"
                           className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                       </div>
@@ -1596,6 +1894,7 @@ const App = () => {
             {weatherData && score !== null && !loading && (
               <div className="p-6">
                 {/* Main Score Overview */}
+{/* Main Score Overview */}
                 <div className="flex flex-col md:flex-row gap-6 mb-6">
                   {/* Score card - LEFT SIDE */}
                   <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center flex flex-col justify-center">
