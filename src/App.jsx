@@ -28,65 +28,56 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
     'Kavouri Beach': {
       latitude: 37.8235,
       longitude: 23.7761,
-      coastlineOrientation: 135, // SE facing
-      bayEnclosure: 0.3, // Somewhat open
-      protectedFromDirections: [315, 360, 45], // Protected from NW, N, NE
-      exposedToDirections: [135, 180, 225], // Exposed to SE, S, SW
+      coastlineOrientation: 135,
+      bayEnclosure: 0.3,
+      protectedFromDirections: [315, 360, 45],
+      exposedToDirections: [135, 180, 225],
       description: "Moderately protected bay, exposed to southern winds"
     },
     'Glyfada Beach': {
       latitude: 37.8650,
       longitude: 23.7470,
-      coastlineOrientation: 110, // ESE facing
-      bayEnclosure: 0.3, // Somewhat open
-      protectedFromDirections: [270, 315, 360], // Protected from W, NW, N
-      exposedToDirections: [90, 135, 180], // Exposed to E, SE, S
+      coastlineOrientation: 110,
+      bayEnclosure: 0.3,
+      protectedFromDirections: [270, 315, 360],
+      exposedToDirections: [90, 135, 180],
       description: "Exposed beach, limited protection"
-    },
-    'Vouliagmeni Beach': {
-      latitude: 37.8179,
-      longitude: 23.7808,
-      coastlineOrientation: 90, // E facing
-      bayEnclosure: 0.5, // Medium enclosure
-      protectedFromDirections: [225, 270, 315], // Protected from SW, W, NW
-      exposedToDirections: [90, 135], // Exposed to E, SE
-      description: "Protected from westerly winds, but exposed to easterly"
     },
     'Astir Beach': {
       latitude: 37.8095,
       longitude: 23.7850,
-      coastlineOrientation: 180, // S facing
-      bayEnclosure: 0.8, // Highly enclosed
-      protectedFromDirections: [0, 45, 90, 270, 315], // Protected from most directions
-      exposedToDirections: [180], // Only directly exposed to south
+      coastlineOrientation: 180,
+      bayEnclosure: 0.8,
+      protectedFromDirections: [0, 45, 90, 270, 315],
+      exposedToDirections: [180],
       description: "Well-protected beach in a sheltered bay"
     },
     'Kapsali Beach': {
       latitude: 36.1360,
       longitude: 22.9980,
-      coastlineOrientation: 180, // S facing
-      bayEnclosure: 0.7, // Well enclosed
-      protectedFromDirections: [270, 315, 0, 45, 90], // Protected from W, NW, N, NE, E
-      exposedToDirections: [180], // Only exposed to south
+      coastlineOrientation: 180,
+      bayEnclosure: 0.7,
+      protectedFromDirections: [270, 315, 0, 45, 90],
+      exposedToDirections: [180],
       description: "Well-protected bay, only exposed to southern winds"
     },
     'Palaiopoli Beach': {
       latitude: 36.2260,
       longitude: 23.0410,
-      coastlineOrientation: 90, // E facing
-      bayEnclosure: 0.6, // Moderately protected
-      protectedFromDirections: [180, 225, 270, 315], // Protected from S, SW, W, NW
-      exposedToDirections: [45, 90, 135], // Exposed to NE, E, SE
+      coastlineOrientation: 90,
+      bayEnclosure: 0.6,
+      protectedFromDirections: [180, 225, 270, 315],
+      exposedToDirections: [45, 90, 135],
       description: "Protected from westerly winds, exposed to easterly"
     },
-    'Varkiza Beach': {
-      latitude: 37.8133,
-      longitude: 23.8011,
-      coastlineOrientation: 170, // S facing slightly E
-      bayEnclosure: 0.4, // Moderately open
-      protectedFromDirections: [270, 315, 0, 45], // Protected from W, NW, N, NE
-      exposedToDirections: [135, 180, 225], // Exposed to SE, S, SW
-      description: "Moderate protection, exposed to southern seas"
+    'Vouliagmeni Beach': {
+      latitude: 37.8179,
+      longitude: 23.7808,
+      coastlineOrientation: 90,
+      bayEnclosure: 0.5,
+      protectedFromDirections: [225, 270, 315],
+      exposedToDirections: [90, 135],
+      description: "Protected from westerly winds, but exposed to easterly"
     }
   };
   
@@ -97,7 +88,7 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
   let exposedToDirections = [];
   
   // Get geographic data if this is a known beach
-  const beachName = beach.name;
+  const beachName = beach?.name || '';
   const knownBeach = Object.keys(geographicData).find(name => 
     beachName.toLowerCase().includes(name.toLowerCase()) || 
     name.toLowerCase().includes(beachName.toLowerCase())
@@ -109,9 +100,6 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
     bayEnclosure = data.bayEnclosure;
     protectedFromDirections = data.protectedFromDirections;
     exposedToDirections = data.exposedToDirections;
-  } else {
-    // For unknown beaches, make a guess based on coordinates
-    console.log("Unknown beach, using estimated protection values");
   }
 
   // Calculate wind protection
@@ -170,9 +158,14 @@ const getCardinalDirection = (degrees) => {
   return directions[(val % 16)];
 };
 
-// Generate Google Maps link
-const getGoogleMapsLink = (latitude, longitude) => 
-  `https://www.google.com/maps?q=${latitude},${longitude}`;
+// Generate Google Maps link - FIXED to use saved URLs
+const getBeachMapLink = (beach) => {
+  if (beach.googleMapsUrl) {
+    return beach.googleMapsUrl;
+  }
+  // Fallback to coordinates if no specific URL
+  return `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`;
+};
 
 // Parse Google Maps URL
 const parseGoogleMapsUrl = (url) => {
@@ -231,7 +224,7 @@ const App = () => {
     endTime: "13:00",
   });
   const [weatherData, setWeatherData] = useState(null);
-  const [view, setView] = useState("dashboard"); // 'dashboard', 'add', 'detail'
+  const [view, setView] = useState("dashboard");
   const [score, setScore] = useState(null);
   const [scoreBreakdown, setScoreBreakdown] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -240,6 +233,7 @@ const App = () => {
     name: "",
     latitude: "",
     longitude: "",
+    googleMapsUrl: ""
   });
   const [mapUrl, setMapUrl] = useState("");
   const [notification, setNotification] = useState(null);
@@ -268,50 +262,30 @@ const App = () => {
     },
   };
 
-  // Handle beach deletion
-  const handleDeleteBeach = (beachId) => {
-    setDeleteConfirm(beachId);
-  };
-  
-  const confirmDeleteBeach = (beachId) => {
-    const beachToDelete = beaches.find(b => b.id === beachId);
-    const newBeaches = beaches.filter(b => b.id !== beachId);
-    setBeaches(newBeaches);
-    
-    // If we're deleting the home beach, unset it
-    if (homeBeach && homeBeach.id === beachId) {
-      setHomeBeach(null);
-    }
-    
-    // If we're deleting the selected beach, go back to dashboard
-    if (selectedBeach && selectedBeach.id === beachId) {
-      setView("dashboard");
-    }
-    
-    toast.success(`Removed ${beachToDelete.name}`);
-    setDeleteConfirm(null);
-  };
-  
-  const cancelDeleteBeach = () => {
-    setDeleteConfirm(null);
-  };
-
-  // Use a ref to store geographic-aware mock data for Greek beaches
-  const mockDataRef = useRef({
-    // Beach mock data...
-  });
-
   // Load saved beaches from localStorage on component mount
   useEffect(() => {
-    const savedBeaches = localStorage.getItem("beaches");
-    if (savedBeaches) {
-      const parsedBeaches = JSON.parse(savedBeaches);
-      setBeaches(parsedBeaches);
-    }
+    try {
+      const savedBeaches = localStorage.getItem("beaches");
+      if (savedBeaches) {
+        const parsedBeaches = JSON.parse(savedBeaches);
+        // Filter out any invalid beach objects to prevent crashes
+        const validBeaches = parsedBeaches.filter(
+          beach => beach && beach.id && beach.name && beach.latitude && beach.longitude
+        );
+        setBeaches(validBeaches);
+      }
 
-    const savedHomeBeach = localStorage.getItem("homeBeach");
-    if (savedHomeBeach) {
-      setHomeBeach(JSON.parse(savedHomeBeach));
+      const savedHomeBeach = localStorage.getItem("homeBeach");
+      if (savedHomeBeach) {
+        const parsedHomeBeach = JSON.parse(savedHomeBeach);
+        if (parsedHomeBeach && parsedHomeBeach.id && parsedHomeBeach.name) {
+          setHomeBeach(parsedHomeBeach);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading saved data:", error);
+      localStorage.removeItem("beaches");
+      localStorage.removeItem("homeBeach");
     }
   }, []);
 
@@ -333,8 +307,65 @@ const App = () => {
     }
   }, [homeBeach]);
 
+  // Handle beach selection - FIXED
+  const handleBeachSelect = (beach) => {
+    if (!beach || !beach.latitude || !beach.longitude) {
+      toast.error("Invalid beach data. Please try adding this beach again.");
+      return;
+    }
+    
+    setSelectedBeach(beach);
+    setView("detail");
+    fetchWeatherData(beach);
+  };
+
+  // Handle beach deletion
+  const handleDeleteBeach = (beachId) => {
+    const beach = beaches.find(b => b.id === beachId);
+    if (!beach) {
+      toast.error("Beach not found");
+      return;
+    }
+    setDeleteConfirm(beachId);
+  };
+  
+  const confirmDeleteBeach = (beachId) => {
+    const beachToDelete = beaches.find(b => b.id === beachId);
+    if (!beachToDelete) {
+      toast.error("Beach not found");
+      setDeleteConfirm(null);
+      return;
+    }
+    
+    const newBeaches = beaches.filter(b => b.id !== beachId);
+    setBeaches(newBeaches);
+    
+    // If we're deleting the home beach, unset it
+    if (homeBeach && homeBeach.id === beachId) {
+      setHomeBeach(null);
+    }
+    
+    // If we're deleting the selected beach, go back to dashboard
+    if (selectedBeach && selectedBeach.id === beachId) {
+      setView("dashboard");
+      setSelectedBeach(null);
+    }
+    
+    toast.success(`Removed ${beachToDelete.name}`);
+    setDeleteConfirm(null);
+  };
+  
+  const cancelDeleteBeach = () => {
+    setDeleteConfirm(null);
+  };
+
   // Function to fetch weather data
   const fetchWeatherData = async (beach) => {
+    if (!beach || !beach.latitude || !beach.longitude) {
+      toast.error("Invalid beach data");
+      return;
+    }
+    
     setLoading(true);
     setError(null);
 
@@ -345,13 +376,10 @@ const App = () => {
       const selectedDate = new Date(timeRange.date);
       const formattedDate = selectedDate.toISOString().split("T")[0];
 
-      // Construct the Open-Meteo API URLs - these are public APIs with CORS enabled
+      // Construct the Open-Meteo API URLs
       const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${latitude}&longitude=${longitude}&hourly=wave_height,wave_direction,wave_period,wind_wave_height,wind_wave_direction,wind_wave_period,swell_wave_height,swell_wave_direction,swell_wave_period&daily=wave_height_max&timezone=auto&start_date=${formattedDate}&end_date=${formattedDate}`;
 
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m&daily=precipitation_sum&timezone=auto&start_date=${formattedDate}&end_date=${formattedDate}`;
-
-      // Attempt to fetch real data from both APIs
-      console.log("Fetching real weather data from Open-Meteo...");
 
       // Fetch both marine and weather data
       const [marineResponse, weatherResponse] = await Promise.all([
@@ -408,43 +436,47 @@ const App = () => {
       );
 
       // Fall back to demo data as a last resort
-      let mockData;
-      const beachNameLower = beach.name.toLowerCase();
+      let mockData = mockDataRef.current["default"]; // Default fallback
       
-      if (beachNameLower.includes("kavouri")) {
-        mockData = mockDataRef.current["Kavouri Beach"];
-      } else if (beachNameLower.includes("glyf")) {
-        mockData = mockDataRef.current["Glyfada Beach"];
-      } else if (beachNameLower.includes("aster") || beachNameLower.includes("astar") || beachNameLower.includes("astir")) {
-        mockData = mockDataRef.current["Astir Beach"];
-      } else if (beachNameLower.includes("kapsal")) {
-        mockData = mockDataRef.current["Kapsali Beach"];
-      } else if (beachNameLower.includes("palaio")) {
-        mockData = mockDataRef.current["Palaiopoli Beach"];
-      } else if (beachNameLower.includes("vouliag")) {
-        mockData = mockDataRef.current["Vouliagmeni Beach"];
-      } else {
-        mockData = mockDataRef.current["default"];
+      try {
+        const beachNameLower = beach.name.toLowerCase();
+        
+        if (beachNameLower.includes("kavouri")) {
+          mockData = mockDataRef.current["Kavouri Beach"];
+        } else if (beachNameLower.includes("glyf")) {
+          mockData = mockDataRef.current["Glyfada Beach"];
+        } else if (beachNameLower.includes("aster") || beachNameLower.includes("astar") || beachNameLower.includes("astir")) {
+          mockData = mockDataRef.current["Astir Beach"];
+        } else if (beachNameLower.includes("kapsal")) {
+          mockData = mockDataRef.current["Kapsali Beach"];
+        } else if (beachNameLower.includes("palaio")) {
+          mockData = mockDataRef.current["Palaiopoli Beach"];
+        } else if (beachNameLower.includes("vouliag")) {
+          mockData = mockDataRef.current["Vouliagmeni Beach"];
+        }
+        
+        // Update the date in mock data
+        mockData.hourly.time = Array.from(
+          { length: 24 },
+          (_, i) => `${timeRange.date}T${String(i).padStart(2, "0")}:00`
+        );
+
+        mockData.isRealData = false;
+        setWeatherData(mockData);
+
+        // Calculate score using the mock data
+        const relevantHours = filterHoursByTimeRange(mockData.hourly, timeRange);
+        const { calculatedScore, breakdown } = calculatePaddleScore(
+          relevantHours,
+          mockData.daily,
+          beach
+        );
+        setScore(calculatedScore);
+        setScoreBreakdown(breakdown);
+      } catch (mockError) {
+        console.error("Error with mock data:", mockError);
+        toast.error("Error loading weather data. Please try again.");
       }
-
-      // Update the date in mock data
-      mockData.hourly.time = Array.from(
-        { length: 24 },
-        (_, i) => `${timeRange.date}T${String(i).padStart(2, "0")}:00`
-      );
-
-      mockData.isRealData = false;
-      setWeatherData(mockData);
-
-      // Calculate score using the mock data
-      const relevantHours = filterHoursByTimeRange(mockData.hourly, timeRange);
-      const { calculatedScore, breakdown } = calculatePaddleScore(
-        relevantHours,
-        mockData.daily,
-        beach
-      );
-      setScore(calculatedScore);
-      setScoreBreakdown(breakdown);
     } finally {
       setLoading(false);
     }
@@ -474,7 +506,7 @@ const App = () => {
       };
 
       setBeaches([...beaches, beachToAdd]);
-      setNewBeach({ name: "", latitude: "", longitude: "" });
+      setNewBeach({ name: "", latitude: "", longitude: "", googleMapsUrl: "" });
       setMapUrl("");
       toast.success(`Added ${beachToAdd.name} to your beaches!`);
       setView("dashboard");
@@ -510,24 +542,57 @@ const App = () => {
     setView("dashboard");
   };
 
-  // Handle extracting coordinates from Google Maps URL
-  const handleExtractCoordinates = () => {
-    const result = parseGoogleMapsUrl(mapUrl);
-    if (result) {
-      setNewBeach({
-        ...newBeach,
-        name: result.name || newBeach.name,
-        latitude: result.latitude.toString(),
-        longitude: result.longitude.toString()
-      });
-      setMapUrl(result.googleMapsUrl || mapUrl);
-      toast.success("Coordinates extracted successfully!");
-    } else {
-      toast.error("Could not extract coordinates from URL. Please check format.");
+  // Delete Confirmation Modal with error handling
+  const DeleteConfirmationModal = ({ beach, onConfirm, onCancel }) => {
+    if (!beach || !beach.id || !beach.name) {
+      setTimeout(onCancel, 0);
+      return null;
     }
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <h3 className="text-lg font-medium mb-4">Confirm Deletion</h3>
+          <p className="text-gray-700 mb-4">
+            Are you sure you want to remove <span className="font-semibold">{beach.name}</span>?
+          </p>
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onConfirm(beach.id)}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
-  // Inside your render method, update the View on Maps link to:
+  // Filter hourly data by time range
+  const filterHoursByTimeRange = (hourlyData, range) => {
+    const startHour = parseInt(range.startTime.split(":")[0]);
+    const endHour = parseInt(range.endTime.split(":")[0]);
+
+    return {
+      temperature_2m: hourlyData.temperature_2m.slice(startHour, endHour + 1),
+      precipitation: hourlyData.precipitation.slice(startHour, endHour + 1),
+      cloudcover: hourlyData.cloudcover.slice(startHour, endHour + 1),
+      windspeed_10m: hourlyData.windspeed_10m.slice(startHour, endHour + 1),
+      winddirection_10m: hourlyData.winddirection_10m.slice(startHour, endHour + 1),
+      swell_wave_height: hourlyData.swell_wave_height ? 
+        hourlyData.swell_wave_height.slice(startHour, endHour + 1) : undefined,
+      wave_height: hourlyData.wave_height ? 
+        hourlyData.wave_height.slice(startHour, endHour + 1) : undefined
+    };
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-blue-50">
       {/* Toast notification */}
@@ -582,7 +647,6 @@ const App = () => {
 
       {/* Main Content */}
       <main className="flex-grow container mx-auto p-4">
-        {/* Dashboard View */}
         {view === "dashboard" && (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {beaches.length === 0 ? (
@@ -629,7 +693,7 @@ const App = () => {
                     </p>
                     <div className="flex justify-between items-center">
                       <a 
-                        href={beach.googleMapsUrl || getGoogleMapsLink(beach.latitude, beach.longitude)} 
+                        href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-blue-600 hover:underline flex items-center"
@@ -652,7 +716,6 @@ const App = () => {
           </div>
         )}
 
-        {/* Add Beach View */}
         {view === "add" && (
           <div className="bg-white rounded-lg shadow-lg">
             <div className="p-4 border-b">
@@ -696,7 +759,6 @@ const App = () => {
                 </div>
               </div>
 
-              {/* Beach detail form */}
               <div className="mb-6">
                 <h3 className="text-lg font-medium mb-3">
                   <span className="flex items-center">
@@ -778,7 +840,6 @@ const App = () => {
                 </div>
               </div>
 
-              {/* Popular beaches section */}
               <div className="border-t pt-6">
                 <h3 className="text-lg font-medium mb-3">
                   Popular Greek Beaches
@@ -795,7 +856,7 @@ const App = () => {
                         {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
                       </p>
                       <a 
-                        href={location.googleMapsUrl || getGoogleMapsLink(location.latitude, location.longitude)} 
+                        href={location.googleMapsUrl || `https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-blue-600 hover:underline flex items-center"
@@ -812,7 +873,6 @@ const App = () => {
           </div>
         )}
 
-        {/* Detail View */}
         {view === "detail" && selectedBeach && (
           <div className="bg-white rounded-lg shadow-lg overflow-hidden">
             <div className="p-4 border-b flex justify-between items-center">
@@ -829,7 +889,7 @@ const App = () => {
                     {selectedBeach.longitude.toFixed(4)}
                   </p>
                   <a 
-                    href={selectedBeach.googleMapsUrl || getGoogleMapsLink(selectedBeach.latitude, selectedBeach.longitude)} 
+                    href={selectedBeach.googleMapsUrl || `https://www.google.com/maps?q=${selectedBeach.latitude},${selectedBeach.longitude}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-blue-600 hover:underline flex items-center"
@@ -857,7 +917,7 @@ const App = () => {
               </div>
             </div>
 
-            {/* Time Range Selector - Made to match Image 1 */}
+            {/* Time Range Selector */}
             <div className="p-4 border-b bg-gray-50">
               <h3 className="text-lg font-medium mb-4">Choose Date & Time Window</h3>
               
@@ -871,7 +931,7 @@ const App = () => {
                       type="date" 
                       className="w-full p-2 border rounded"
                       value={timeRange.date}
-                      onChange={(e) => handleTimeRangeChange('date', e.target.value)}
+                      onChange={(e) => setTimeRange({...timeRange, date: e.target.value})}
                     />
                   </div>
                 </div>
@@ -884,7 +944,7 @@ const App = () => {
                   </label>
                   <select
                     value={timeRange.startTime}
-                    onChange={(e) => handleTimeRangeChange('startTime', e.target.value)}
+                    onChange={(e) => setTimeRange({...timeRange, startTime: e.target.value})}
                     className="w-full p-2 border rounded appearance-none bg-white"
                   >
                     {Array.from({ length: 24 }, (_, i) => (
@@ -900,7 +960,7 @@ const App = () => {
                   </label>
                   <select
                     value={timeRange.endTime}
-                    onChange={(e) => handleTimeRangeChange('endTime', e.target.value)}
+                    onChange={(e) => setTimeRange({...timeRange, endTime: e.target.value})}
                     className="w-full p-2 border rounded appearance-none bg-white"
                   >
                     {Array.from({ length: 24 }, (_, i) => (
@@ -921,8 +981,30 @@ const App = () => {
               </button>
             </div>
 
-            {/* Weather display and other components... */}
-            {/* Rest of the UI will be similar to the previous version */}
+            {/* Loading state */}
+            {loading && (
+              <div className="p-8 text-center">
+                <div className="inline-block animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
+                <p className="text-gray-600">Loading weather data...</p>
+              </div>
+            )}
+
+            {/* Error state */}
+            {error && !loading && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-md text-blue-800 mx-4 my-2">
+                <p className="flex items-center font-medium">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-5 h-5 mr-2 text-blue-600"
+                  >
+                    <path d="M11.25 4.533A9.707 9.707 0 006 3a9.735 9.735 0 00-3.25.555.75.75 0 00-.5.707v14.25a.75.75 0 001 .707A8.237 8.237 0 016 18.75c1.995 0 3.823.707 5.25 1.886V4.533zM12.75 20.636A8.214 8.214 0 0118 18.75c.966 0 1.89.166 2.75.47a.75.75 0 001-.708V4.262a.75.75 0 00-.5-.707A9.735 9.735 0 0018 3a9.707 9.707 0 00-5.25 1.533v16.103z" />
+                  </svg>
+                  {error}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </main>
