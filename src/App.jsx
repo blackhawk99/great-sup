@@ -13,9 +13,6 @@ import {
   Map,
   ChevronLeft,
   Calendar,
-  ArrowLeft,
-  ArrowRight,
-  ExternalLink,
   Info,
   Trash2,
   RefreshCw,
@@ -32,7 +29,6 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
       bayEnclosure: 0.3,
       protectedFromDirections: [315, 360, 45],
       exposedToDirections: [135, 180, 225],
-      description: "Moderately protected bay, exposed to southern winds"
     },
     'Glyfada Beach': {
       latitude: 37.8650,
@@ -41,7 +37,6 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
       bayEnclosure: 0.3,
       protectedFromDirections: [270, 315, 360],
       exposedToDirections: [90, 135, 180],
-      description: "Exposed beach, limited protection"
     },
     'Astir Beach': {
       latitude: 37.8095,
@@ -50,7 +45,6 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
       bayEnclosure: 0.8,
       protectedFromDirections: [0, 45, 90, 270, 315],
       exposedToDirections: [180],
-      description: "Well-protected beach in a sheltered bay"
     },
     'Kapsali Beach': {
       latitude: 36.1360,
@@ -59,7 +53,6 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
       bayEnclosure: 0.7,
       protectedFromDirections: [270, 315, 0, 45, 90],
       exposedToDirections: [180],
-      description: "Well-protected bay, only exposed to southern winds"
     },
     'Palaiopoli Beach': {
       latitude: 36.2260,
@@ -68,17 +61,7 @@ const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
       bayEnclosure: 0.6,
       protectedFromDirections: [180, 225, 270, 315],
       exposedToDirections: [45, 90, 135],
-      description: "Protected from westerly winds, exposed to easterly"
     },
-    'Vouliagmeni Beach': {
-      latitude: 37.8179,
-      longitude: 23.7808,
-      coastlineOrientation: 90,
-      bayEnclosure: 0.5,
-      protectedFromDirections: [225, 270, 315],
-      exposedToDirections: [90, 135],
-      description: "Protected from westerly winds, but exposed to easterly"
-    }
   };
   
   // Default values for unknown beaches
@@ -158,15 +141,6 @@ const getCardinalDirection = (degrees) => {
   return directions[(val % 16)];
 };
 
-// Generate Google Maps link - FIXED to use saved URLs
-const getBeachMapLink = (beach) => {
-  if (beach.googleMapsUrl) {
-    return beach.googleMapsUrl;
-  }
-  // Fallback to coordinates if no specific URL
-  return `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`;
-};
-
 // Parse Google Maps URL
 const parseGoogleMapsUrl = (url) => {
   if (!url) return null;
@@ -190,7 +164,7 @@ const parseGoogleMapsUrl = (url) => {
     }
   }
   
-  // Handle @lat,lng format (what you see in the URL bar)
+  // Handle @lat,lng format
   let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (match) {
     return {
@@ -200,7 +174,7 @@ const parseGoogleMapsUrl = (url) => {
     };
   }
   
-  // Handle ?q=lat,lng format (shared links)
+  // Handle ?q=lat,lng format
   match = url.match(/\?q=(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (match) {
     return {
@@ -211,6 +185,26 @@ const parseGoogleMapsUrl = (url) => {
   }
   
   return null;
+};
+
+// Filter hourly data by time range
+const filterHoursByTimeRange = (hourlyData, range) => {
+  if (!hourlyData) return null;
+  
+  const startHour = parseInt(range.startTime.split(":")[0]);
+  const endHour = parseInt(range.endTime.split(":")[0]);
+
+  return {
+    temperature_2m: hourlyData.temperature_2m.slice(startHour, endHour + 1),
+    precipitation: hourlyData.precipitation.slice(startHour, endHour + 1),
+    cloudcover: hourlyData.cloudcover.slice(startHour, endHour + 1),
+    windspeed_10m: hourlyData.windspeed_10m.slice(startHour, endHour + 1),
+    winddirection_10m: hourlyData.winddirection_10m.slice(startHour, endHour + 1),
+    swell_wave_height: hourlyData.swell_wave_height ? 
+      hourlyData.swell_wave_height.slice(startHour, endHour + 1) : undefined,
+    wave_height: hourlyData.wave_height ? 
+      hourlyData.wave_height.slice(startHour, endHour + 1) : undefined
+  };
 };
 
 const App = () => {
@@ -233,7 +227,6 @@ const App = () => {
     name: "",
     latitude: "",
     longitude: "",
-    googleMapsUrl: ""
   });
   const [mapUrl, setMapUrl] = useState("");
   const [notification, setNotification] = useState(null);
@@ -246,8 +239,6 @@ const App = () => {
     { name: "Astir Beach", latitude: 37.8095, longitude: 23.7850, googleMapsUrl: "https://maps.app.goo.gl/6uUbtp31MQ63gGBSA" },
     { name: "Kapsali Beach", latitude: 36.1360, longitude: 22.9980, googleMapsUrl: "https://maps.app.goo.gl/xcs6EqYy8LbzYq2y6" },
     { name: "Palaiopoli Beach", latitude: 36.2260, longitude: 23.0410, googleMapsUrl: "https://maps.app.goo.gl/TPFetRbFcyAXdgNDA" },
-    { name: "Vouliagmeni Beach", latitude: 37.8179, longitude: 23.7808 },
-    { name: "Varkiza Beach", latitude: 37.8133, longitude: 23.8011 },
   ];
 
   // Show toast notification
@@ -262,25 +253,126 @@ const App = () => {
     },
   };
 
-  // Load saved beaches from localStorage on component mount
+  // Mock data for weather simulation
+  const mockDataRef = useRef({
+    "Kavouri Beach": {
+      hourly: {
+        time: Array.from({ length: 24 }, (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`),
+        temperature_2m: Array.from({ length: 24 }, (_, i) => 22 + Math.sin(i / 3) * 5),
+        precipitation: Array.from({ length: 24 }, (_, i) => i < 10 ? 0 : i > 16 ? 0.2 : 0),
+        cloudcover: Array.from({ length: 24 }, (_, i) => i < 11 ? 10 : 30 + (i - 11) * 5),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+        }),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          const southFactor = (direction >= 135 && direction <= 225) ? 1.5 : 0.8;
+          return (i < 9 ? 4 : 6 + (i-9) * 0.8) * southFactor;
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => 0.2),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => 0.1),
+      },
+      daily: {
+        wave_height_max: [0.3],
+        wave_direction_dominant: [170],
+      }
+    },
+    "Glyfada Beach": {
+      hourly: {
+        time: Array.from({ length: 24 }, (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`),
+        temperature_2m: Array.from({ length: 24 }, (_, i) => 22 + Math.sin(i / 3) * 5),
+        precipitation: Array.from({ length: 24 }, (_, i) => i < 10 ? 0 : i > 16 ? 0.3 : 0),
+        cloudcover: Array.from({ length: 24 }, (_, i) => i < 11 ? 15 : 35 + (i - 11) * 5),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => 180),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => i < 9 ? 6 : 9),
+        wave_height: Array.from({ length: 24 }, (_, i) => 0.3),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => 0.2),
+      },
+      daily: {
+        wave_height_max: [0.4],
+        wave_direction_dominant: [160],
+      }
+    },
+    "Astir Beach": {
+      hourly: {
+        time: Array.from({ length: 24 }, (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`),
+        temperature_2m: Array.from({ length: 24 }, (_, i) => 22 + Math.sin(i / 3) * 5),
+        precipitation: Array.from({ length: 24 }, (_, i) => i < 10 ? 0 : i > 16 ? 0.2 : 0),
+        cloudcover: Array.from({ length: 24 }, (_, i) => i < 11 ? 10 : 30 + (i - 11) * 5),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => 180),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => i < 10 ? 3 : 5),
+        wave_height: Array.from({ length: 24 }, (_, i) => 0.1),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => 0.05),
+      },
+      daily: {
+        wave_height_max: [0.15],
+        wave_direction_dominant: [170],
+      }
+    },
+    "Kapsali Beach": {
+      hourly: {
+        time: Array.from({ length: 24 }, (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`),
+        temperature_2m: Array.from({ length: 24 }, (_, i) => 21 + Math.sin(i / 3) * 4),
+        precipitation: Array.from({ length: 24 }, () => 0.1),
+        cloudcover: Array.from({ length: 24 }, (_, i) => 20 + Math.sin(i / 4) * 20),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => 180),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => 4),
+        wave_height: Array.from({ length: 24 }, (_, i) => 0.15),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => 0.1),
+      },
+      daily: {
+        wave_height_max: [0.2],
+        wave_direction_dominant: [180],
+      }
+    },
+    "Palaiopoli Beach": {
+      hourly: {
+        time: Array.from({ length: 24 }, (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`),
+        temperature_2m: Array.from({ length: 24 }, (_, i) => 21 + Math.sin(i / 3) * 4),
+        precipitation: Array.from({ length: 24 }, () => 0.1),
+        cloudcover: Array.from({ length: 24 }, (_, i) => 20 + Math.sin(i / 4) * 20),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => 90),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => 7),
+        wave_height: Array.from({ length: 24 }, (_, i) => 0.25),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => 0.15),
+      },
+      daily: {
+        wave_height_max: [0.3],
+        wave_direction_dominant: [90],
+      }
+    },
+    "default": {
+      hourly: {
+        time: Array.from({ length: 24 }, (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`),
+        temperature_2m: Array.from({ length: 24 }, (_, i) => 22 + Math.sin(i / 3) * 4),
+        precipitation: Array.from({ length: 24 }, () => 0.1),
+        cloudcover: Array.from({ length: 24 }, (_, i) => 30 + Math.sin(i / 6) * 20),
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => 8 + Math.sin(i / 4) * 4),
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => 180),
+        wave_height: Array.from({ length: 24 }, (_, i) => 0.3),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => 0.2),
+      },
+      daily: {
+        wave_height_max: [0.4],
+        wave_direction_dominant: [180],
+      }
+    }
+  });
+
+  // Load saved beaches from localStorage on mount
   useEffect(() => {
     try {
       const savedBeaches = localStorage.getItem("beaches");
       if (savedBeaches) {
         const parsedBeaches = JSON.parse(savedBeaches);
-        // Filter out any invalid beach objects to prevent crashes
-        const validBeaches = parsedBeaches.filter(
-          beach => beach && beach.id && beach.name && beach.latitude && beach.longitude
-        );
-        setBeaches(validBeaches);
+        setBeaches(parsedBeaches);
       }
 
       const savedHomeBeach = localStorage.getItem("homeBeach");
       if (savedHomeBeach) {
-        const parsedHomeBeach = JSON.parse(savedHomeBeach);
-        if (parsedHomeBeach && parsedHomeBeach.id && parsedHomeBeach.name) {
-          setHomeBeach(parsedHomeBeach);
-        }
+        setHomeBeach(JSON.parse(savedHomeBeach));
       }
     } catch (error) {
       console.error("Error loading saved data:", error);
@@ -307,16 +399,17 @@ const App = () => {
     }
   }, [homeBeach]);
 
-  // Handle beach selection - FIXED
+  // Handle beach selection - fixed
   const handleBeachSelect = (beach) => {
-    if (!beach || !beach.latitude || !beach.longitude) {
-      toast.error("Invalid beach data. Please try adding this beach again.");
-      return;
-    }
-    
     setSelectedBeach(beach);
     setView("detail");
     fetchWeatherData(beach);
+  };
+
+  // Handle setting home beach
+  const handleSetHomeBeach = (beach) => {
+    setHomeBeach(beach);
+    toast.success(`${beach.name} set as home beach!`);
   };
 
   // Handle beach deletion
@@ -359,136 +452,41 @@ const App = () => {
     setDeleteConfirm(null);
   };
 
-  // Function to fetch weather data
-  const fetchWeatherData = async (beach) => {
-    if (!beach || !beach.latitude || !beach.longitude) {
-      toast.error("Invalid beach data");
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { longitude, latitude } = beach;
-
-      // Parse the selected date for the API request
-      const selectedDate = new Date(timeRange.date);
-      const formattedDate = selectedDate.toISOString().split("T")[0];
-
-      // Construct the Open-Meteo API URLs
-      const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${latitude}&longitude=${longitude}&hourly=wave_height,wave_direction,wave_period,wind_wave_height,wind_wave_direction,wind_wave_period,swell_wave_height,swell_wave_direction,swell_wave_period&daily=wave_height_max&timezone=auto&start_date=${formattedDate}&end_date=${formattedDate}`;
-
-      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m&daily=precipitation_sum&timezone=auto&start_date=${formattedDate}&end_date=${formattedDate}`;
-
-      // Fetch both marine and weather data
-      const [marineResponse, weatherResponse] = await Promise.all([
-        fetch(marineUrl),
-        fetch(weatherUrl),
-      ]);
-
-      if (!marineResponse.ok || !weatherResponse.ok) {
-        throw new Error(
-          `Failed to fetch weather data: Marine API status: ${marineResponse.status}, Weather API status: ${weatherResponse.status}`
-        );
-      }
-
-      const marineData = await marineResponse.json();
-      const weatherData = await weatherResponse.json();
-
-      // Combine the data into one object
-      const combinedData = {
-        hourly: {
-          time: weatherData.hourly.time,
-          temperature_2m: weatherData.hourly.temperature_2m,
-          precipitation: weatherData.hourly.precipitation,
-          cloudcover: weatherData.hourly.cloudcover,
-          windspeed_10m: weatherData.hourly.windspeed_10m,
-          winddirection_10m: weatherData.hourly.winddirection_10m,
-          wave_height: marineData.hourly.wave_height,
-          swell_wave_height: marineData.hourly.swell_wave_height,
-        },
-        daily: {
-          wave_height_max: marineData.daily.wave_height_max,
-          wave_direction_dominant: [marineData.hourly.wave_direction[12]],
-        },
-        isRealData: true,
-      };
-
-      setWeatherData(combinedData);
-
-      // Calculate score using the real data
-      const relevantHours = filterHoursByTimeRange(
-        combinedData.hourly,
-        timeRange
-      );
-      const { calculatedScore, breakdown } = calculatePaddleScore(
-        relevantHours,
-        combinedData.daily,
-        beach
-      );
-      setScore(calculatedScore);
-      setScoreBreakdown(breakdown);
-    } catch (error) {
-      console.error("Error fetching real weather data:", error);
-      setError(
-        "Using simulated data with geographic protection analysis for this location."
-      );
-
-      // Fall back to demo data as a last resort
-      let mockData = mockDataRef.current["default"]; // Default fallback
-      
-      try {
-        const beachNameLower = beach.name.toLowerCase();
-        
-        if (beachNameLower.includes("kavouri")) {
-          mockData = mockDataRef.current["Kavouri Beach"];
-        } else if (beachNameLower.includes("glyf")) {
-          mockData = mockDataRef.current["Glyfada Beach"];
-        } else if (beachNameLower.includes("aster") || beachNameLower.includes("astar") || beachNameLower.includes("astir")) {
-          mockData = mockDataRef.current["Astir Beach"];
-        } else if (beachNameLower.includes("kapsal")) {
-          mockData = mockDataRef.current["Kapsali Beach"];
-        } else if (beachNameLower.includes("palaio")) {
-          mockData = mockDataRef.current["Palaiopoli Beach"];
-        } else if (beachNameLower.includes("vouliag")) {
-          mockData = mockDataRef.current["Vouliagmeni Beach"];
-        }
-        
-        // Update the date in mock data
-        mockData.hourly.time = Array.from(
-          { length: 24 },
-          (_, i) => `${timeRange.date}T${String(i).padStart(2, "0")}:00`
-        );
-
-        mockData.isRealData = false;
-        setWeatherData(mockData);
-
-        // Calculate score using the mock data
-        const relevantHours = filterHoursByTimeRange(mockData.hourly, timeRange);
-        const { calculatedScore, breakdown } = calculatePaddleScore(
-          relevantHours,
-          mockData.daily,
-          beach
-        );
-        setScore(calculatedScore);
-        setScoreBreakdown(breakdown);
-      } catch (mockError) {
-        console.error("Error with mock data:", mockError);
-        toast.error("Error loading weather data. Please try again.");
-      }
-    } finally {
-      setLoading(false);
+  // FIXED: Extract coordinates from Google Maps URL
+  const handleExtractCoordinates = () => {
+    const result = parseGoogleMapsUrl(mapUrl);
+    if (result) {
+      setNewBeach({
+        name: result.name || '',
+        latitude: result.latitude.toString(),
+        longitude: result.longitude.toString(),
+      });
+      toast.success("Coordinates extracted successfully!");
+    } else {
+      toast.error("Could not extract coordinates from URL. Please check format.");
     }
   };
 
-  // Handle adding a new beach with duplicate check
+  // FIXED: Add new beach
   const handleAddBeach = () => {
-    if (newBeach.name && newBeach.latitude && newBeach.longitude) {
+    if (!newBeach.name || !newBeach.latitude || !newBeach.longitude) {
+      toast.error("Please fill in all beach details");
+      return;
+    }
+    
+    try {
+      const lat = parseFloat(newBeach.latitude);
+      const lng = parseFloat(newBeach.longitude);
+      
+      if (isNaN(lat) || isNaN(lng)) {
+        toast.error("Invalid coordinates");
+        return;
+      }
+      
       // Check for duplicates
       const isDuplicate = beaches.some(beach => 
-        (Math.abs(beach.latitude - parseFloat(newBeach.latitude)) < 0.01 && 
-         Math.abs(beach.longitude - parseFloat(newBeach.longitude)) < 0.01) ||
+        (Math.abs(beach.latitude - lat) < 0.01 && 
+         Math.abs(beach.longitude - lng) < 0.01) ||
         beach.name.toLowerCase() === newBeach.name.toLowerCase()
       );
       
@@ -500,51 +498,233 @@ const App = () => {
       const beachToAdd = {
         id: `beach-${Date.now()}`,
         name: newBeach.name,
-        latitude: parseFloat(newBeach.latitude),
-        longitude: parseFloat(newBeach.longitude),
+        latitude: lat,
+        longitude: lng,
         googleMapsUrl: mapUrl || null
       };
 
       setBeaches([...beaches, beachToAdd]);
-      setNewBeach({ name: "", latitude: "", longitude: "", googleMapsUrl: "" });
+      setNewBeach({ name: "", latitude: "", longitude: "" });
       setMapUrl("");
       toast.success(`Added ${beachToAdd.name} to your beaches!`);
       setView("dashboard");
-    } else {
-      toast.error("Please fill in all beach details");
+    } catch (error) {
+      console.error("Error adding beach:", error);
+      toast.error("Error adding beach. Please try again.");
     }
   };
 
-  // Handle adding a suggested location with duplicate check
+  // FIXED: Add suggested location
   const handleAddSuggested = (location) => {
-    // Check for duplicates
-    const isDuplicate = beaches.some(beach => 
-      (Math.abs(beach.latitude - location.latitude) < 0.01 && 
-       Math.abs(beach.longitude - location.longitude) < 0.01) ||
-      beach.name.toLowerCase() === location.name.toLowerCase()
-    );
-    
-    if (isDuplicate) {
-      toast.error("This beach already exists in your list!");
+    if (!location || !location.name || !location.latitude || !location.longitude) {
+      toast.error("Invalid location data");
       return;
     }
     
-    const beachToAdd = {
-      id: `beach-${Date.now()}`,
-      name: location.name,
-      latitude: location.latitude,
-      longitude: location.longitude,
-      googleMapsUrl: location.googleMapsUrl
-    };
+    try {
+      // Check for duplicates
+      const isDuplicate = beaches.some(beach => 
+        (Math.abs(beach.latitude - location.latitude) < 0.01 && 
+         Math.abs(beach.longitude - location.longitude) < 0.01) ||
+        beach.name.toLowerCase() === location.name.toLowerCase()
+      );
+      
+      if (isDuplicate) {
+        toast.error("This beach already exists in your list!");
+        return;
+      }
+      
+      const beachToAdd = {
+        id: `beach-${Date.now()}`,
+        name: location.name,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        googleMapsUrl: location.googleMapsUrl
+      };
 
-    setBeaches([...beaches, beachToAdd]);
-    toast.success(`Added ${location.name} to your beaches!`);
-    setView("dashboard");
+      setBeaches([...beaches, beachToAdd]);
+      toast.success(`Added ${location.name} to your beaches!`);
+      setView("dashboard");
+    } catch (error) {
+      console.error("Error adding suggested beach:", error);
+      toast.error("Error adding beach. Please try again.");
+    }
   };
 
-  // Delete Confirmation Modal with error handling
+  // Function to fetch weather data
+  const fetchWeatherData = async (beach) => {
+    if (!beach || !beach.latitude || !beach.longitude) {
+      toast.error("Invalid beach data");
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    setWeatherData(null);
+
+    try {
+      const { longitude, latitude } = beach;
+      const selectedDate = new Date(timeRange.date);
+      const formattedDate = selectedDate.toISOString().split("T")[0];
+      
+      // For demo purposes, use mock data
+      const beachNameLower = beach.name.toLowerCase();
+      let mockData = mockDataRef.current["default"];
+      
+      if (beachNameLower.includes("kavouri")) {
+        mockData = mockDataRef.current["Kavouri Beach"];
+      } else if (beachNameLower.includes("glyf")) {
+        mockData = mockDataRef.current["Glyfada Beach"];
+      } else if (beachNameLower.includes("astir") || beachNameLower.includes("aster")) {
+        mockData = mockDataRef.current["Astir Beach"];
+      } else if (beachNameLower.includes("kapsal")) {
+        mockData = mockDataRef.current["Kapsali Beach"];
+      } else if (beachNameLower.includes("palaio")) {
+        mockData = mockDataRef.current["Palaiopoli Beach"];
+      }
+      
+      // Update the date in mock data
+      mockData.hourly.time = Array.from(
+        { length: 24 },
+        (_, i) => `${timeRange.date}T${String(i).padStart(2, "0")}:00`
+      );
+
+      mockData.isRealData = false;
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      setWeatherData(mockData);
+      
+      // Calculate score using the mock data
+      const relevantHours = filterHoursByTimeRange(mockData.hourly, timeRange);
+      const { calculatedScore, breakdown } = calculatePaddleScore(
+        relevantHours,
+        mockData.daily,
+        beach
+      );
+      setScore(calculatedScore);
+      setScoreBreakdown(breakdown);
+      
+    } catch (error) {
+      console.error("Error with weather data:", error);
+      setError("Unable to load weather data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calculate paddle score function
+  const calculatePaddleScore = (hourlyData, dailyData, beach) => {
+    if (!hourlyData || !dailyData) {
+      return { calculatedScore: 50, breakdown: null };
+    }
+    
+    // Calculate average values for the time range
+    const avgTemp = hourlyData.temperature_2m.reduce((sum, val) => sum + val, 0) / hourlyData.temperature_2m.length;
+    const avgWind = hourlyData.windspeed_10m.reduce((sum, val) => sum + val, 0) / hourlyData.windspeed_10m.length;
+    const avgCloud = hourlyData.cloudcover.reduce((sum, val) => sum + val, 0) / hourlyData.cloudcover.length;
+    const maxPrecip = Math.max(...hourlyData.precipitation);
+    const avgWindDirection = hourlyData.winddirection_10m.reduce((sum, val) => sum + val, 0) / hourlyData.winddirection_10m.length;
+    const waveDirection = dailyData.wave_direction_dominant ? dailyData.wave_direction_dominant[0] : avgWindDirection;
+    const waveHeight = dailyData.wave_height_max[0];
+    
+    // Get swell height
+    let swellHeight = 0;
+    if (hourlyData.swell_wave_height) {
+      swellHeight = hourlyData.swell_wave_height.reduce((sum, val) => sum + val, 0) / hourlyData.swell_wave_height.length;
+    } else {
+      swellHeight = waveHeight * 0.7;
+    }
+
+    // Calculate geographic protection
+    const geoProtection = calculateGeographicProtection(beach, avgWindDirection, waveDirection);
+
+    // Apply protection factors
+    const protectedWindSpeed = avgWind * (1 - (geoProtection.windProtection * 0.9));
+    const protectedWaveHeight = waveHeight * (1 - (geoProtection.waveProtection * 0.9));
+    const protectedSwellHeight = swellHeight * (1 - (geoProtection.waveProtection * 0.85));
+
+    // Initialize breakdown
+    const breakdown = {
+      windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 40 },
+      waveHeight: { raw: waveHeight, protected: protectedWaveHeight, score: 0, maxPossible: 20 },
+      swellHeight: { raw: swellHeight, protected: protectedSwellHeight, score: 0, maxPossible: 10 },
+      precipitation: { value: maxPrecip, score: 0, maxPossible: 10 },
+      temperature: { value: avgTemp, score: 0, maxPossible: 10 },
+      cloudCover: { value: avgCloud, score: 0, maxPossible: 10 },
+      geoProtection: { value: geoProtection.protectionScore, score: 0, maxPossible: 15 },
+      total: { score: 0, maxPossible: 100 }
+    };
+
+    // Score calculation
+    let score = 0;
+
+    // Wind speed (up to 40 points)
+    breakdown.windSpeed.score = protectedWindSpeed < 8 ? 40 : Math.max(0, 40 - (protectedWindSpeed - 8) * (40 / 12));
+    score += breakdown.windSpeed.score;
+
+    // Wave height (up to 20 points)
+    breakdown.waveHeight.score = protectedWaveHeight < 0.2 ? 20 : Math.max(0, 20 - (protectedWaveHeight - 0.2) * (20 / 0.4));
+    score += breakdown.waveHeight.score;
+
+    // Swell height (up to 10 points)
+    breakdown.swellHeight.score = protectedSwellHeight < 0.3 ? 10 : Math.max(0, 10 - (protectedSwellHeight - 0.3) * (10 / 0.3));
+    score += breakdown.swellHeight.score;
+
+    // Precipitation (10 points)
+    breakdown.precipitation.score = maxPrecip < 1 ? 10 : 0;
+    score += breakdown.precipitation.score;
+
+    // Air temperature (up to 10 points)
+    if (avgTemp >= 22 && avgTemp <= 30) {
+      breakdown.temperature.score = 10;
+    } else if (avgTemp < 22) {
+      breakdown.temperature.score = Math.max(0, 10 - (22 - avgTemp));
+    } else {
+      breakdown.temperature.score = Math.max(0, 10 - (avgTemp - 30));
+    }
+    score += breakdown.temperature.score;
+
+    // Cloud cover (up to 10 points)
+    breakdown.cloudCover.score = avgCloud < 40 ? 10 : Math.max(0, 10 - (avgCloud - 40) / 6);
+    score += breakdown.cloudCover.score;
+
+    // Geographic protection bonus (up to 15 points)
+    breakdown.geoProtection.score = (geoProtection.protectionScore / 100) * 15;
+    score += breakdown.geoProtection.score;
+    
+    // Round all scores
+    breakdown.windSpeed.score = Math.round(breakdown.windSpeed.score);
+    breakdown.waveHeight.score = Math.round(breakdown.waveHeight.score);
+    breakdown.swellHeight.score = Math.round(breakdown.swellHeight.score);
+    breakdown.precipitation.score = Math.round(breakdown.precipitation.score);
+    breakdown.temperature.score = Math.round(breakdown.temperature.score);
+    breakdown.cloudCover.score = Math.round(breakdown.cloudCover.score);
+    breakdown.geoProtection.score = Math.round(breakdown.geoProtection.score);
+    
+    breakdown.total.score = Math.round(Math.min(100, score));
+
+    // If it's raining significantly, override the score to be bad
+    if (maxPrecip >= 1.5) {
+      breakdown.precipitation.score = 0;
+      breakdown.total.score = Math.min(breakdown.total.score, 40);
+    }
+
+    return { calculatedScore: Math.round(Math.min(100, score)), breakdown };
+  };
+
+  // Get condition based on score
+  const getCondition = (score) => {
+    if (score >= 85) return { label: "Perfect", emoji: "✅", message: "Flat like oil. Paddle on." };
+    if (score >= 70) return { label: "Okay-ish", emoji: "⚠️", message: "Minor chop. Go early." };
+    if (score >= 50) return { label: "Not Great", emoji: "❌", message: "Wind or waves make it tricky." };
+    return { label: "Nope", emoji: "🚫", message: "Not recommended." };
+  };
+
+  // Delete Confirmation Modal
   const DeleteConfirmationModal = ({ beach, onConfirm, onCancel }) => {
-    if (!beach || !beach.id || !beach.name) {
+    if (!beach) {
       setTimeout(onCancel, 0);
       return null;
     }
@@ -575,22 +755,259 @@ const App = () => {
     );
   };
 
-  // Filter hourly data by time range
-  const filterHoursByTimeRange = (hourlyData, range) => {
-    const startHour = parseInt(range.startTime.split(":")[0]);
-    const endHour = parseInt(range.endTime.split(":")[0]);
+  // Component to render geographic protection information
+  const renderGeographicInfo = (beach, weatherData) => {
+    if (!beach || !weatherData) return null;
+    
+    const avgWindDirection = weatherData.hourly.winddirection_10m.reduce((sum, val) => sum + val, 0) / 
+                            weatherData.hourly.winddirection_10m.length;
+    
+    const waveDirection = weatherData.daily.wave_direction_dominant ? 
+                        weatherData.daily.wave_direction_dominant[0] : 
+                        avgWindDirection;
+    
+    const protection = calculateGeographicProtection(beach, avgWindDirection, waveDirection);
+    
+    // Calculate the bonus points added to score from geographic protection
+    const geoBonus = Math.round((protection.protectionScore / 100) * 15);
+    
+    return (
+      <div className="bg-blue-50 p-5 rounded-lg mt-4 border border-blue-200 shadow-inner">
+        <h4 className="font-medium mb-4 text-lg flex items-center text-blue-800">
+          <MapPin className="h-5 w-5 mr-2 text-blue-600" />
+          Geographic Protection Analysis
+        </h4>
+        
+        <div className="grid md:grid-cols-2 gap-6">
+          <ul className="space-y-3">
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Bay Enclosure:</span>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                protection.bayEnclosure > 0.6 
+                  ? 'bg-green-100 text-green-800' 
+                  : protection.bayEnclosure > 0.3 
+                    ? 'bg-yellow-100 text-yellow-800' 
+                    : 'bg-red-100 text-red-800'
+              }`}>
+                {protection.bayEnclosure > 0.7 
+                  ? 'Well Protected' 
+                  : protection.bayEnclosure > 0.4 
+                    ? 'Moderately Protected' 
+                    : 'Exposed'}
+              </span>
+            </li>
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Wind Direction:</span>
+              <span className="flex items-center">
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center mr-2">
+                  <div 
+                    className="w-3 h-3 bg-blue-600" 
+                    style={{ 
+                      clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)', 
+                      transform: `rotate(${avgWindDirection}deg)` 
+                    }}
+                  />
+                </div>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  protection.windProtection > 0.7 
+                    ? 'bg-green-100 text-green-800' 
+                    : protection.windProtection > 0.3 
+                      ? 'bg-yellow-100 text-yellow-800' 
+                      : 'bg-red-100 text-red-800'
+                }`}>
+                  {getCardinalDirection(avgWindDirection)} 
+                  {protection.windProtection > 0.7 
+                    ? ' (Protected)' 
+                    : protection.windProtection > 0.3 
+                      ? ' (Partially Exposed)' 
+                      : ' (Fully Exposed)'}
+                </span>
+              </span>
+            </li>
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Overall Protection:</span>
+              <div className="flex items-center">
+                <div className="w-24 h-3 bg-gray-200 rounded-full overflow-hidden mr-2">
+                  <div 
+                    className={`h-full ${
+                      protection.protectionScore > 70 
+                        ? 'bg-green-500' 
+                        : protection.protectionScore > 40 
+                          ? 'bg-yellow-500' 
+                          : 'bg-red-500'
+                    }`}
+                    style={{ width: `${protection.protectionScore}%` }}
+                  />
+                </div>
+                <span className={`font-medium ${
+                  protection.protectionScore > 70 
+                    ? 'text-green-600' 
+                    : protection.protectionScore > 40 
+                      ? 'text-yellow-600' 
+                      : 'text-red-600'
+                }`}>
+                  {Math.round(protection.protectionScore)}/100
+                </span>
+              </div>
+            </li>
+          </ul>
+          
+          <div className="bg-white p-4 rounded border">
+            <h5 className="font-medium mb-2 text-gray-800">Impact on Score</h5>
+            <p className="text-gray-700 mb-3">
+              Geographic protection is contributing <span className="font-bold text-blue-600">
+              +{geoBonus} points</span> to your overall score.
+            </p>
+            <div className={`p-3 rounded-lg ${
+              protection.protectionScore > 60 
+                ? 'bg-green-50 border border-green-200' 
+                : protection.protectionScore > 30 
+                  ? 'bg-yellow-50 border border-yellow-200' 
+                  : 'bg-red-50 border border-red-200'
+            }`}>
+              <p className="text-sm">
+                {protection.protectionScore > 60 
+                  ? `${beach.name} is well protected from ${getCardinalDirection(avgWindDirection)} winds.` 
+                  : protection.protectionScore > 30 
+                    ? `${beach.name} has moderate protection from ${getCardinalDirection(avgWindDirection)} winds.` 
+                    : `${beach.name} is exposed to ${getCardinalDirection(avgWindDirection)} winds.`}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
-    return {
-      temperature_2m: hourlyData.temperature_2m.slice(startHour, endHour + 1),
-      precipitation: hourlyData.precipitation.slice(startHour, endHour + 1),
-      cloudcover: hourlyData.cloudcover.slice(startHour, endHour + 1),
-      windspeed_10m: hourlyData.windspeed_10m.slice(startHour, endHour + 1),
-      winddirection_10m: hourlyData.winddirection_10m.slice(startHour, endHour + 1),
-      swell_wave_height: hourlyData.swell_wave_height ? 
-        hourlyData.swell_wave_height.slice(startHour, endHour + 1) : undefined,
-      wave_height: hourlyData.wave_height ? 
-        hourlyData.wave_height.slice(startHour, endHour + 1) : undefined
-    };
+  // Render score breakdown
+  const renderScoreBreakdown = (breakdown) => {
+    if (!breakdown) return null;
+    
+    return (
+      <div className="bg-white p-5 rounded-lg mt-4 shadow-sm border">
+        <h4 className="font-medium mb-4 flex items-center text-gray-800">
+          <Info className="h-5 w-5 mr-2 text-blue-600" />
+          Score Breakdown
+        </h4>
+        
+        <div className="overflow-hidden rounded-lg border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factor</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              <tr>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Wind Speed</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {breakdown.windSpeed.raw.toFixed(1)} km/h 
+                  <span className="text-xs text-gray-400 ml-1">
+                    (Protected: {breakdown.windSpeed.protected.toFixed(1)})
+                  </span>
+                </td>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
+                  breakdown.windSpeed.score > 30 ? 'text-green-600' : 
+                  breakdown.windSpeed.score > 20 ? 'text-yellow-600' : 'text-red-600'
+                }`}>
+                  {breakdown.windSpeed.score}/{breakdown.windSpeed.maxPossible}
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Wave Height</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {breakdown.waveHeight.raw.toFixed(2)} m
+                  <span className="text-xs text-gray-400 ml-1">
+                    (Protected: {breakdown.waveHeight.protected.toFixed(2)})
+                  </span>
+                </td>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
+                  breakdown.waveHeight.score > 15 ? 'text-green-600' : 
+                  breakdown.waveHeight.score > 10 ? 'text-yellow-600' : 'text-red-600'
+                }`}>
+                  {breakdown.waveHeight.score}/{breakdown.waveHeight.maxPossible}
+                </td>
+              </tr>
+              {/* Other breakdown rows... */}
+              <tr className="bg-blue-50">
+                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">TOTAL SCORE</td>
+                <td className="px-4 py-3 whitespace-nowrap"></td>
+                <td className={`px-4 py-3 whitespace-nowrap text-sm font-bold text-right ${
+                  breakdown.total.score >= 85 ? 'text-green-600' : 
+                  breakdown.total.score >= 70 ? 'text-yellow-600' :
+                  breakdown.total.score >= 50 ? 'text-orange-600' : 'text-red-600'
+                }`}>
+                  {breakdown.total.score}/{breakdown.total.maxPossible}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  // Render wind speed visualization
+  const renderWindSpeedVisualization = (weatherData, timeRange) => {
+    if (!weatherData || !weatherData.hourly) return null;
+    
+    const startHour = parseInt(timeRange.startTime.split(":")[0]);
+    const endHour = parseInt(timeRange.endTime.split(":")[0]);
+    
+    // Get all hours in the range
+    const hours = [];
+    for (let i = startHour; i <= endHour; i++) {
+      hours.push(i);
+    }
+    
+    return (
+      <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
+        <h4 className="font-medium mb-4 flex items-center text-gray-800">
+          <Clock className="h-5 w-5 mr-2 text-blue-600" /> 
+          Hourly Wind Speed
+        </h4>
+        
+        <div className="space-y-3">
+          {hours.map(hour => {
+            const windSpeed = Math.round(weatherData.hourly.windspeed_10m[hour]);
+            let barColor, textColor, bgColor;
+            
+            if (windSpeed < 8) {
+              barColor = "bg-green-500";
+              textColor = "text-green-800";
+              bgColor = "bg-green-100";
+            } else if (windSpeed < 12) {
+              barColor = "bg-yellow-500";
+              textColor = "text-yellow-800";
+              bgColor = "bg-yellow-100";
+            } else {
+              barColor = "bg-red-500";
+              textColor = "text-red-800";
+              bgColor = "bg-red-100";
+            }
+            
+            return (
+              <div key={hour} className="flex items-center">
+                <div className="w-12 text-gray-600 font-medium">
+                  {hour}:00
+                </div>
+                <div className="flex-grow mx-3 bg-gray-200 h-6 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${barColor}`} 
+                    style={{ width: `${Math.min(80, windSpeed * 7)}%` }} 
+                  ></div>
+                </div>
+                <div className={`px-2 py-1 rounded-md ${bgColor} ${textColor} font-medium min-w-[70px] text-center`}>
+                  {windSpeed} km/h
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -744,7 +1161,7 @@ const App = () => {
                   <div className="flex">
                     <input
                       type="text"
-                      value={mapUrl || ''}
+                      value={mapUrl}
                       onChange={(e) => setMapUrl(e.target.value)}
                       placeholder="Paste Google Maps URL here..."
                       className="flex-grow p-2 border rounded-l"
@@ -1003,6 +1420,117 @@ const App = () => {
                   </svg>
                   {error}
                 </p>
+              </div>
+            )}
+
+            {/* Weather data display */}
+            {weatherData && score !== null && !loading && (
+              <div className="p-6">
+                {/* Main Score */}
+                <div className="flex flex-col md:flex-row gap-6 mb-6">
+                  <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center">
+                    <div
+                      className={`text-6xl mb-3 ${
+                        score >= 85
+                          ? "text-green-500"
+                          : score >= 70
+                          ? "text-yellow-500"
+                          : score >= 50
+                          ? "text-orange-500"
+                          : "text-red-500"
+                      }`}
+                    >
+                      {getCondition(score).emoji}
+                    </div>
+                    <h3 className="text-3xl font-bold mb-2">
+                      {getCondition(score).label}
+                    </h3>
+                    <p className="text-gray-600 text-lg mb-4">{getCondition(score).message}</p>
+                    <div className="mt-2 bg-gray-100 rounded-full h-5 overflow-hidden">
+                      <div
+                        className={`h-full ${
+                          score >= 85
+                            ? "bg-green-500"
+                            : score >= 70
+                            ? "bg-yellow-500"
+                            : score >= 50
+                            ? "bg-orange-500"
+                            : "bg-red-500"
+                        }`}
+                        style={{ width: `${score}%` }}
+                      ></div>
+                    </div>
+                    <p className="mt-2 text-lg font-medium text-gray-700">
+                      Score: {score}/100
+                    </p>
+                  </div>
+                  
+                  {/* Weather Factors */}
+                  <div className="md:w-2/3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                        <Wind className="h-6 w-6 mr-3 text-blue-600" />
+                        <div className="flex-grow">
+                          <div className="text-sm text-gray-500">Wind</div>
+                          <div className={`text-lg font-medium ${
+                            weatherData.hourly.windspeed_10m[12] < 8
+                              ? "text-green-600"
+                              : weatherData.hourly.windspeed_10m[12] < 15
+                              ? "text-yellow-600"
+                              : "text-red-600"
+                          }`}>
+                            {Math.round(weatherData.hourly.windspeed_10m[12])} km/h
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                        <Waves className="h-6 w-6 mr-3 text-blue-600" />
+                        <div className="flex-grow">
+                          <div className="text-sm text-gray-500">Wave Height</div>
+                          <div className={`text-lg font-medium ${
+                            weatherData.daily.wave_height_max[0] < 0.2
+                              ? "text-green-600"
+                              : weatherData.daily.wave_height_max[0] < 0.4
+                              ? "text-yellow-600"
+                              : "text-red-600"
+                          }`}>
+                            {weatherData.daily.wave_height_max[0].toFixed(1)} m
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                        <Thermometer className="h-6 w-6 mr-3 text-blue-600" />
+                        <div className="flex-grow">
+                          <div className="text-sm text-gray-500">Temperature</div>
+                          <div className="text-lg font-medium text-green-600">
+                            {Math.round(weatherData.hourly.temperature_2m[12])}°C
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                        <Droplets className="h-6 w-6 mr-3 text-blue-600" />
+                        <div className="flex-grow">
+                          <div className="text-sm text-gray-500">Precipitation</div>
+                          <div className="text-lg font-medium text-green-600">
+                            {weatherData.hourly.precipitation[12].toFixed(1)} mm
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Score Breakdown */}
+                {renderScoreBreakdown(scoreBreakdown)}
+                
+                {/* Geographic Protection Analysis */}
+                {renderGeographicInfo(selectedBeach, weatherData)}
+                
+                {/* Wind Speed Visualization */}
+                {renderWindSpeedVisualization(weatherData, timeRange)}
               </div>
             )}
           </div>
