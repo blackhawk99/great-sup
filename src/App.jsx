@@ -14,6 +14,128 @@ import {
   ChevronLeft,
 } from "lucide-react";
 
+// Geographic protection analysis
+const calculateGeographicProtection = (beach, windDirection, waveDirection) => {
+  // Hardcoded geographic data for known Greek beaches
+  const geographicData = {
+    'Kavouri Beach': {
+      latitude: 37.8207,
+      longitude: 23.7686,
+      coastlineOrientation: 135, // SE facing
+      bayEnclosure: 0.3, // Somewhat open
+      protectedFromDirections: [315, 360, 45], // Protected from NW, N, NE
+      exposedToDirections: [135, 180, 225], // Exposed to SE, S, SW
+      description: "Moderately protected bay, exposed to southern winds"
+    },
+    'Vouliagmeni Beach': {
+      latitude: 37.8179,
+      longitude: 23.7808,
+      coastlineOrientation: 90, // E facing
+      bayEnclosure: 0.5, // Medium enclosure
+      protectedFromDirections: [225, 270, 315], // Protected from SW, W, NW
+      exposedToDirections: [90, 135], // Exposed to E, SE
+      description: "Protected from westerly winds, but exposed to easterly"
+    },
+    'Astir Beach': {
+      latitude: 37.8016,
+      longitude: 23.7711,
+      coastlineOrientation: 180, // S facing
+      bayEnclosure: 0.8, // Highly enclosed
+      protectedFromDirections: [0, 45, 90, 270, 315], // Protected from most directions
+      exposedToDirections: [180], // Only directly exposed to south
+      description: "Well-protected beach in a sheltered bay"
+    },
+    'Varkiza Beach': {
+      latitude: 37.8133,
+      longitude: 23.8011,
+      coastlineOrientation: 170, // S facing slightly E
+      bayEnclosure: 0.4, // Moderately open
+      protectedFromDirections: [270, 315, 0, 45], // Protected from W, NW, N, NE
+      exposedToDirections: [135, 180, 225], // Exposed to SE, S, SW
+      description: "Moderate protection, exposed to southern seas"
+    }
+  };
+  
+  // Default values for unknown beaches
+  let coastlineOrientation = 0;
+  let bayEnclosure = 0.5;
+  let protectedFromDirections = [];
+  let exposedToDirections = [];
+  
+  // Get geographic data if this is a known beach
+  const beachName = beach.name;
+  const knownBeach = Object.keys(geographicData).find(name => 
+    beachName.includes(name) || name.includes(beachName)
+  );
+  
+  if (knownBeach) {
+    const data = geographicData[knownBeach];
+    coastlineOrientation = data.coastlineOrientation;
+    bayEnclosure = data.bayEnclosure;
+    protectedFromDirections = data.protectedFromDirections;
+    exposedToDirections = data.exposedToDirections;
+  } else {
+    // For unknown beaches, make a guess based on coordinates
+    // This would be replaced with actual coastline analysis in a production app
+    console.log("Unknown beach, using estimated protection values");
+  }
+
+  // Calculate wind protection
+  const windProtection = calculateDirectionalProtection(
+    windDirection, 
+    protectedFromDirections, 
+    exposedToDirections,
+    bayEnclosure
+  );
+  
+  // Calculate wave protection
+  const waveProtection = calculateDirectionalProtection(
+    waveDirection,
+    protectedFromDirections,
+    exposedToDirections,
+    bayEnclosure
+  );
+  
+  // Calculate overall protection score (0-100)
+  const protectionScore = (bayEnclosure * 40) + (windProtection * 30) + (waveProtection * 30);
+  
+  return {
+    protectionScore,
+    windProtection,
+    waveProtection,
+    bayEnclosure,
+    isProtected: protectionScore > 50
+  };
+};
+
+// Helper function to calculate directional protection
+const calculateDirectionalProtection = (direction, protectedDirections, exposedDirections, bayEnclosure) => {
+  // Check if direction is within protected ranges
+  const isProtected = protectedDirections.some(protectedDir => {
+    return Math.abs(direction - protectedDir) <= 45;
+  });
+  
+  // Check if direction is within exposed ranges
+  const isExposed = exposedDirections.some(exposedDir => {
+    return Math.abs(direction - exposedDir) <= 45;
+  });
+  
+  if (isProtected) {
+    return 0.8 + (bayEnclosure * 0.2); // High protection
+  } else if (isExposed) {
+    return 0.2 * bayEnclosure; // Low protection
+  } else {
+    return 0.5 * bayEnclosure; // Medium protection
+  }
+};
+
+// Helper function to convert degrees to cardinal directions
+const getCardinalDirection = (degrees) => {
+  const val = Math.floor((degrees / 22.5) + 0.5);
+  const directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  return directions[(val % 16)];
+};
+
 const App = () => {
   // State
   const [beaches, setBeaches] = useState([]);
@@ -35,9 +157,9 @@ const App = () => {
     longitude: "",
   });
 
-  // Use a ref to store consistent mock data for Greek beaches
+  // Use a ref to store geographic-aware mock data for Greek beaches
   const mockDataRef = useRef({
-    // Kavouri beach - typically excellent conditions in morning
+    // Kavouri beach - exposed to southern winds
     "Kavouri Beach": {
       hourly: {
         time: Array.from(
@@ -54,21 +176,99 @@ const App = () => {
         cloudcover: Array.from({ length: 24 }, (_, i) =>
           i < 11 ? 10 : 30 + (i - 11) * 5
         ), // Clear mornings
-        windspeed_10m: Array.from({ length: 24 }, (_, i) =>
-          i < 9 ? 3 : 5 + (i - 9) * 0.7
-        ), // Light morning winds
-        winddirection_10m: Array.from({ length: 24 }, () => 45), // Consistent NE direction (good for Kavouri)
-        wave_height: Array.from({ length: 24 }, (_, i) =>
-          i < 10 ? 0.1 : 0.2 + (i - 10) * 0.03
-        ), // Calm mornings
-        swell_wave_height: Array.from({ length: 24 }, (_, i) =>
-          i < 10 ? 0.05 : 0.1 + (i - 10) * 0.02
-        ), // Low swell
+        // Wind direction changes through the day (NE in morning, shifting S in afternoon)
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          // Morning: 45° (NE), gradually shifting to 180° (S) in afternoon
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+        }),
+        // Wind speed varies by direction - stronger from south
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          // Dynamically calculate direction for this hour
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          // South winds (135-225) are stronger at Kavouri
+          const southFactor = (direction >= 135 && direction <= 225) ? 1.5 : 0.8;
+          return (i < 9 ? 4 : 6 + (i-9) * 0.8) * southFactor;
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          // Dynamically calculate direction for this hour
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          // South winds create bigger waves at Kavouri
+          const southFactor = (direction >= 135 && direction <= 225) ? 1.8 : 0.7;
+          return (i < 10 ? 0.15 : 0.2 + (i-10) * 0.03) * southFactor;
+        }),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          // Dynamically calculate direction for this hour
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          // South winds create bigger swell at Kavouri
+          const southFactor = (direction >= 135 && direction <= 225) ? 1.6 : 0.6;
+          return (i < 10 ? 0.07 : 0.12 + (i-10) * 0.02) * southFactor;
+        }),
       },
       daily: {
-        wave_height_max: [0.3], // Moderate max wave height
-        wave_direction_dominant: [45], // NE direction
+        wave_height_max: [0.4], // Moderate max wave height
+        wave_direction_dominant: [170], // S direction (matches afternoon wind)
+      }
+    },
+
+    // Astir Beach - protected from most directions
+    "Astir Beach": {
+      hourly: {
+        time: Array.from(
+          { length: 24 },
+          (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`
+        ),
+        temperature_2m: Array.from(
+          { length: 24 },
+          (_, i) => 22 + Math.sin(i / 3) * 5
+        ), // Same temperature
+        precipitation: Array.from({ length: 24 }, (_, i) =>
+          i < 10 ? 0 : i > 16 ? 0.2 : 0
+        ), // Same precipitation
+        cloudcover: Array.from({ length: 24 }, (_, i) =>
+          i < 11 ? 10 : 30 + (i - 11) * 5
+        ), // Same cloud cover
+        // Same wind direction pattern
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          // Morning: 45° (NE), gradually shifting to 180° (S) in afternoon
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+        }),
+        // Wind speed is same but Astir is protected from most directions
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          // Dynamically calculate direction for this hour
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          // Only south winds (160-200) fully affect Astir
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 1.0 : 0.4;
+          return (i < 9 ? 4 : 6 + (i-9) * 0.8) * protectionFactor;
+        }),
+        // Wave height is much lower due to protection
+        wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          // Dynamically calculate direction for this hour
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          // Only south winds (160-200) create significant waves at Astir
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 0.9 : 0.3;
+          return (i < 10 ? 0.15 : 0.2 + (i-10) * 0.03) * protectionFactor;
+        }),
+        // Swell is much lower due to protection
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          // Dynamically calculate direction for this hour
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 15);
+          // Only south winds (160-200) create significant swell at Astir
+          const protectionFactor = (direction >= 160 && direction <= 200) ? 0.8 : 0.2;
+          return (i < 10 ? 0.07 : 0.12 + (i-10) * 0.02) * protectionFactor;
+        }),
       },
+      daily: {
+        wave_height_max: [0.2], // Lower max wave height due to protection
+        wave_direction_dominant: [170], // S direction (matches afternoon wind)
+      }
     },
 
     // Vouliagmeni beach - typically good but more variable
@@ -87,24 +287,41 @@ const App = () => {
           { length: 24 },
           (_, i) => 20 + Math.sin(i / 4) * 20
         ), // Variable clouds
-        windspeed_10m: Array.from(
-          { length: 24 },
-          (_, i) => 5 + Math.sin(i / 2) * 4
-        ), // More variable winds
-        winddirection_10m: Array.from({ length: 24 }, () => 90), // E direction
-        wave_height: Array.from(
-          { length: 24 },
-          (_, i) => 0.2 + Math.sin(i / 6) * 0.1
-        ), // More variable
-        swell_wave_height: Array.from(
-          { length: 24 },
-          (_, i) => 0.1 + Math.sin(i / 6) * 0.05
-        ),
+        // Morning: 45° (NE), gradually shifting to 135° (SE) in afternoon
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          return hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+        }),
+        // Wind speed varies by direction - stronger from SE
+        windspeed_10m: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          // Dynamically calculate direction for this hour
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          // SE winds (90-135) are stronger at Vouliagmeni
+          const exposureFactor = (direction >= 90 && direction <= 135) ? 1.3 : 0.7;
+          return (5 + Math.sin(i/2) * 4) * exposureFactor; 
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          // Dynamically calculate direction for this hour
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          // SE winds (90-135) create bigger waves at Vouliagmeni
+          const exposureFactor = (direction >= 90 && direction <= 135) ? 1.3 : 0.6;
+          return (0.2 + Math.sin(i/6) * 0.1) * exposureFactor;
+        }),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => {
+          const hour = i % 24;
+          // Dynamically calculate direction for this hour
+          const direction = hour < 10 ? 45 : 45 + ((hour - 10) * 10);
+          // SE winds (90-135) create bigger swell at Vouliagmeni
+          const exposureFactor = (direction >= 90 && direction <= 135) ? 1.2 : 0.5;
+          return (0.1 + Math.sin(i/6) * 0.05) * exposureFactor;
+        }),
       },
       daily: {
         wave_height_max: [0.3],
-        wave_direction_dominant: [90], // E direction
-      },
+        wave_direction_dominant: [115], // ESE direction (matches afternoon wind)
+      }
     },
 
     // Default for other beaches - average conditions
@@ -127,21 +344,25 @@ const App = () => {
           { length: 24 },
           (_, i) => 8 + Math.sin(i / 4) * 4
         ), // Moderate winds
-        winddirection_10m: Array.from({ length: 24 }, () => 180), // S direction
-        wave_height: Array.from({ length: 24 }, () => 0.3), // Moderate waves
-        swell_wave_height: Array.from({ length: 24 }, () => 0.2), // Moderate swell
+        winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+          // Gradually shifting wind direction through the day
+          return 45 + (i * 5) % 360;  // Full rotation through the day
+        }),
+        wave_height: Array.from({ length: 24 }, (_, i) => 0.3 + Math.sin(i/12) * 0.1),
+        swell_wave_height: Array.from({ length: 24 }, (_, i) => 0.2 + Math.sin(i/12) * 0.07),
       },
       daily: {
         wave_height_max: [0.4],
         wave_direction_dominant: [180], // S direction
-      },
-    },
+      }
+    }
   });
 
   // Greek coastal locations
   const suggestedLocations = [
     { name: "Kavouri Beach", latitude: 37.8207, longitude: 23.7686 },
     { name: "Vouliagmeni Beach", latitude: 37.8179, longitude: 23.7808 },
+    { name: "Astir Beach", latitude: 37.8016, longitude: 23.7711 },
     { name: "Varkiza Beach", latitude: 37.8133, longitude: 23.8011 },
     { name: "Alimos Beach", latitude: 37.9111, longitude: 23.7017 },
     { name: "Edem Beach", latitude: 37.9331, longitude: 23.7075 },
@@ -246,7 +467,7 @@ const App = () => {
     } catch (error) {
       console.error("Error fetching real weather data:", error);
       setError(
-        "Unable to fetch real-time weather data. If you want actual data, try opening the app from your own server with proper API access."
+        "Unable to fetch real-time weather data. Using geographic-aware simulated data for this location."
       );
 
       // Fall back to demo data as a last resort
@@ -255,6 +476,8 @@ const App = () => {
         mockData = mockDataRef.current["Kavouri Beach"];
       } else if (beach.name.includes("Vouliagmeni")) {
         mockData = mockDataRef.current["Vouliagmeni Beach"];
+      } else if (beach.name.includes("Astir")) {
+        mockData = mockDataRef.current["Astir Beach"];
       } else {
         mockData = mockDataRef.current["default"];
       }
@@ -295,10 +518,14 @@ const App = () => {
         startHour,
         endHour + 1
       ),
+      swell_wave_height: hourlyData.swell_wave_height ? 
+        hourlyData.swell_wave_height.slice(startHour, endHour + 1) : undefined,
+      wave_height: hourlyData.wave_height ? 
+        hourlyData.wave_height.slice(startHour, endHour + 1) : undefined
     };
   };
 
-  // Calculate paddle score based on weather conditions
+  // Calculate paddle score based on weather conditions and geographic protection
   const calculatePaddleScore = (hourlyData, dailyData, beach) => {
     // Calculate average values for the time range
     const avgTemp =
@@ -311,6 +538,16 @@ const App = () => {
       hourlyData.cloudcover.reduce((sum, val) => sum + val, 0) /
       hourlyData.cloudcover.length;
     const maxPrecip = Math.max(...hourlyData.precipitation);
+
+    // Get wind direction
+    const avgWindDirection =
+      hourlyData.winddirection_10m.reduce((sum, val) => sum + val, 0) /
+      hourlyData.winddirection_10m.length;
+
+    // Get wave direction (use wind direction as proxy if not available)
+    const waveDirection = dailyData.wave_direction_dominant ? 
+                      dailyData.wave_direction_dominant[0] : 
+                      avgWindDirection;
 
     // Get wave height from API or daily data
     let waveHeight = dailyData.wave_height_max[0];
@@ -326,21 +563,29 @@ const App = () => {
       swellHeight = waveHeight * 0.7; // Rough approximation
     }
 
+    // Calculate geographic protection
+    const geoProtection = calculateGeographicProtection(beach, avgWindDirection, waveDirection);
+
+    // Apply geographic protection factor to wind and wave values
+    const protectedWindSpeed = avgWind * (1 - (geoProtection.windProtection * 0.8));
+    const protectedWaveHeight = waveHeight * (1 - (geoProtection.waveProtection * 0.8));
+    const protectedSwellHeight = swellHeight * (1 - (geoProtection.waveProtection * 0.7));
+
     // Score calculation based on the table in the requirements
     let score = 0;
 
-    // Wind speed (up to 40 points)
-    score += avgWind < 8 ? 40 : Math.max(0, 40 - (avgWind - 8) * (40 / 12));
+    // Wind speed (up to 40 points) - now uses protected wind speed
+    score += protectedWindSpeed < 8 ? 40 : Math.max(0, 40 - (protectedWindSpeed - 8) * (40 / 12));
 
-    // Wave height (up to 20 points)
+    // Wave height (up to 20 points) - now uses protected wave height
     score +=
-      waveHeight < 0.2 ? 20 : Math.max(0, 20 - (waveHeight - 0.2) * (20 / 0.4));
+      protectedWaveHeight < 0.2 ? 20 : Math.max(0, 20 - (protectedWaveHeight - 0.2) * (20 / 0.4));
 
-    // Swell height (up to 10 points)
+    // Swell height (up to 10 points) - now uses protected swell height
     score +=
-      swellHeight < 0.3
+      protectedSwellHeight < 0.3
         ? 10
-        : Math.max(0, 10 - (swellHeight - 0.3) * (10 / 0.3));
+        : Math.max(0, 10 - (protectedSwellHeight - 0.3) * (10 / 0.3));
 
     // Precipitation (10 points)
     score += maxPrecip < 1 ? 10 : 0;
@@ -357,25 +602,8 @@ const App = () => {
     // Cloud cover (up to 10 points)
     score += avgCloud < 40 ? 10 : Math.max(0, 10 - (avgCloud - 40) / 6);
 
-    // Beach-specific adjustments
-    if (beach && beach.name) {
-      // Kavouri beach directional wind preference
-      if (beach.name.includes("Kavouri")) {
-        // Check wind direction
-        const avgWindDirection =
-          hourlyData.winddirection_10m.reduce((sum, val) => sum + val, 0) /
-          hourlyData.winddirection_10m.length;
-
-        // Check if wind is from preferred directions (N = 0, NE = 45)
-        if (
-          (avgWindDirection >= 0 && avgWindDirection <= 20) ||
-          (avgWindDirection >= 35 && avgWindDirection <= 55)
-        ) {
-          // Bonus for preferred wind directions at Kavouri
-          score += 5;
-        }
-      }
-    }
+    // Add geographic protection bonus (up to 10 points)
+    score += geoProtection.protectionScore / 10;
 
     return Math.round(Math.min(100, score)); // Cap at 100
   };
@@ -452,6 +680,58 @@ const App = () => {
 
     setBeaches([...beaches, beachToAdd]);
     setView("dashboard");
+  };
+
+  // Component to render geographic protection information
+  const renderGeographicInfo = (beach, weatherData) => {
+    if (!beach || !weatherData) return null;
+    
+    const avgWindDirection = weatherData.hourly.winddirection_10m.reduce((sum, val) => sum + val, 0) / 
+                            weatherData.hourly.winddirection_10m.length;
+    
+    const waveDirection = weatherData.daily.wave_direction_dominant ? 
+                        weatherData.daily.wave_direction_dominant[0] : 
+                        avgWindDirection;
+    
+    const protection = calculateGeographicProtection(beach, avgWindDirection, waveDirection);
+    
+    return (
+      <div className="bg-gray-50 p-4 rounded-lg mt-4">
+        <h4 className="font-medium mb-3 flex items-center">
+          <MapPin className="h-5 w-5 mr-2 text-blue-600" />
+          Geographic Protection Analysis
+        </h4>
+        
+        <ul className="space-y-2 text-sm">
+          <li className="flex justify-between">
+            <span>Bay Enclosure:</span>
+            <span className={`font-medium ${protection.bayEnclosure > 0.6 ? 'text-green-600' : protection.bayEnclosure > 0.3 ? 'text-yellow-600' : 'text-red-600'}`}>
+              {protection.bayEnclosure > 0.7 ? 'Well Protected' : protection.bayEnclosure > 0.4 ? 'Moderately Protected' : 'Exposed'}
+            </span>
+          </li>
+          <li className="flex justify-between">
+            <span>Wind Direction:</span>
+            <span className="font-medium">
+              {getCardinalDirection(avgWindDirection)} ({Math.round(avgWindDirection)}°)
+              {protection.windProtection > 0.7 ? ' - Protected' : protection.windProtection > 0.3 ? ' - Partially Exposed' : ' - Fully Exposed'}
+            </span>
+          </li>
+          <li className="flex justify-between">
+            <span>Wave Direction:</span>
+            <span className="font-medium">
+              {getCardinalDirection(waveDirection)} ({Math.round(waveDirection)}°)
+              {protection.waveProtection > 0.7 ? ' - Protected' : protection.waveProtection > 0.3 ? ' - Partially Exposed' : ' - Fully Exposed'}
+            </span>
+          </li>
+          <li className="flex justify-between">
+            <span>Overall Protection:</span>
+            <span className={`font-medium ${protection.protectionScore > 70 ? 'text-green-600' : protection.protectionScore > 40 ? 'text-yellow-600' : 'text-red-600'}`}>
+              {Math.round(protection.protectionScore)}/100
+            </span>
+          </li>
+        </ul>
+      </div>
+    );
   };
 
   return (
@@ -768,8 +1048,7 @@ const App = () => {
                   {error}
                 </p>
                 <p className="mt-1 text-xs ml-7">
-                  The app is using location-specific simulated data based on
-                  Greek coastal patterns
+                  The app now considers geographic features like bay enclosure and coastal orientation
                 </p>
               </div>
             )}
@@ -811,12 +1090,23 @@ const App = () => {
                   <p className="mt-2 text-sm text-gray-600">
                     Score: {score}/100
                   </p>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {window.location.hostname === "localhost" ||
-                    window.location.hostname.includes("test")
-                      ? "(Using simulated data)"
-                      : "(Using real Open-Meteo data)"}
-                  </p>
+                  <div className="mt-1 text-xs text-gray-500 flex items-center justify-center">
+                    {weatherData.isRealData ? (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 mr-1 text-green-500">
+                          <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                        </svg>
+                        Using real Open-Meteo data
+                      </>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 mr-1 text-yellow-500">
+                          <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
+                        </svg>
+                        Using simulated data with geographic protection analysis
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
@@ -960,6 +1250,50 @@ const App = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Geographic Protection Analysis */}
+                {renderGeographicInfo(selectedBeach, weatherData)}
+
+                {/* Beach Comparison Section */}
+                {beaches.length > 1 && (
+                  <div className="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <MapPin className="h-5 w-5 mr-2 text-blue-600" />
+                      Compare with Nearby Beaches
+                    </h4>
+                    
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {beaches.filter(b => b.id !== selectedBeach.id).slice(0, 4).map(otherBeach => {
+                        const avgWindDirection = weatherData.hourly.winddirection_10m.reduce((sum, val) => sum + val, 0) / 
+                                              weatherData.hourly.winddirection_10m.length;
+                        
+                        const waveDirection = weatherData.daily.wave_direction_dominant[0];
+                        
+                        const currentProtection = calculateGeographicProtection(selectedBeach, avgWindDirection, waveDirection);
+                        const otherProtection = calculateGeographicProtection(otherBeach, avgWindDirection, waveDirection);
+                        
+                        const comparison = otherProtection.protectionScore - currentProtection.protectionScore;
+                        
+                        return (
+                          <div key={otherBeach.id} 
+                              className="flex items-center justify-between p-2 bg-white rounded border cursor-pointer hover:bg-blue-50"
+                              onClick={() => handleBeachSelect(otherBeach)}>
+                            <span className="font-medium">{otherBeach.name}</span>
+                            <span className={`text-sm px-2 py-1 rounded ${
+                              comparison > 10 ? 'bg-green-100 text-green-800' : 
+                              comparison < -10 ? 'bg-red-100 text-red-800' : 
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {comparison > 10 ? 'May be better today' : 
+                              comparison < -10 ? 'Likely worse today' : 
+                              'Similar conditions'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
