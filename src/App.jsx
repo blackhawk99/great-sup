@@ -18,6 +18,7 @@ import {
   ExternalLink,
   Info,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 
 // Geographic protection analysis
@@ -177,33 +178,6 @@ const getGoogleMapsLink = (latitude, longitude) =>
 const parseGoogleMapsUrl = (url) => {
   if (!url) return null;
   
-  // Handle @lat,lng format (what you see in the URL bar)
-  let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if (match) {
-    return {
-      latitude: parseFloat(match[1]),
-      longitude: parseFloat(match[2])
-    };
-  }
-  
-  // Handle ?q=lat,lng format (shared links)
-  match = url.match(/\?q=(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if (match) {
-    return {
-      latitude: parseFloat(match[1]),
-      longitude: parseFloat(match[2])
-    };
-  }
-  
-  // Handle old format with ll=lat,lng
-  match = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if (match) {
-    return {
-      latitude: parseFloat(match[1]),
-      longitude: parseFloat(match[2])
-    };
-  }
-  
   // Handle maps.app.goo.gl links by ID matching
   if (url.includes("maps.app.goo.gl")) {
     // Map specific known beach links to their coordinates
@@ -221,6 +195,24 @@ const parseGoogleMapsUrl = (url) => {
         return mapLinkMapping[id];
       }
     }
+  }
+  
+  // Handle @lat,lng format (what you see in the URL bar)
+  let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (match) {
+    return {
+      latitude: parseFloat(match[1]),
+      longitude: parseFloat(match[2])
+    };
+  }
+  
+  // Handle ?q=lat,lng format (shared links)
+  match = url.match(/\?q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (match) {
+    return {
+      latitude: parseFloat(match[1]),
+      longitude: parseFloat(match[2])
+    };
   }
   
   return null;
@@ -955,13 +947,19 @@ const App = () => {
     toast.success(`${beach.name} set as home beach!`);
   };
 
-  // Handle time range change
+  // Handle time range change with immediate update
   const handleTimeRangeChange = (field, value) => {
-    setTimeRange({ ...timeRange, [field]: value });
-
-    // Re-fetch weather data if a beach is selected
+    const newTimeRange = { ...timeRange, [field]: value };
+    setTimeRange(newTimeRange);
+    
+    // Don't automatically re-fetch as we'll have an explicit Update button
+  };
+  
+  // Handle explicit update request
+  const handleUpdateForecast = () => {
     if (selectedBeach) {
       fetchWeatherData(selectedBeach);
+      toast.success("Forecast updated!");
     }
   };
 
@@ -1013,166 +1011,6 @@ const App = () => {
     } else {
       toast.error("Could not extract coordinates from URL. Please check format.");
     }
-  };
-
-  // Custom Date Picker
-  const DatePickerModal = ({ onSelect, onClose }) => {
-    const today = new Date();
-    const [selectedDate, setSelectedDate] = useState(new Date(timeRange.date));
-    const [month, setMonth] = useState(selectedDate.getMonth());
-    const [year, setYear] = useState(selectedDate.getFullYear());
-    
-    const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDayOfMonth = new Date(year, month, 1).getDay();
-    
-    const handlePrevMonth = () => {
-      if (month === 0) {
-        setMonth(11);
-        setYear(year - 1);
-      } else {
-        setMonth(month - 1);
-      }
-    };
-    
-    const handleNextMonth = () => {
-      if (month === 11) {
-        setMonth(0);
-        setYear(year + 1);
-      } else {
-        setMonth(month + 1);
-      }
-    };
-    
-    const handleDateClick = (day) => {
-      const newDate = new Date(year, month, day);
-      setSelectedDate(newDate);
-    };
-    
-    const handleSelect = () => {
-      const formattedDate = selectedDate.toISOString().split('T')[0];
-      onSelect(formattedDate);
-      onClose();
-    };
-
-    const handleSetToday = () => {
-      setSelectedDate(new Date());
-      setMonth(today.getMonth());
-      setYear(today.getFullYear());
-    };
-
-    const handleSetTomorrow = () => {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setSelectedDate(tomorrow);
-      setMonth(tomorrow.getMonth());
-      setYear(tomorrow.getFullYear());
-    };
-    
-    const days = [];
-    
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < firstDayOfMonth; i++) {
-      days.push(<div key={`empty-${i}`} className="h-10"></div>);
-    }
-    
-    // Add the days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      const isSelected = 
-        selectedDate.getDate() === day &&
-        selectedDate.getMonth() === month &&
-        selectedDate.getFullYear() === year;
-      
-      const isToday =
-        today.getDate() === day &&
-        today.getMonth() === month &&
-        today.getFullYear() === year;
-      
-      days.push(
-        <div
-          key={day}
-          className={`h-10 w-10 flex items-center justify-center rounded-full cursor-pointer
-            ${isSelected ? 'bg-blue-500 text-white' : ''}
-            ${isToday && !isSelected ? 'border border-blue-500 text-blue-600' : ''}
-            ${!isSelected && !isToday ? 'hover:bg-gray-100' : ''}
-          `}
-          onClick={() => handleDateClick(day)}
-        >
-          {day}
-        </div>
-      );
-    }
-    
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl p-5 w-full max-w-md">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Select Date</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
-          </div>
-          
-          <div className="flex space-x-4 mb-4">
-            <button 
-              onClick={handleSetToday}
-              className="flex-1 bg-blue-500 text-white py-3 px-6 rounded-xl text-lg font-medium hover:bg-blue-600 transition"
-            >
-              Today
-            </button>
-            <button 
-              onClick={handleSetTomorrow}
-              className="flex-1 bg-blue-500 text-white py-3 px-6 rounded-xl text-lg font-medium hover:bg-blue-600 transition"
-            >
-              Tomorrow
-            </button>
-          </div>
-          
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <button onClick={handlePrevMonth} className="p-1 rounded-full hover:bg-gray-100">
-                <ArrowLeft className="h-6 w-6" />
-              </button>
-              <span className="text-lg font-medium">{monthNames[month]} {year}</span>
-              <button onClick={handleNextMonth} className="p-1 rounded-full hover:bg-gray-100">
-                <ArrowRight className="h-6 w-6" />
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-7 gap-1 text-center mb-2">
-              <div className="text-gray-500">Su</div>
-              <div className="text-gray-500">Mo</div>
-              <div className="text-gray-500">Tu</div>
-              <div className="text-gray-500">We</div>
-              <div className="text-gray-500">Th</div>
-              <div className="text-gray-500">Fr</div>
-              <div className="text-gray-500">Sa</div>
-            </div>
-            
-            <div className="grid grid-cols-7 gap-1">
-              {days}
-            </div>
-          </div>
-          
-          <div className="flex justify-end">
-            <button
-              onClick={handleSelect}
-              className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700"
-            >
-              Select
-            </button>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   // Delete Confirmation Modal
@@ -1454,6 +1292,67 @@ const App = () => {
     );
   };
 
+  // Render wind speed hourly visualization
+  const renderWindSpeedVisualization = (weatherData, timeRange) => {
+    if (!weatherData) return null;
+    
+    const startHour = parseInt(timeRange.startTime.split(":")[0]);
+    const endHour = parseInt(timeRange.endTime.split(":")[0]);
+    
+    // Get all hours in the range
+    const hours = [];
+    for (let i = startHour; i <= endHour; i++) {
+      hours.push(i);
+    }
+    
+    return (
+      <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
+        <h4 className="font-medium mb-4 flex items-center text-gray-800">
+          <Clock className="h-5 w-5 mr-2 text-blue-600" /> 
+          Hourly Wind Speed
+        </h4>
+        
+        <div className="space-y-3">
+          {hours.map(hour => {
+            const windSpeed = Math.round(weatherData.hourly.windspeed_10m[hour]);
+            const barWidth = Math.min(80, windSpeed * 6); // Cap at 80% width
+            
+            let barColor = "bg-green-500";
+            let textColor = "text-green-800";
+            let bgColor = "bg-green-100";
+            
+            if (windSpeed >= 12) {
+              barColor = "bg-red-500";
+              textColor = "text-red-800";
+              bgColor = "bg-red-100";
+            } else if (windSpeed >= 8) {
+              barColor = "bg-yellow-500";
+              textColor = "text-yellow-800";
+              bgColor = "bg-yellow-100";
+            }
+            
+            return (
+              <div key={hour} className="flex items-center">
+                <div className="w-12 text-gray-600 font-medium">
+                  {hour}:00
+                </div>
+                <div className="flex-grow mx-3 bg-gray-200 h-6 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${barColor} rounded-l-full`} 
+                    style={{ width: `${barWidth}%` }} 
+                  ></div>
+                </div>
+                <div className={`px-2 py-1 rounded-md ${bgColor} ${textColor} font-medium text-sm min-w-[70px] text-center`}>
+                  {windSpeed} km/h
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-blue-50">
       {/* Toast notification */}
@@ -1466,17 +1365,6 @@ const App = () => {
         </div>
       )}
 
-      {/* Custom Date Picker Modal */}
-      {showDatePicker && (
-        <DatePickerModal
-          onSelect={(date) => {
-            handleTimeRangeChange('date', date);
-            setShowDatePicker(false);
-          }}
-          onClose={() => setShowDatePicker(false)}
-        />
-      )}
-      
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <DeleteConfirmationModal 
@@ -1489,7 +1377,10 @@ const App = () => {
       {/* Header */}
       <header className="bg-blue-600 text-white p-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold flex items-center">
+          <h1 
+            className="text-2xl font-bold flex items-center cursor-pointer hover:text-blue-100 transition-colors"
+            onClick={() => setView("dashboard")}
+          >
             <div className="mr-2 text-3xl">🌊</div> 
             Paddleboard Weather Advisor
           </h1>
@@ -1786,62 +1677,35 @@ const App = () => {
               </div>
             </div>
 
-            {/* IMPROVED Time Range Selector */}
-            <div className="p-4 border-b">
-              <h3 className="text-lg font-medium mb-4">Select Time Range</h3>
-              
-              <div className="flex space-x-4 mb-4">
-                <button 
-                  onClick={() => {
-                    const today = new Date().toISOString().split('T')[0];
-                    handleTimeRangeChange('date', today);
-                  }}
-                  className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-lg text-lg font-medium hover:bg-blue-600"
-                >
-                  Today
-                </button>
-                <button 
-                  onClick={() => {
-                    const tomorrow = new Date();
-                    tomorrow.setDate(tomorrow.getDate() + 1);
-                    handleTimeRangeChange('date', tomorrow.toISOString().split('T')[0]);
-                  }}
-                  className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-lg text-lg font-medium hover:bg-blue-600"
-                >
-                  Tomorrow
-                </button>
-              </div>
+            {/* IMPROVED Time Range Selector - Made to match Image 1 */}
+            <div className="p-4 border-b bg-gray-50">
+              <h3 className="text-lg font-medium mb-4">Choose Date & Time Window</h3>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                <div 
-                  className="relative cursor-pointer" 
-                  onClick={() => setShowDatePicker(true)}
-                >
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Calendar className="h-5 w-5 text-gray-400" />
+                <div className="flex">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date
+                    </label>
+                    <input 
+                      type="date" 
+                      className="w-full p-2 border rounded"
+                      value={timeRange.date}
+                      onChange={(e) => handleTimeRangeChange('date', e.target.value)}
+                    />
                   </div>
-                  <input
-                    type="text"
-                    value={new Date(timeRange.date).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                    readOnly
-                    className="w-full pl-10 p-3 bg-white border rounded-lg cursor-pointer text-lg"
-                  />
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Time</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Start Time
+                  </label>
                   <select
                     value={timeRange.startTime}
                     onChange={(e) => handleTimeRangeChange('startTime', e.target.value)}
-                    className="w-full p-3 border rounded-lg text-lg"
+                    className="w-full p-2 border rounded appearance-none bg-white"
                   >
                     {Array.from({ length: 24 }, (_, i) => (
                       <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
@@ -1851,11 +1715,13 @@ const App = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">End Time</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    End Time
+                  </label>
                   <select
                     value={timeRange.endTime}
                     onChange={(e) => handleTimeRangeChange('endTime', e.target.value)}
-                    className="w-full p-3 border rounded-lg text-lg"
+                    className="w-full p-2 border rounded appearance-none bg-white"
                   >
                     {Array.from({ length: 24 }, (_, i) => (
                       <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
@@ -1865,6 +1731,14 @@ const App = () => {
                   </select>
                 </div>
               </div>
+              
+              <button 
+                onClick={handleUpdateForecast}
+                className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 flex items-center justify-center"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Update Forecast
+              </button>
             </div>
 
             {/* Conditions */}
@@ -1894,7 +1768,6 @@ const App = () => {
             {weatherData && score !== null && !loading && (
               <div className="p-6">
                 {/* Main Score Overview */}
-{/* Main Score Overview */}
                 <div className="flex flex-col md:flex-row gap-6 mb-6">
                   {/* Score card - LEFT SIDE */}
                   <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center flex flex-col justify-center">
@@ -1965,7 +1838,7 @@ const App = () => {
                               ? "text-yellow-600"
                               : "text-red-600"
                           }`}>
-                            {Math.round(weatherData.hourly.windspeed_10m[12])} km/h
+{Math.round(weatherData.hourly.windspeed_10m[12])} km/h
                           </div>
                         </div>
                       </div>
@@ -2047,54 +1920,17 @@ const App = () => {
                         </div>
                       )}
                     </div>
-                    
-                    <div className="mt-3 bg-white rounded-lg p-3 border shadow-sm">
-                      <h4 className="font-medium mb-2 flex items-center">
-                        <Clock className="h-5 w-5 mr-2 text-blue-600" />
-                        Hourly Wind Speed
-                      </h4>
-                      <div className="space-y-2">
-                        {[9, 10, 11, 12, 13].map((hour) => (
-                          <div
-                            key={hour}
-                            className="flex items-center p-2 hover:bg-blue-50 rounded"
-                          >
-                            <div className="w-10 text-center text-gray-600">{hour}:00</div>
-                            <div className="flex-grow mx-2">
-                              <div className="h-3 bg-gray-200 rounded-full">
-                                <div 
-                                  className={`h-full rounded-full ${
-                                    weatherData.hourly.windspeed_10m[hour] < 8
-                                      ? "bg-green-500"
-                                      : weatherData.hourly.windspeed_10m[hour] < 12
-                                      ? "bg-yellow-500"
-                                      : "bg-red-500"
-                                  }`}
-                                  style={{ width: `${Math.min(100, weatherData.hourly.windspeed_10m[hour] * 5)}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              weatherData.hourly.windspeed_10m[hour] < 8
-                                ? "bg-green-100 text-green-800"
-                                : weatherData.hourly.windspeed_10m[hour] < 12
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
-                            }`}>
-                              {Math.round(weatherData.hourly.windspeed_10m[hour])} km/h
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 </div>
                 
-                {/* Score Breakdown Table - NEW */}
+                {/* Score Breakdown Table */}
                 {renderScoreBreakdown(scoreBreakdown)}
                 
-                {/* Geographic Protection Analysis - MOVED UP */}
+                {/* Geographic Protection Analysis */}
                 {renderGeographicInfo(selectedBeach, weatherData)}
+                
+                {/* Hourly Wind Speed Visualization - NEW IMPROVED VERSION */}
+                {renderWindSpeedVisualization(weatherData, timeRange)}
 
                 {/* Beach Comparison Section */}
                 {beaches.length > 1 && (
