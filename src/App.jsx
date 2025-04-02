@@ -27,7 +27,6 @@ import {
 // Generate rays from a point in all directions
 function generateRays(center, numRays, distance) {
   try {
-
   const rays = [];
   const [lng, lat] = center.geometry.coordinates;
   
@@ -37,7 +36,7 @@ function generateRays(center, numRays, distance) {
     rays.push(turf.lineString([center.geometry.coordinates, destination.geometry.coordinates]));
   }
   
-      return rays;
+    return rays;
   } catch (error) {
     console.error('Error generating rays:', error);
     return [];
@@ -47,7 +46,6 @@ function generateRays(center, numRays, distance) {
 // Check if a ray intersects with the coastline
 function intersectsCoastline(ray, coastline) {
   try {
-
   let minDistance = Infinity;
   let intersection = null;
   
@@ -74,10 +72,14 @@ function intersectsCoastline(ray, coastline) {
     }
   }
   
-          return {
-      intersects: intersection !== null,
+    return {
+    intersects: intersection !== null,
     distance: minDistance === Infinity ? null : minDistance,
     point: intersection
+  } catch (error) {
+    console.error('Error in coastline intersection logic:', error);
+    return { intersects: false, distance: Infinity, intersection: null };
+  }
   };
 }
 
@@ -164,10 +166,8 @@ async function analyzeBayProtection(latitude, longitude, windDirection, waveDire
       waveProtection: totalWaveProtection,
       bayEnclosure: enclosureScore,
       isProtected: protectionScore > 50
-        };
+    };
   } catch (error) {
-    console.error('Error in coastline intersection logic:', error);
-    return { intersects: false, distance: Infinity, intersection: null };
     console.error("Error in coastline analysis:", error);
     // Return default values as fallback
     return {
