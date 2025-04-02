@@ -4,6 +4,8 @@ import { greeceCoastline } from '../data/greece-coastline';
 
 // Generate rays from a point in all directions
 export function generateRays(center, numRays, distance) {
+  try {
+
   const rays = [];
   const [lng, lat] = center.coordinates;
   
@@ -13,11 +15,17 @@ export function generateRays(center, numRays, distance) {
     rays.push(turf.lineString([center.coordinates, destination.coordinates]));
   }
   
-  return rays;
+      return rays;
+  } catch (error) {
+    console.error('Error generating rays:', error);
+    return [];
+  }
 }
 
 // Check if a ray intersects with the coastline
 export function intersectsCoastline(ray, coastline) {
+  try {
+
   let minDistance = Infinity;
   let intersection = null;
   
@@ -44,11 +52,15 @@ export function intersectsCoastline(ray, coastline) {
     }
   }
   
-  return {
-    intersects: intersection !== null,
+      return {
+      intersects: intersection !== null,
     distance: minDistance === Infinity ? null : minDistance,
     point: intersection
-  };
+      };
+  } catch (error) {
+    console.error('Error in coastline intersection logic:', error);
+    return { intersects: false, distance: Infinity, intersection: null };
+  }
 }
 
 // Find the nearest coastline segment to a beach
