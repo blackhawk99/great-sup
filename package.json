@@ -9,11 +9,12 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
-  "dependencies": {
-    "lucide-react": "0.486.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
-  },
+"dependencies": {
+  "lucide-react": "0.486.0",
+  "react": "^19.0.0",
+  "react-dom": "^19.0.0",
+  "@turf/turf": "^6.5.0"
+},
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
