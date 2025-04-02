@@ -26,3 +26,4 @@ import {
 } from "lucide-react";
 
 // Full original App component follows with geospatial logic externalized
+export default App;
