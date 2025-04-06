@@ -1,6 +1,5 @@
-// services/WeatherService.js - Handles weather data and score calculations
-import { getCardinalDirection } from "../utils/helpers";
-import { calculateGeographicProtection } from "../utils/coastlineAnalysis";
+import { getCardinalDirection } from "./helpers";
+import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 
 // Filter hourly data by time range
 export const filterHoursByTimeRange = (hourlyData, range) => {
@@ -45,25 +44,17 @@ export const getCondition = (score) => {
   return { label: "Nope", emoji: "🚫", message: "Not recommended." };
 };
 
-// Fetch weather data
-export const fetchWeatherData = async (beach, timeRange, mockDataRef, callbacks) => {
-  const { setLoading, setError, setWeatherData, setScore, setScoreBreakdown } = callbacks;
-  
+// Main function to fetch and process weather data
+export const fetchWeatherData = async (beach, timeRange, mockDataRef) => {
   if (!beach || !beach.latitude || !beach.longitude) {
-    throw new Error("Invalid beach data. Please try adding this beach again.");
+    throw new Error("Invalid beach data");
   }
-  
-  setLoading(true);
-  setError(null);
-  
+
+  // Fetch implementation details would go here
+  // For now, we're using mock data
   try {
-    const { longitude, latitude } = beach;
-    const selectedDate = new Date(timeRange.date);
-    const formattedDate = selectedDate.toISOString().split("T")[0];
-    
-    // For demo purposes, use mock data with proper variation between beaches
     const beachNameLower = beach.name.toLowerCase();
-    let mockData = {...mockDataRef.current["default"]}; // Create a copy to avoid reference issues
+    let mockData = {...mockDataRef.current["default"]};
     
     if (beachNameLower.includes("kavouri")) {
       mockData = {...mockDataRef.current["Kavouri Beach"]};
@@ -77,56 +68,35 @@ export const fetchWeatherData = async (beach, timeRange, mockDataRef, callbacks)
       mockData = {...mockDataRef.current["Palaiopoli Beach"]};
     }
     
-    // Verify that mockData structure is valid
-    if (!mockData || !mockData.hourly || !mockData.daily) {
-      console.error("Invalid mock data structure", mockData);
-      throw new Error("Invalid mock data structure");
-    }
+    // Deep copy to prevent reference issues
+    mockData = JSON.parse(JSON.stringify(mockData));
     
-    // Deep clone the hourly data to prevent reference issues
-    mockData.hourly = {...mockData.hourly};
-    mockData.daily = {...mockData.daily};
-    
-    // Update the date in mock data - create a new array
+    // Update date
     mockData.hourly.time = Array.from(
       { length: 24 },
       (_, i) => `${timeRange.date}T${String(i).padStart(2, "0")}:00`
     );
-
+    
     mockData.isRealData = false;
     
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 800));
     
-    // Set weather data first
-    setWeatherData(mockData);
-    
-    // Allow a render cycle to complete
-    await new Promise(resolve => setTimeout(resolve, 50));
-    
-    // Calculate score using the mock data with dynamic protection analysis
+    // Get relevant weather data and calculate score
     const relevantHours = filterHoursByTimeRange(mockData.hourly, timeRange);
     
-    // Validate that we have the necessary data to proceed
-    if (!relevantHours || !relevantHours.winddirection_10m || relevantHours.winddirection_10m.length === 0) {
-      console.error("Missing wind direction data", relevantHours);
-      throw new Error("Missing wind direction data");
-    }
-    
-    // Get average wind direction for protection analysis
     const avgWindDirection =
       relevantHours.winddirection_10m.reduce((sum, val) => sum + val, 0) /
       relevantHours.winddirection_10m.length;
     
-    // Get wave direction (safely)
     const waveDirection = mockData.daily.wave_direction_dominant ? 
                       mockData.daily.wave_direction_dominant[0] : 
                       avgWindDirection;
     
-    // Now calculate protection dynamically for this beach
+    // Calculate protection
     const protection = await calculateGeographicProtection(beach, avgWindDirection, waveDirection);
     
-    // Use this protection data in the score calculation
+    // Calculate score
     const { calculatedScore, breakdown } = calculatePaddleScore(
       relevantHours,
       mockData.daily,
@@ -134,48 +104,18 @@ export const fetchWeatherData = async (beach, timeRange, mockDataRef, callbacks)
       protection
     );
     
-    // Update score and breakdown
-    setScore(calculatedScore);
-    setScoreBreakdown(breakdown);
-    
+    return {
+      weatherData: mockData,
+      score: calculatedScore,
+      scoreBreakdown: breakdown
+    };
   } catch (error) {
     console.error("Error with weather data:", error);
-    setError(`Unable to load weather data: ${error.message || "Unknown error"}. Please try again.`);
-    
-    // Set default data to prevent null rendering errors
-    setWeatherData({
-      hourly: {
-        time: Array.from({ length: 24 }, (_, i) => `2025-04-01T${String(i).padStart(2, "0")}:00`),
-        temperature_2m: Array.from({ length: 24 }, () => 20),
-        precipitation: Array.from({ length: 24 }, () => 0),
-        cloudcover: Array.from({ length: 24 }, () => 30),
-        windspeed_10m: Array.from({ length: 24 }, () => 5),
-        winddirection_10m: Array.from({ length: 24 }, () => 180),
-      },
-      daily: {
-        wave_height_max: [0.1],
-        wave_direction_dominant: [180],
-      },
-      isRealData: false
-    });
-    
-    setScore(0);
-    setScoreBreakdown({
-      windSpeed: { raw: 0, protected: 0, score: 0, maxPossible: 40 },
-      waveHeight: { raw: 0, protected: 0, score: 0, maxPossible: 20 },
-      swellHeight: { raw: 0, protected: 0, score: 0, maxPossible: 10 },
-      precipitation: { value: 0, score: 0, maxPossible: 10 },
-      temperature: { value: 0, score: 0, maxPossible: 10 },
-      cloudCover: { value: 0, score: 0, maxPossible: 10 },
-      geoProtection: { value: 0, score: 0, maxPossible: 15 },
-      total: { score: 0, maxPossible: 100 }
-    });
-  } finally {
-    setLoading(false);
+    throw error;
   }
 };
 
-// Calculate paddle score
+// Calculate paddle score with dynamic protection
 export const calculatePaddleScore = (hourlyData, dailyData, beach, protectionData = null) => {
   if (!hourlyData || !dailyData || !beach) {
     return { calculatedScore: 0, breakdown: null };
@@ -242,7 +182,6 @@ export const calculatePaddleScore = (hourlyData, dailyData, beach, protectionDat
   let geoProtection = protectionData;
   if (!geoProtection) {
     // This is a synchronous fallback since we can't make this function async
-    // In practice, protection should be calculated beforehand
     geoProtection = {
       protectionScore: 50,
       windProtection: 0.5,
@@ -280,16 +219,52 @@ export const calculatePaddleScore = (hourlyData, dailyData, beach, protectionDat
     protectedWaveHeight < 0.2 ? 20 : Math.max(0, 20 - (protectedWaveHeight - 0.2) * (20 / 0.4));
   score += breakdown.waveHeight.score;
 
-  // Continue with other score calculations...
-  // (rest of score calculation omitted for brevity)
+  // Swell height (up to 10 points) - now uses protected swell height
+  breakdown.swellHeight.score =
+    protectedSwellHeight < 0.3
+      ? 10
+      : Math.max(0, 10 - (protectedSwellHeight - 0.3) * (10 / 0.3));
+  score += breakdown.swellHeight.score;
 
-  // Round all score components
+  // Precipitation (10 points)
+  breakdown.precipitation.score = maxPrecip < 1 ? 10 : 0;
+  score += breakdown.precipitation.score;
+
+  // Air temperature (up to 10 points)
+  if (avgTemp >= 22 && avgTemp <= 30) {
+    breakdown.temperature.score = 10;
+  } else if (avgTemp < 22) {
+    breakdown.temperature.score = Math.max(0, 10 - (22 - avgTemp));
+  } else {
+    breakdown.temperature.score = Math.max(0, 10 - (avgTemp - 30));
+  }
+  score += breakdown.temperature.score;
+
+  // Cloud cover (up to 10 points)
+  breakdown.cloudCover.score = avgCloud < 40 ? 10 : Math.max(0, 10 - (avgCloud - 40) / 6);
+  score += breakdown.cloudCover.score;
+
+  // Add ENHANCED geographic protection bonus (up to 15 points)
+  breakdown.geoProtection.score = (geoProtection.protectionScore / 100) * 15;
+  score += breakdown.geoProtection.score;
+  
+  // Round all score components for clean display
   breakdown.windSpeed.score = Math.round(breakdown.windSpeed.score);
   breakdown.waveHeight.score = Math.round(breakdown.waveHeight.score);
-  // (remaining roundings omitted for brevity)
+  breakdown.swellHeight.score = Math.round(breakdown.swellHeight.score);
+  breakdown.precipitation.score = Math.round(breakdown.precipitation.score);
+  breakdown.temperature.score = Math.round(breakdown.temperature.score);
+  breakdown.cloudCover.score = Math.round(breakdown.cloudCover.score);
+  breakdown.geoProtection.score = Math.round(breakdown.geoProtection.score);
   
   // Store the total
   breakdown.total.score = Math.round(Math.min(100, score));
+
+  // If it's raining significantly, override the score to be bad
+  if (maxPrecip >= 1.5) {
+    breakdown.precipitation.score = 0;
+    breakdown.total.score = Math.min(breakdown.total.score, 40); // Cap score at 40 for rainy conditions
+  }
 
   return { calculatedScore: Math.round(Math.min(100, score)), breakdown };
 };
