@@ -44,40 +44,60 @@ export const getCondition = (score) => {
   return { label: "Nope", emoji: "🚫", message: "Not recommended." };
 };
 
+// Generate location-specific weather data
+const generateLocationSpecificWeather = (latitude, longitude, date) => {
+  // Create a seed value based on location and date
+  const locationSeed = Math.floor((latitude * 10 + longitude * 7) % 23);
+  const dateParts = date.split('-');
+  const dateSeed = Math.floor((parseInt(dateParts[2]) * 3 + parseInt(dateParts[1]) * 5) % 17);
+  const combinedSeed = (locationSeed + dateSeed) % 100;
+  
+  // Use the seed to create variations in weather
+  const baseTemp = 20 + (combinedSeed % 10);
+  const windFactor = 0.8 + (combinedSeed % 15) / 10; // 0.8-2.3
+  const waveFactor = 0.7 + (combinedSeed % 12) / 20; // 0.7-1.3
+  const precipFactor = (combinedSeed % 20) / 100; // 0-0.19
+  
+  console.log(`Generating weather for lat=${latitude}, lng=${longitude}, seed=${combinedSeed}`);
+  console.log(`Weather factors: baseTemp=${baseTemp}, windFactor=${windFactor}, waveFactor=${waveFactor}`);
+  
+  return {
+    hourly: {
+      time: Array.from({ length: 24 }, (_, i) => `${date}T${String(i).padStart(2, "0")}:00`),
+      temperature_2m: Array.from({ length: 24 }, (_, i) => baseTemp + Math.sin(i / 3) * 4),
+      precipitation: Array.from({ length: 24 }, (_, i) => i < 10 ? 0 : i > 16 ? precipFactor : 0),
+      cloudcover: Array.from({ length: 24 }, (_, i) => 20 + (combinedSeed % 30) + Math.sin(i / 6) * 20),
+      windspeed_10m: Array.from({ length: 24 }, (_, i) => (6 + Math.sin(i / 4) * 4) * windFactor),
+      winddirection_10m: Array.from({ length: 24 }, (_, i) => {
+        const baseDirection = 90 + (combinedSeed % 270);
+        return (baseDirection + i * 5) % 360;
+      }),
+      wave_height: Array.from({ length: 24 }, (_, i) => (0.2 * waveFactor + (i / 80))),
+      swell_wave_height: Array.from({ length: 24 }, (_, i) => (0.1 * waveFactor + (i / 100))),
+    },
+    daily: {
+      wave_height_max: [0.3 * waveFactor],
+      wave_direction_dominant: [120 + (combinedSeed % 240)],
+    },
+    isRealData: false
+  };
+};
+
 // Main function to fetch and process weather data
 export const fetchWeatherData = async (beach, timeRange, mockDataRef) => {
   if (!beach || !beach.latitude || !beach.longitude) {
     throw new Error("Invalid beach data");
   }
 
-  // Fetch implementation details would go here
-  // For now, we're using mock data
   try {
-    const beachNameLower = beach.name.toLowerCase();
-    let mockData = {...mockDataRef.current["default"]};
+    console.log("Fetching weather for beach:", beach.name, beach.latitude, beach.longitude);
     
-    if (beachNameLower.includes("kavouri")) {
-      mockData = {...mockDataRef.current["Kavouri Beach"]};
-    } else if (beachNameLower.includes("glyf")) {
-      mockData = {...mockDataRef.current["Glyfada Beach"]};
-    } else if (beachNameLower.includes("astir") || beachNameLower.includes("aster")) {
-      mockData = {...mockDataRef.current["Astir Beach"]};
-    } else if (beachNameLower.includes("kapsal")) {
-      mockData = {...mockDataRef.current["Kapsali Beach"]};
-    } else if (beachNameLower.includes("palaio")) {
-      mockData = {...mockDataRef.current["Palaiopoli Beach"]};
-    }
-    
-    // Deep copy to prevent reference issues
-    mockData = JSON.parse(JSON.stringify(mockData));
-    
-    // Update date
-    mockData.hourly.time = Array.from(
-      { length: 24 },
-      (_, i) => `${timeRange.date}T${String(i).padStart(2, "0")}:00`
+    // Generate location-specific weather data instead of using fixed mock data
+    const mockData = generateLocationSpecificWeather(
+      beach.latitude,
+      beach.longitude, 
+      timeRange.date
     );
-    
-    mockData.isRealData = false;
     
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 800));
@@ -94,7 +114,18 @@ export const fetchWeatherData = async (beach, timeRange, mockDataRef) => {
                       avgWindDirection;
     
     // Calculate protection
-    const protection = await calculateGeographicProtection(beach, avgWindDirection, waveDirection);
+    let protection;
+    try {
+      protection = await calculateGeographicProtection(beach, avgWindDirection, waveDirection);
+    } catch (error) {
+      console.error("Error calculating geographic protection:", error);
+      protection = {
+        protectionScore: 50,
+        windProtection: 0.5,
+        waveProtection: 0.5,
+        bayEnclosure: 0.5
+      };
+    }
     
     // Calculate score
     const { calculatedScore, breakdown } = calculatePaddleScore(
