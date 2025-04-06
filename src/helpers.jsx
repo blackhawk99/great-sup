@@ -8,6 +8,49 @@ export const getCardinalDirection = (degrees) => {
   return directions[(val % 16)];
 };
 
+// Helper function to extract location name from Google Maps URL
+const extractNameFromGoogleMapsUrl = (url) => {
+  try {
+    // Try different patterns to extract the name
+    
+    // Pattern 1: /place/Name/ in the URL
+    let placeMatch = url.match(/\/place\/([^\/]+)\//);
+    if (placeMatch && placeMatch[1]) {
+      const decoded = decodeURIComponent(placeMatch[1]);
+      // Clean up the name (replace + and remove coordinates)
+      return decoded
+        .replace(/\+/g, ' ')
+        .replace(/\d+\.\d+,\d+\.\d+/, '')
+        .trim();
+    }
+    
+    // Pattern 2: ?q=Name in the URL
+    let qMatch = url.match(/[?&]q=([^&@]+)/);
+    if (qMatch && qMatch[1]) {
+      const decoded = decodeURIComponent(qMatch[1]);
+      // Remove coordinates if present
+      return decoded
+        .replace(/\+/g, ' ')
+        .replace(/\d+\.\d+,\d+\.\d+/, '')
+        .trim();
+    }
+    
+    // Pattern 3: /maps/place/Name format
+    let mapsPlaceMatch = url.match(/\/maps\/place\/([^\/]+)/);
+    if (mapsPlaceMatch && mapsPlaceMatch[1]) {
+      const decoded = decodeURIComponent(mapsPlaceMatch[1]);
+      return decoded
+        .replace(/\+/g, ' ')
+        .trim();
+    }
+    
+    return null;
+  } catch (e) {
+    console.error("Error extracting name from URL:", e);
+    return null;
+  }
+};
+
 // Helper function to try extracting location from URL parameters
 const extractLocationFromUrl = (url) => {
   try {
@@ -17,6 +60,15 @@ const extractLocationFromUrl = (url) => {
       return {
         lat: parseFloat(latLngMatch[1]),
         lng: parseFloat(latLngMatch[2])
+      };
+    }
+    
+    // Try to find @lat,lng pattern
+    const atLatLngMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (atLatLngMatch) {
+      return {
+        lat: parseFloat(atLatLngMatch[1]),
+        lng: parseFloat(atLatLngMatch[2])
       };
     }
     
@@ -37,22 +89,53 @@ const extractLocationFromUrl = (url) => {
   }
 };
 
-// Parse Google Maps URL with expanded support
+// Parse Google Maps URL with automatic name extraction
 export const parseGoogleMapsUrl = (url) => {
   if (!url) return null;
   
-  // Handle maps.app.goo.gl links by ID or any shortened URL
-  if (url.includes("maps.app.goo.gl")) {
-    // Map specific known beach links to their coordinates
-    const mapLinkMapping = {
-      "KP6MpuG6mgrv1Adm6": { name: "Kavouri Beach", latitude: 37.8235, longitude: 23.7761, googleMapsUrl: "https://maps.app.goo.gl/KP6MpuG6mgrv1Adm6" },
-      "yEXLZW5kwBArCHvb7": { name: "Glyfada Beach", latitude: 37.8650, longitude: 23.7470, googleMapsUrl: "https://maps.app.goo.gl/yEXLZW5kwBArCHvb7" },
-      "6uUbtp31MQ63gGBSA": { name: "Astir Beach", latitude: 37.8095, longitude: 23.7850, googleMapsUrl: "https://maps.app.goo.gl/6uUbtp31MQ63gGBSA" },
-      "xcs6EqYy8LbzYq2y6": { name: "Kapsali Beach", latitude: 36.1360, longitude: 22.9980, googleMapsUrl: "https://maps.app.goo.gl/xcs6EqYy8LbzYq2y6" },
-      "TPFetRbFcyAXdgNDA": { name: "Palaiopoli Beach", latitude: 36.2260, longitude: 23.0410, googleMapsUrl: "https://maps.app.goo.gl/TPFetRbFcyAXdgNDA" },
-      "dXhCRfbfmD6Kz2ot6": { name: "Agii Anargiri Beach", latitude: 37.7216, longitude: 23.9516, googleMapsUrl: "https://maps.app.goo.gl/dXhCRfbfmD6Kz2ot6" },
-      // Add the new beach
-      "RQCy8NKnJNgb5V6w6": { name: "Unnamed Beach", latitude: 37.85, longitude: 23.75, googleMapsUrl: "https://maps.app.goo.gl/RQCy8NKnJNgb5V6w6" }
+  console.log("Parsing URL:", url);
+  
+  // First try to extract the beach name from various URL formats
+  let beachName = extractNameFromGoogleMapsUrl(url);
+  console.log("Extracted name:", beachName);
+  
+  // Handle standard Google Maps URL format with @lat,lng
+  let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (match) {
+    console.log("Matched @lat,lng pattern");
+    return {
+      name: beachName || "New Beach",
+      latitude: parseFloat(match[1]),
+      longitude: parseFloat(match[2]),
+      googleMapsUrl: url
+    };
+  }
+  
+  // Handle maps.app.goo.gl short links
+  if (url.includes("maps.app.goo.gl") || url.includes("goo.gl")) {
+    console.log("Matched short URL pattern");
+    
+    // For short links, try to extract coordinates if possible
+    const location = extractLocationFromUrl(url);
+    
+    if (location) {
+      return {
+        name: beachName || "New Beach",
+        latitude: location.lat,
+        longitude: location.lng,
+        googleMapsUrl: url
+      };
+    }
+    
+    // Known beach mappings as fallback for specific short links
+    const knownShortlinks = {
+      "KP6MpuG6mgrv1Adm6": { name: "Kavouri Beach", latitude: 37.8235, longitude: 23.7761 },
+      "yEXLZW5kwBArCHvb7": { name: "Glyfada Beach", latitude: 37.8650, longitude: 23.7470 },
+      "6uUbtp31MQ63gGBSA": { name: "Astir Beach", latitude: 37.8095, longitude: 23.7850 },
+      "xcs6EqYy8LbzYq2y6": { name: "Kapsali Beach", latitude: 36.1360, longitude: 22.9980 },
+      "TPFetRbFcyAXdgNDA": { name: "Palaiopoli Beach", latitude: 36.2260, longitude: 23.0410 },
+      "dXhCRfbfmD6Kz2ot6": { name: "Agii Anargiri Beach", latitude: 37.7216, longitude: 23.9516 },
+      "9kr9Uc4NkATt7yAB7": { name: "Akti Iliou Beach", latitude: 37.8894, longitude: 23.7037 }
     };
     
     // Extract the ID from the URL
@@ -60,38 +143,21 @@ export const parseGoogleMapsUrl = (url) => {
     const id = urlParts[urlParts.length - 1];
     
     // Check if we have this specific beach
-    if (mapLinkMapping[id]) {
-      return mapLinkMapping[id];
-    }
-    
-    // If it's a maps.app.goo.gl URL we don't recognize, extract location from URL if possible
-    const location = extractLocationFromUrl(url);
-    
-    if (location) {
+    if (knownShortlinks[id]) {
       return {
-        name: "New Beach",  // Changed from "Beach" to "New Beach" for better UX
-        latitude: location.lat,
-        longitude: location.lng,
+        name: beachName || knownShortlinks[id].name,
+        latitude: knownShortlinks[id].latitude,
+        longitude: knownShortlinks[id].longitude,
         googleMapsUrl: url
       };
     }
     
-    // Fallback to Athens area
+    // We don't have direct access to coordinates in unknown short links
+    // In a real app, you'd use an API to resolve the short URL
     return {
-      name: "New Greek Beach",  // More descriptive default name
-      latitude: 37.8, 
+      name: beachName || "New Beach",
+      latitude: 37.9, // Athens area as fallback 
       longitude: 23.7,
-      googleMapsUrl: url
-    };
-  }
-  
-  // Handle @lat,lng format
-  let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if (match) {
-    return {
-      name: "New Beach",  // Better default name
-      latitude: parseFloat(match[1]),
-      longitude: parseFloat(match[2]),
       googleMapsUrl: url
     };
   }
@@ -99,14 +165,16 @@ export const parseGoogleMapsUrl = (url) => {
   // Handle ?q=lat,lng format
   match = url.match(/\?q=(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (match) {
+    console.log("Matched ?q=lat,lng pattern");
     return {
-      name: "New Beach",  // Better default name
+      name: beachName || "New Beach",
       latitude: parseFloat(match[1]),
       longitude: parseFloat(match[2]),
       googleMapsUrl: url
     };
   }
   
+  console.log("No matching pattern found");
   return null;
 };
 
