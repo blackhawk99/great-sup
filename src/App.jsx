@@ -16,6 +16,10 @@ const App = () => {
     endTime: "13:00",
   });
   
+  // App version information
+  const APP_VERSION = "1.0.2";
+  const LAST_UPDATED = "April 7, 2025";
+  
   // Use beach manager
   const { 
     beaches, 
@@ -429,10 +433,10 @@ const App = () => {
           </p>
           <div className="flex items-center mt-2 sm:mt-0">
             <span className="text-xs text-blue-300 border-r border-blue-600 pr-3 mr-3">
-              Version 1.0.2
+              Version {APP_VERSION}
             </span>
             <span className="text-xs text-blue-300">
-              Last updated: April 7, 2025
+              Last updated: {LAST_UPDATED}
             </span>
             {debugMode ? (
               <button onClick={() => setDebugMode(false)} className="ml-4 text-blue-300 hover:text-white text-xs">
