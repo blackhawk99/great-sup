@@ -8,70 +8,80 @@ export const getCardinalDirection = (degrees) => {
   return directions[(val % 16)];
 };
 
-// Parse Google Maps URL with expanded support
+// Helper function to try extracting location name from URL parameters
+const extractNameFromUrl = (url) => {
+  try {
+    // Try pattern: /place/Name/ in the URL
+    let placeMatch = url.match(/\/place\/([^\/]+)\//);
+    if (placeMatch && placeMatch[1]) {
+      const decoded = decodeURIComponent(placeMatch[1]);
+      // Clean up the name (replace + and remove coordinates)
+      return decoded
+        .replace(/\+/g, ' ')
+        .replace(/\d+\.\d+,\d+\.\d+/, '')
+        .trim();
+    }
+    
+    // Try pattern: ?q=Name in the URL
+    let qMatch = url.match(/[?&]q=([^&@]+)/);
+    if (qMatch && qMatch[1]) {
+      const decoded = decodeURIComponent(qMatch[1]);
+      // Remove coordinates if present
+      return decoded
+        .replace(/\+/g, ' ')
+        .replace(/\d+\.\d+,\d+\.\d+/, '')
+        .trim();
+    }
+    
+    return null;
+  } catch (e) {
+    console.error("Error extracting name from URL:", e);
+    return null;
+  }
+};
+
+// Helper function to try extracting location from URL parameters
+const extractLocationFromUrl = (url) => {
+  try {
+    // Try to find lat,lng pattern
+    const latLngMatch = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (latLngMatch) {
+      return {
+        lat: parseFloat(latLngMatch[1]),
+        lng: parseFloat(latLngMatch[2])
+      };
+    }
+    
+    // Try to find @lat,lng pattern
+    const atLatLngMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (atLatLngMatch) {
+      return {
+        lat: parseFloat(atLatLngMatch[1]),
+        lng: parseFloat(atLatLngMatch[2])
+      };
+    }
+    
+    return null;
+  } catch (e) {
+    console.error("Error extracting location from URL:", e);
+    return null;
+  }
+};
+
+// Parse Google Maps URL - standard pattern only, short URLs now handled by proxy.js
 export const parseGoogleMapsUrl = (url) => {
   if (!url) return null;
   
   console.log("Parsing URL:", url);
   
-  // Handle maps.app.goo.gl links by ID or any shortened URL
-  if (url.includes("maps.app.goo.gl") || url.includes("goo.gl")) {
-    // Direct mapping of shortlinks to known beaches
-    // This is needed because shortlinks don't contain the name in the URL itself
-    const knownBeaches = {
-      "KP6MpuG6mgrv1Adm6": { name: "Kavouri Beach", latitude: 37.8235, longitude: 23.7761 },
-      "yEXLZW5kwBArCHvb7": { name: "Glyfada Beach", latitude: 37.8650, longitude: 23.7470 },
-      "6uUbtp31MQ63gGBSA": { name: "Astir Beach", latitude: 37.8095, longitude: 23.7850 },
-      "xcs6EqYy8LbzYq2y6": { name: "Kapsali Beach", latitude: 36.1360, longitude: 22.9980 },
-      "TPFetRbFcyAXdgNDA": { name: "Palaiopoli Beach", latitude: 36.2260, longitude: 23.0410 },
-      "dXhCRfbfmD6Kz2ot6": { name: "Agii Anargiri Beach", latitude: 37.7216, longitude: 23.9516 },
-      "RQCy8NKnJNgb5V6w6": { name: "Unnamed Beach", latitude: 37.85, longitude: 23.75 },
-      // Add the specific beach the user is trying to add
-      "9kr9Uc4NkATt7yAB7": { name: "Akti Iliou Beach", latitude: 37.8894, longitude: 23.7037 }
-    };
-    
-    // Extract the ID from the URL
-    const urlParts = url.split('/');
-    const id = urlParts[urlParts.length - 1];
-    console.log("Extracted ID:", id);
-    
-    // Check if we have this specific beach
-    if (knownBeaches[id]) {
-      console.log("Found known beach:", knownBeaches[id]);
-      return {
-        name: knownBeaches[id].name,
-        latitude: knownBeaches[id].latitude,
-        longitude: knownBeaches[id].longitude,
-        googleMapsUrl: url
-      };
-    }
-    
-    console.log("Unknown shortened URL, using default coordinates");
-    return {
-      name: "New Beach",
-      latitude: 37.9, 
-      longitude: 23.7,
-      googleMapsUrl: url
-    };
-  }
+  // Extract name if it's in the URL
+  const nameFromUrl = extractNameFromUrl(url);
+  console.log("Name extracted from URL:", nameFromUrl);
   
-  // Handle standard Google Maps URL with coordinates and possibly name
-  let nameFromUrl = null;
-  
-  // Try to extract name from /place/ in URL (common format)
-  const placeMatch = url.match(/\/place\/([^\/]+)/);
-  if (placeMatch && placeMatch[1]) {
-    nameFromUrl = decodeURIComponent(placeMatch[1])
-      .replace(/\+/g, ' ')
-      .replace(/\d+\.\d+,\s*\d+\.\d+/, '')
-      .trim();
-    console.log("Extracted name from place pattern:", nameFromUrl);
-  }
-  
-  // Handle @lat,lng format
+  // Handle standard Google Maps URL with @lat,lng
   let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (match) {
-    console.log("Extracted coordinates from @ pattern");
+    console.log("Coordinates extracted from URL:", match[1], match[2]);
     return {
       name: nameFromUrl || "New Beach",
       latitude: parseFloat(match[1]),
@@ -83,7 +93,7 @@ export const parseGoogleMapsUrl = (url) => {
   // Handle ?q=lat,lng format
   match = url.match(/\?q=(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (match) {
-    console.log("Extracted coordinates from q= pattern");
+    console.log("Coordinates extracted from q= parameter:", match[1], match[2]);
     return {
       name: nameFromUrl || "New Beach",
       latitude: parseFloat(match[1]),
@@ -92,11 +102,16 @@ export const parseGoogleMapsUrl = (url) => {
     };
   }
   
+  // If it's a short URL, return null to let the proxy handler take over
+  if (url.includes("goo.gl")) {
+    console.log("Short URL detected, deferring to proxy handler");
+    return null;
+  }
+  
   console.log("No matching pattern found");
   return null;
 };
 
-// Rest of your component code...
 // Error Boundary Component
 export const ErrorBoundary = ({ children }) => {
   const [hasError, setHasError] = useState(false);
