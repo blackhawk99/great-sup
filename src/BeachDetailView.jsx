@@ -17,7 +17,7 @@ import {
   Clock
 } from "lucide-react";
 import { ErrorBoundary, DatePickerModal, getCardinalDirection } from "./helpers.jsx";
-import { fetchWeatherData, getCondition, filterHoursByTimeRange } from "./WeatherService.js";
+import { fetchWeatherData, getCondition, filterHoursByTimeRange } from "./WeatherService.jsx";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis.js";
 
 const BeachDetailView = ({ 
