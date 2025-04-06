@@ -1,4 +1,4 @@
-// Create a new file: src/utils/coastlineAnalysis.js
+// utils/coastlineAnalysis.js
 import * as turf from '@turf/turf';
 import { greeceCoastline } from '../data/greece-coastline';
 
@@ -190,3 +190,34 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     };
   }
 }
+
+// ADD THIS FUNCTION to export calculateGeographicProtection
+export const calculateGeographicProtection = async (beach, windDirection, waveDirection) => {
+  if (!beach || !beach.latitude || !beach.longitude) {
+    throw new Error('Invalid beach data for protection calculation');
+  }
+  
+  try {
+    // Always use dynamic analysis for any beach in Greece
+    const dynamicAnalysis = await analyzeBayProtection(
+      beach.latitude,
+      beach.longitude,
+      windDirection,
+      waveDirection
+    );
+    
+    return dynamicAnalysis;
+  } catch (error) {
+    console.error("Dynamic protection analysis failed:", error);
+    
+    // Fallback to simple estimation
+    return {
+      protectionScore: 50,
+      coastlineAngle: 0,
+      windProtection: 0.5,
+      waveProtection: 0.5,
+      bayEnclosure: 0.5,
+      isProtected: true
+    };
+  }
+};
