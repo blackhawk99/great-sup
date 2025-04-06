@@ -19,7 +19,6 @@ const App = () => {
   
   // App version information
   const APP_VERSION = "1.0.2";
-  const LAST_UPDATED = "April 7, 2025";
   
   // Update current time every minute
   useEffect(() => {
@@ -30,10 +29,17 @@ const App = () => {
     return () => clearInterval(timer);
   }, []);
   
-  // Format current time
+  // Format current time for display
   const formattedTime = currentTime.toLocaleTimeString([], { 
     hour: '2-digit', 
     minute: '2-digit'
+  });
+  
+  // Format current date for display
+  const formattedDate = currentTime.toLocaleDateString([], {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
   
   // Use beach manager
@@ -441,28 +447,25 @@ const App = () => {
         )}
       </main>
 
-      {/* Footer with Version Information and Current Time */}
+      {/* Footer with Version Information and Live Update Time */}
       <footer className="bg-blue-800 text-white p-4 mt-auto shadow-inner">
         <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center">
           <p className="text-sm">
             © 2025 Paddleboard Weather Advisor | Ladi Thalassa
           </p>
-          <div className="flex items-center mt-2 sm:mt-0">
-            <span className="text-xs text-blue-300 border-r border-blue-600 pr-3 mr-3">
+          <div className="flex items-center mt-2 sm:mt-0 text-xs text-blue-300">
+            <span className="border-r border-blue-600 pr-3 mr-3">
               Version {APP_VERSION}
             </span>
-            <span className="text-xs text-blue-300 border-r border-blue-600 pr-3 mr-3">
-              Last updated: {LAST_UPDATED}
-            </span>
-            <span className="text-xs text-blue-300 border-r border-blue-600 pr-3 mr-3">
-              Current time: {formattedTime}
+            <span className="border-r border-blue-600 pr-3 mr-3">
+              Last updated: {formattedDate} {formattedTime}
             </span>
             {debugMode ? (
-              <button onClick={() => setDebugMode(false)} className="text-blue-300 hover:text-white text-xs">
+              <button onClick={() => setDebugMode(false)} className="text-blue-300 hover:text-white">
                 Debug Mode On
               </button>
             ) : (
-              <button onClick={() => setDebugMode(true)} className="text-blue-300 hover:text-white text-xs">
+              <button onClick={() => setDebugMode(true)} className="text-blue-300 hover:text-white">
                 Enable Debug
               </button>
             )}
