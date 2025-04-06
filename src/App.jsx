@@ -421,15 +421,29 @@ const App = () => {
         )}
       </main>
 
-      {/* Footer */}
+      {/* Footer with Version Information */}
       <footer className="bg-blue-800 text-white p-4 mt-auto shadow-inner">
-        <div className="container mx-auto text-center text-sm">
-          <p>© 2025 Paddleboard Weather Advisor | Ladi Thalassa
-            {debugMode ? 
-              <button onClick={() => setDebugMode(false)} className="ml-4 text-blue-300 hover:text-white text-xs">Debug Mode On</button> :
-              <button onClick={() => setDebugMode(true)} className="ml-4 text-blue-300 hover:text-white text-xs">Enable Debug</button>
-            }
+        <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center">
+          <p className="text-sm">
+            © 2025 Paddleboard Weather Advisor | Ladi Thalassa
           </p>
+          <div className="flex items-center mt-2 sm:mt-0">
+            <span className="text-xs text-blue-300 border-r border-blue-600 pr-3 mr-3">
+              Version 1.0.2
+            </span>
+            <span className="text-xs text-blue-300">
+              Last updated: April 7, 2025
+            </span>
+            {debugMode ? (
+              <button onClick={() => setDebugMode(false)} className="ml-4 text-blue-300 hover:text-white text-xs">
+                Debug Mode On
+              </button>
+            ) : (
+              <button onClick={() => setDebugMode(true)} className="ml-4 text-blue-300 hover:text-white text-xs">
+                Enable Debug
+              </button>
+            )}
+          </div>
         </div>
       </footer>
     </div>
