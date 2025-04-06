@@ -66,52 +66,61 @@ const BeachDetailView = ({
   }, []);
 
   // Handle update forecast button
-  const handleUpdateForecast = () => {
-    if (!beach) return;
+
+const handleUpdateForecast = async () => {
+  if (!beach) return;
+  
+  setLoading(true);
+  setError(null);
+  
+  try {
+    // Fetch real weather data using the API
+    const { weatherData, score, scoreBreakdown } = await fetchWeatherData(beach, timeRange);
     
-    setLoading(true);
-    setError(null);
+    setWeatherData(weatherData);
+    setScore(score);
+    setScoreBreakdown(scoreBreakdown);
     
-    // Simple direct implementation to avoid external dependencies
-    try {
-      // Create mock data
-      const mockData = JSON.parse(JSON.stringify(mockDataRef.current["default"]));
-      
-      // Update the date
-      mockData.hourly.time = Array.from(
-        { length: 24 },
-        (_, i) => `${timeRange.date}T${String(i).padStart(2, "0")}:00`
-      );
-      
-      // Simulate API delay
-      setTimeout(() => {
-        // Set weather data
-        setWeatherData(mockData);
-        
-        // Calculate a simple score
-        setScore(75); // Default good score
-        
-        // Set score breakdown
-        setScoreBreakdown({
-          windSpeed: { raw: 8, protected: 6, score: 35, maxPossible: 40 },
-          waveHeight: { raw: 0.3, protected: 0.2, score: 15, maxPossible: 20 },
-          swellHeight: { raw: 0.2, protected: 0.15, score: 8, maxPossible: 10 },
-          precipitation: { value: 0.1, score: 10, maxPossible: 10 },
-          temperature: { value: 25, score: 10, maxPossible: 10 },
-          cloudCover: { value: 30, score: 10, maxPossible: 10 },
-          geoProtection: { value: 60, score: 9, maxPossible: 15 },
-          total: { score: 75, maxPossible: 100 }
-        });
-        
-        // End loading
-        setLoading(false);
-      }, 1000);
-    } catch (err) {
-      console.error("Error fetching weather data:", err);
-      setError("Error fetching data. Please try again.");
-      setLoading(false);
+    // Update last updated time in parent component if callback provided
+    if (onDataUpdate) {
+      onDataUpdate();
     }
-  };
+  } catch (err) {
+    console.error("Failed to update forecast:", err);
+    setError(err.message || "Failed to update forecast. Please try again.");
+    
+    // Set default fallback data
+    setWeatherData({
+      hourly: {
+        time: Array.from({ length: 24 }, (_, i) => `${timeRange.date}T${String(i).padStart(2, "0")}:00`),
+        temperature_2m: Array.from({ length: 24 }, () => 20),
+        precipitation: Array.from({ length: 24 }, () => 0),
+        cloudcover: Array.from({ length: 24 }, () => 30),
+        windspeed_10m: Array.from({ length: 24 }, () => 5),
+        winddirection_10m: Array.from({ length: 24 }, () => 180),
+      },
+      daily: {
+        wave_height_max: [0.1],
+        wave_direction_dominant: [180],
+      },
+      isRealData: false
+    });
+    
+    setScore(0);
+    setScoreBreakdown({
+      windSpeed: { raw: 0, protected: 0, score: 0, maxPossible: 40 },
+      waveHeight: { raw: 0, protected: 0, score: 0, maxPossible: 20 },
+      swellHeight: { raw: 0, protected: 0, score: 0, maxPossible: 10 },
+      precipitation: { value: 0, score: 0, maxPossible: 10 },
+      temperature: { value: 0, score: 0, maxPossible: 10 },
+      cloudCover: { value: 0, score: 0, maxPossible: 10 },
+      geoProtection: { value: 0, score: 0, maxPossible: 15 },
+      total: { score: 0, maxPossible: 100 }
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Render geographic protection information
   const renderGeographicInfo = (beach, weatherData) => {
