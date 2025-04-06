@@ -8,6 +8,35 @@ export const getCardinalDirection = (degrees) => {
   return directions[(val % 16)];
 };
 
+// Helper function to try extracting location from URL parameters
+const extractLocationFromUrl = (url) => {
+  try {
+    // Try to find lat,lng pattern
+    const latLngMatch = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (latLngMatch) {
+      return {
+        lat: parseFloat(latLngMatch[1]),
+        lng: parseFloat(latLngMatch[2])
+      };
+    }
+    
+    // Try to find lat and lng as separate parameters
+    const latMatch = url.match(/[?&]lat=(-?\d+\.\d+)/);
+    const lngMatch = url.match(/[?&]lng=(-?\d+\.\d+)/);
+    if (latMatch && lngMatch) {
+      return {
+        lat: parseFloat(latMatch[1]),
+        lng: parseFloat(lngMatch[1])
+      };
+    }
+    
+    return null;
+  } catch (e) {
+    console.error("Error extracting location from URL:", e);
+    return null;
+  }
+};
+
 // Parse Google Maps URL with expanded support
 export const parseGoogleMapsUrl = (url) => {
   if (!url) return null;
@@ -21,7 +50,9 @@ export const parseGoogleMapsUrl = (url) => {
       "6uUbtp31MQ63gGBSA": { name: "Astir Beach", latitude: 37.8095, longitude: 23.7850, googleMapsUrl: "https://maps.app.goo.gl/6uUbtp31MQ63gGBSA" },
       "xcs6EqYy8LbzYq2y6": { name: "Kapsali Beach", latitude: 36.1360, longitude: 22.9980, googleMapsUrl: "https://maps.app.goo.gl/xcs6EqYy8LbzYq2y6" },
       "TPFetRbFcyAXdgNDA": { name: "Palaiopoli Beach", latitude: 36.2260, longitude: 23.0410, googleMapsUrl: "https://maps.app.goo.gl/TPFetRbFcyAXdgNDA" },
-      "dXhCRfbfmD6Kz2ot6": { name: "Agii Anargiri Beach", latitude: 37.7216, longitude: 23.9516, googleMapsUrl: "https://maps.app.goo.gl/dXhCRfbfmD6Kz2ot6" }
+      "dXhCRfbfmD6Kz2ot6": { name: "Agii Anargiri Beach", latitude: 37.7216, longitude: 23.9516, googleMapsUrl: "https://maps.app.goo.gl/dXhCRfbfmD6Kz2ot6" },
+      // Add the new beach
+      "RQCy8NKnJNgb5V6w6": { name: "Unnamed Beach", latitude: 37.85, longitude: 23.75, googleMapsUrl: "https://maps.app.goo.gl/RQCy8NKnJNgb5V6w6" }
     };
     
     // Extract the ID from the URL
@@ -33,11 +64,22 @@ export const parseGoogleMapsUrl = (url) => {
       return mapLinkMapping[id];
     }
     
-    // If it's a maps.app.goo.gl URL we don't recognize, we'll need to call the Maps API
-    // For now, return a placeholder that keeps the original URL
+    // If it's a maps.app.goo.gl URL we don't recognize, extract location from URL if possible
+    const location = extractLocationFromUrl(url);
+    
+    if (location) {
+      return {
+        name: "New Beach",  // Changed from "Beach" to "New Beach" for better UX
+        latitude: location.lat,
+        longitude: location.lng,
+        googleMapsUrl: url
+      };
+    }
+    
+    // Fallback to Athens area
     return {
-      name: "Beach",
-      latitude: 37.8, // Default to Athens area
+      name: "New Greek Beach",  // More descriptive default name
+      latitude: 37.8, 
       longitude: 23.7,
       googleMapsUrl: url
     };
@@ -47,6 +89,7 @@ export const parseGoogleMapsUrl = (url) => {
   let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (match) {
     return {
+      name: "New Beach",  // Better default name
       latitude: parseFloat(match[1]),
       longitude: parseFloat(match[2]),
       googleMapsUrl: url
@@ -57,6 +100,7 @@ export const parseGoogleMapsUrl = (url) => {
   match = url.match(/\?q=(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (match) {
     return {
+      name: "New Beach",  // Better default name
       latitude: parseFloat(match[1]),
       longitude: parseFloat(match[2]),
       googleMapsUrl: url
