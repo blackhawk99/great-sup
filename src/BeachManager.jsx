@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { analyzeBayProtection } from "./utils/coastlineAnalysis";
 import { parseGoogleMapsUrl } from "./helpers";
+import { resolveGoogleMapsShortUrl } from "./proxy";
+import { getCardinalDirection } from "./helpers";
 
 export const useBeachManager = () => {
   const [beaches, setBeaches] = useState([]);
@@ -53,33 +55,47 @@ export const useBeachManager = () => {
     }
   }, [homeBeach]);
   
-  // Extract coordinates from Google Maps URL - with dynamic protection analysis
+  // Extract coordinates from Google Maps URL with dynamic name extraction
   const handleExtractCoordinates = async () => {
     try {
       setLoading(true);
-      const result = parseGoogleMapsUrl(mapUrl);
-      if (!result) {
+      console.log("Extracting coordinates from:", mapUrl);
+      
+      let beachData;
+      
+      // If it's a short URL (goo.gl), use the resolver
+      if (mapUrl.includes("goo.gl")) {
+        console.log("Short URL detected, using resolver");
+        beachData = await resolveGoogleMapsShortUrl(mapUrl);
+      } else {
+        // Otherwise use the standard parser
+        beachData = parseGoogleMapsUrl(mapUrl);
+      }
+      
+      if (!beachData) {
         throw new Error("Could not extract coordinates from URL. Please check format.");
       }
       
+      console.log("Extracted beach data:", beachData);
+      
       setNewBeach({
         ...newBeach,
-        name: result.name || "Beach",
-        latitude: result.latitude.toString(),
-        longitude: result.longitude.toString(),
-        googleMapsUrl: result.googleMapsUrl || mapUrl,
+        name: beachData.name || "New Beach",
+        latitude: beachData.latitude.toString(),
+        longitude: beachData.longitude.toString(),
+        googleMapsUrl: beachData.googleMapsUrl || mapUrl,
       });
       
       // Perform dynamic protection analysis with default wind/wave values
       try {
         const analysis = await analyzeBayProtection(
-          result.latitude,
-          result.longitude,
+          beachData.latitude,
+          beachData.longitude,
           180, // Default south wind
           180  // Default south waves
         );
         
-        if (result.name === "Beach" || !result.name) {
+        if (beachData.name === "New Beach" || !beachData.name) {
           // Try to generate a better name based on protection
           const directionName = getCardinalDirection((analysis.coastlineAngle + 180) % 360);
           let protectionName = "Beach";
