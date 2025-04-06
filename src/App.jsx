@@ -15,10 +15,26 @@ const App = () => {
     startTime: "09:00",
     endTime: "13:00",
   });
+  const [currentTime, setCurrentTime] = useState(new Date());
   
   // App version information
   const APP_VERSION = "1.0.2";
   const LAST_UPDATED = "April 7, 2025";
+  
+  // Update current time every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+    
+    return () => clearInterval(timer);
+  }, []);
+  
+  // Format current time
+  const formattedTime = currentTime.toLocaleTimeString([], { 
+    hour: '2-digit', 
+    minute: '2-digit'
+  });
   
   // Use beach manager
   const { 
@@ -425,7 +441,7 @@ const App = () => {
         )}
       </main>
 
-      {/* Footer with Version Information */}
+      {/* Footer with Version Information and Current Time */}
       <footer className="bg-blue-800 text-white p-4 mt-auto shadow-inner">
         <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center">
           <p className="text-sm">
@@ -435,15 +451,18 @@ const App = () => {
             <span className="text-xs text-blue-300 border-r border-blue-600 pr-3 mr-3">
               Version {APP_VERSION}
             </span>
-            <span className="text-xs text-blue-300">
+            <span className="text-xs text-blue-300 border-r border-blue-600 pr-3 mr-3">
               Last updated: {LAST_UPDATED}
             </span>
+            <span className="text-xs text-blue-300 border-r border-blue-600 pr-3 mr-3">
+              Current time: {formattedTime}
+            </span>
             {debugMode ? (
-              <button onClick={() => setDebugMode(false)} className="ml-4 text-blue-300 hover:text-white text-xs">
+              <button onClick={() => setDebugMode(false)} className="text-blue-300 hover:text-white text-xs">
                 Debug Mode On
               </button>
             ) : (
-              <button onClick={() => setDebugMode(true)} className="ml-4 text-blue-300 hover:text-white text-xs">
+              <button onClick={() => setDebugMode(true)} className="text-blue-300 hover:text-white text-xs">
                 Enable Debug
               </button>
             )}
