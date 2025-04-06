@@ -1,3 +1,4 @@
+// WeatherService.js - USING REAL WEATHER DATA
 import { getCardinalDirection } from "./helpers";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 
@@ -7,17 +8,27 @@ export const filterHoursByTimeRange = (hourlyData, range) => {
   
   const startHour = parseInt(range.startTime.split(":")[0]);
   const endHour = parseInt(range.endTime.split(":")[0]);
+  
+  // Create a map of indices for the given time range
+  const indices = [];
+  for (let i = 0; i < hourlyData.time.length; i++) {
+    const hourString = hourlyData.time[i];
+    const hour = new Date(hourString).getHours();
+    if (hour >= startHour && hour <= endHour) {
+      indices.push(i);
+    }
+  }
 
+  // Filter all data for the specified time range
   return {
-    temperature_2m: hourlyData.temperature_2m.slice(startHour, endHour + 1),
-    precipitation: hourlyData.precipitation.slice(startHour, endHour + 1),
-    cloudcover: hourlyData.cloudcover.slice(startHour, endHour + 1),
-    windspeed_10m: hourlyData.windspeed_10m.slice(startHour, endHour + 1),
-    winddirection_10m: hourlyData.winddirection_10m.slice(startHour, endHour + 1),
-    swell_wave_height: hourlyData.swell_wave_height ? 
-      hourlyData.swell_wave_height.slice(startHour, endHour + 1) : undefined,
-    wave_height: hourlyData.wave_height ? 
-      hourlyData.wave_height.slice(startHour, endHour + 1) : undefined
+    time: indices.map(i => hourlyData.time[i]),
+    temperature_2m: indices.map(i => hourlyData.temperature_2m[i]),
+    precipitation: indices.map(i => hourlyData.precipitation[i]),
+    cloudcover: indices.map(i => hourlyData.cloudcover[i]),
+    windspeed_10m: indices.map(i => hourlyData.windspeed_10m[i]),
+    winddirection_10m: indices.map(i => hourlyData.winddirection_10m[i]),
+    wave_height: hourlyData.wave_height ? indices.map(i => hourlyData.wave_height[i]) : undefined,
+    swell_wave_height: hourlyData.swell_wave_height ? indices.map(i => hourlyData.swell_wave_height[i]) : undefined
   };
 };
 
@@ -44,76 +55,115 @@ export const getCondition = (score) => {
   return { label: "Nope", emoji: "🚫", message: "Not recommended." };
 };
 
-// Generate location-specific weather data
-const generateLocationSpecificWeather = (latitude, longitude, date) => {
-  // Create a seed value based on location and date
-  const locationSeed = Math.floor((latitude * 10 + longitude * 7) % 23);
-  const dateParts = date.split('-');
-  const dateSeed = Math.floor((parseInt(dateParts[2]) * 3 + parseInt(dateParts[1]) * 5) % 17);
-  const combinedSeed = (locationSeed + dateSeed) % 100;
-  
-  // Use the seed to create variations in weather
-  const baseTemp = 20 + (combinedSeed % 10);
-  const windFactor = 0.8 + (combinedSeed % 15) / 10; // 0.8-2.3
-  const waveFactor = 0.7 + (combinedSeed % 12) / 20; // 0.7-1.3
-  const precipFactor = (combinedSeed % 20) / 100; // 0-0.19
-  
-  console.log(`Generating weather for lat=${latitude}, lng=${longitude}, seed=${combinedSeed}`);
-  console.log(`Weather factors: baseTemp=${baseTemp}, windFactor=${windFactor}, waveFactor=${waveFactor}`);
-  
-  return {
-    hourly: {
-      time: Array.from({ length: 24 }, (_, i) => `${date}T${String(i).padStart(2, "0")}:00`),
-      temperature_2m: Array.from({ length: 24 }, (_, i) => baseTemp + Math.sin(i / 3) * 4),
-      precipitation: Array.from({ length: 24 }, (_, i) => i < 10 ? 0 : i > 16 ? precipFactor : 0),
-      cloudcover: Array.from({ length: 24 }, (_, i) => 20 + (combinedSeed % 30) + Math.sin(i / 6) * 20),
-      windspeed_10m: Array.from({ length: 24 }, (_, i) => (6 + Math.sin(i / 4) * 4) * windFactor),
-      winddirection_10m: Array.from({ length: 24 }, (_, i) => {
-        const baseDirection = 90 + (combinedSeed % 270);
-        return (baseDirection + i * 5) % 360;
-      }),
-      wave_height: Array.from({ length: 24 }, (_, i) => (0.2 * waveFactor + (i / 80))),
-      swell_wave_height: Array.from({ length: 24 }, (_, i) => (0.1 * waveFactor + (i / 100))),
-    },
-    daily: {
-      wave_height_max: [0.3 * waveFactor],
-      wave_direction_dominant: [120 + (combinedSeed % 240)],
-    },
-    isRealData: false
-  };
-};
-
-// Main function to fetch and process weather data
-export const fetchWeatherData = async (beach, timeRange, mockDataRef) => {
+// Fetch real weather data from Open-Meteo API
+export const fetchWeatherData = async (beach, timeRange) => {
   if (!beach || !beach.latitude || !beach.longitude) {
     throw new Error("Invalid beach data");
   }
 
   try {
-    console.log("Fetching weather for beach:", beach.name, beach.latitude, beach.longitude);
+    console.log("Fetching REAL weather data for:", beach.name, beach.latitude, beach.longitude);
     
-    // Generate location-specific weather data instead of using fixed mock data
-    const mockData = generateLocationSpecificWeather(
-      beach.latitude,
-      beach.longitude, 
-      timeRange.date
-    );
+    // Format date for API
+    const date = new Date(timeRange.date);
+    const formattedDate = date.toISOString().split("T")[0];
     
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // Calculate start and end dates for forecast (we'll get 7 days)
+    const startDate = formattedDate;
+    const endDate = new Date(date);
+    endDate.setDate(endDate.getDate() + 7);
+    const formattedEndDate = endDate.toISOString().split("T")[0];
     
-    // Get relevant weather data and calculate score
-    const relevantHours = filterHoursByTimeRange(mockData.hourly, timeRange);
+    // Prepare Open-Meteo weather API URL
+    // Documentation: https://open-meteo.com/en/docs
+    const weatherApiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m&daily=precipitation_sum,windspeed_10m_max&start_date=${startDate}&end_date=${formattedEndDate}&timezone=auto`;
     
+    // Prepare Open-Meteo marine API URL for wave data
+    // Documentation: https://open-meteo.com/en/docs/marine-weather-api
+    const marineApiUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,wave_direction&daily=wave_height_max,wave_direction_dominant&start_date=${startDate}&end_date=${formattedEndDate}&timezone=auto`;
+    
+    console.log("Weather API URL:", weatherApiUrl);
+    console.log("Marine API URL:", marineApiUrl);
+    
+    // Fetch weather and marine data in parallel
+    const [weatherResponse, marineResponse] = await Promise.all([
+      fetch(weatherApiUrl),
+      fetch(marineApiUrl)
+    ]);
+    
+    // Check for errors
+    if (!weatherResponse.ok || !marineResponse.ok) {
+      throw new Error("Failed to fetch weather data");
+    }
+    
+    // Parse JSON responses
+    const weatherData = await weatherResponse.json();
+    const marineData = await marineResponse.json();
+    
+    console.log("Weather data received:", weatherData);
+    console.log("Marine data received:", marineData);
+    
+    // Combine data into a single object
+    const combinedData = {
+      hourly: {
+        time: weatherData.hourly.time,
+        temperature_2m: weatherData.hourly.temperature_2m,
+        precipitation: weatherData.hourly.precipitation,
+        cloudcover: weatherData.hourly.cloudcover,
+        windspeed_10m: weatherData.hourly.windspeed_10m,
+        winddirection_10m: weatherData.hourly.winddirection_10m,
+        wave_height: marineData.hourly.wave_height,
+        swell_wave_height: marineData.hourly.swell_wave_height,
+        wave_direction: marineData.hourly.wave_direction,
+      },
+      daily: {
+        wave_height_max: marineData.daily.wave_height_max,
+        wave_direction_dominant: marineData.daily.wave_direction_dominant,
+      },
+      isRealData: true
+    };
+    
+    // Filter data for the requested date
+    const requestedDate = timeRange.date;
+    
+    // Filter hourly data for the selected date
+    const todayData = {
+      hourly: {
+        time: combinedData.hourly.time.filter(t => t.startsWith(requestedDate)),
+        temperature_2m: filterByDate(combinedData.hourly.time, combinedData.hourly.temperature_2m, requestedDate),
+        precipitation: filterByDate(combinedData.hourly.time, combinedData.hourly.precipitation, requestedDate),
+        cloudcover: filterByDate(combinedData.hourly.time, combinedData.hourly.cloudcover, requestedDate),
+        windspeed_10m: filterByDate(combinedData.hourly.time, combinedData.hourly.windspeed_10m, requestedDate),
+        winddirection_10m: filterByDate(combinedData.hourly.time, combinedData.hourly.winddirection_10m, requestedDate),
+        wave_height: filterByDate(combinedData.hourly.time, combinedData.hourly.wave_height, requestedDate),
+        swell_wave_height: filterByDate(combinedData.hourly.time, combinedData.hourly.swell_wave_height, requestedDate),
+        wave_direction: filterByDate(combinedData.hourly.time, combinedData.hourly.wave_direction, requestedDate),
+      },
+      daily: {
+        // Use the first day data (today)
+        wave_height_max: [combinedData.daily.wave_height_max[0]],
+        wave_direction_dominant: [combinedData.daily.wave_direction_dominant[0]],
+      },
+      isRealData: true
+    };
+    
+    // Get relevant weather data for the time range
+    const relevantHours = filterHoursByTimeRange(todayData.hourly, timeRange);
+    
+    // Get average wind direction
     const avgWindDirection =
       relevantHours.winddirection_10m.reduce((sum, val) => sum + val, 0) /
       relevantHours.winddirection_10m.length;
     
-    const waveDirection = mockData.daily.wave_direction_dominant ? 
-                      mockData.daily.wave_direction_dominant[0] : 
-                      avgWindDirection;
+    // Get wave direction
+    const waveDirection = todayData.daily.wave_direction_dominant ? 
+                      todayData.daily.wave_direction_dominant[0] : 
+                      relevantHours.wave_direction ? 
+                        relevantHours.wave_direction.reduce((sum, val) => sum + val, 0) / 
+                        relevantHours.wave_direction.length : 
+                        avgWindDirection;
     
-    // Calculate protection
+    // Calculate protection using REAL geographical data
     let protection;
     try {
       protection = await calculateGeographicProtection(beach, avgWindDirection, waveDirection);
@@ -127,23 +177,30 @@ export const fetchWeatherData = async (beach, timeRange, mockDataRef) => {
       };
     }
     
-    // Calculate score
+    // Calculate score using REAL data
     const { calculatedScore, breakdown } = calculatePaddleScore(
       relevantHours,
-      mockData.daily,
+      todayData.daily,
       beach,
       protection
     );
     
+    console.log("Calculated final score:", calculatedScore);
+    
     return {
-      weatherData: mockData,
+      weatherData: todayData,
       score: calculatedScore,
       scoreBreakdown: breakdown
     };
   } catch (error) {
-    console.error("Error with weather data:", error);
-    throw error;
+    console.error("Error fetching real weather data:", error);
+    throw new Error(`Failed to get weather data: ${error.message}. Please try again or check your internet connection.`);
   }
+};
+
+// Helper function to filter arrays by date
+const filterByDate = (times, values, date) => {
+  return values.filter((_, index) => times[index].startsWith(date));
 };
 
 // Calculate paddle score with dynamic protection
