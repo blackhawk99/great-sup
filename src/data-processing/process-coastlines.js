@@ -1,11 +1,16 @@
 // data-processing/process-coastlines.js
-const fs = require('fs');
-const path = require('path');
-const turf = require('@turf/turf');
+import fs from 'fs';
+import path from 'path';
+import * as turf from '@turf/turf';
+import { fileURLToPath } from 'url';
+
+// Get current directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configuration
 const INPUT_FILE = './gadm41_GRC_1.json';
-const OUTPUT_DIR = './src/data';
+const OUTPUT_DIR = path.join(__dirname, '../src/data');
 
 // Simplification settings
 const SIMPLIFY_TOLERANCE = 0.005; // Higher = more simplification, smaller files
@@ -78,8 +83,8 @@ function processFeatures(features) {
             islands.push({
               type: 'Feature',
               properties: {
-                name: `${feature.properties.NAME_1 || 'Region'}_Island_${polyIndex}`,
-                region: feature.properties.NAME_1 || 'Unknown'
+                name: `${feature.properties?.NAME_1 || 'Region'}_Island_${polyIndex}`,
+                region: feature.properties?.NAME_1 || 'Unknown'
               },
               geometry: simplifiedIsland.geometry
             });
@@ -90,8 +95,8 @@ function processFeatures(features) {
           coastlines.push({
             type: 'Feature',
             properties: {
-              name: `${feature.properties.NAME_1 || 'Region'}_Coast_${polyIndex}`,
-              region: feature.properties.NAME_1 || 'Unknown'
+              name: `${feature.properties?.NAME_1 || 'Region'}_Coast_${polyIndex}`,
+              region: feature.properties?.NAME_1 || 'Unknown'
             },
             geometry: {
               type: 'LineString',
@@ -114,8 +119,8 @@ function processFeatures(features) {
           islands.push({
             type: 'Feature',
             properties: {
-              name: feature.properties.NAME_1 || `Island_${index}`,
-              region: feature.properties.NAME_1 || 'Unknown'
+              name: feature.properties?.NAME_1 || `Island_${index}`,
+              region: feature.properties?.NAME_1 || 'Unknown'
             },
             geometry: simplifiedIsland.geometry
           });
@@ -125,8 +130,8 @@ function processFeatures(features) {
         coastlines.push({
           type: 'Feature',
           properties: {
-            name: `${feature.properties.NAME_1 || 'Region'}_Coast`,
-            region: feature.properties.NAME_1 || 'Unknown'
+            name: `${feature.properties?.NAME_1 || 'Region'}_Coast`,
+            region: feature.properties?.NAME_1 || 'Unknown'
           },
           geometry: {
             type: 'LineString',
