@@ -20,13 +20,13 @@ const App = () => {
   // App version information
   const APP_VERSION = "1.0.3";
   
-  // Format last updated time for display
+  // Format last updated time
   const formattedUpdateTime = lastUpdated.toLocaleTimeString([], { 
     hour: '2-digit', 
     minute: '2-digit'
   });
   
-  // Format last updated date for display
+  // Format last updated date
   const formattedUpdateDate = lastUpdated.toLocaleDateString([], {
     year: 'numeric',
     month: 'long',
@@ -64,6 +64,11 @@ const App = () => {
     },
   };
   
+  // Function to update the last updated timestamp
+  const handleDataUpdate = () => {
+    setLastUpdated(new Date());
+  };
+  
   // Handle beach selection
   const handleBeachSelect = (beach) => {
     if (!beach || !beach.latitude || !beach.longitude) {
@@ -79,6 +84,7 @@ const App = () => {
   const handleSetHomeBeach = (beach) => {
     setHomeBeach(beach);
     toast.success(`${beach.name} set as home beach!`);
+    handleDataUpdate(); // Update timestamp
   };
   
   // Handle time range change
@@ -91,7 +97,7 @@ const App = () => {
     try {
       const beach = await addBeach(newBeach);
       toast.success(`Added ${beach.name} to your beaches!`);
-      setLastUpdated(new Date()); // Update timestamp when beach is added
+      handleDataUpdate(); // Update timestamp
       setView("dashboard");
     } catch (error) {
       toast.error(error.message);
@@ -103,7 +109,7 @@ const App = () => {
     try {
       const beach = await addSuggestedBeach(location);
       toast.success(`Added ${beach.name} to your beaches!`);
-      setLastUpdated(new Date()); // Update timestamp when beach is added
+      handleDataUpdate(); // Update timestamp
       setView("dashboard");
     } catch (error) {
       toast.error(error.message);
@@ -125,13 +131,8 @@ const App = () => {
       setView("dashboard");
     }
     
-    setLastUpdated(new Date()); // Update timestamp when beach is deleted
+    handleDataUpdate(); // Update timestamp
     toast.success(`Removed ${name}`);
-  };
-  
-  // Update timestamp when forecast is updated
-  const handleDataUpdate = () => {
-    setLastUpdated(new Date());
   };
 
   // Greek coastal locations with correct Google Maps URLs
@@ -441,7 +442,7 @@ const App = () => {
               beaches={beaches}
               toast={toast}
               debugMode={debugMode}
-              onDataUpdate={handleDataUpdate}  // Pass the function here
+              onDataUpdate={handleDataUpdate}
             />
           </ErrorBoundary>
         )}
