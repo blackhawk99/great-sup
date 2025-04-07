@@ -1,105 +1,244 @@
-// src/FixedBeachView.jsx
+// FixedBeachView.jsx - Production-ready with all required features
 import React, { useState, useEffect } from "react";
-import { 
-  Home, 
-  ChevronLeft, 
-  Calendar, 
-  RefreshCw, 
-  AlertCircle, 
-  MapPin, 
-  Map, 
-  Wind, 
-  Waves,
-  Thermometer,
-  Droplets,
-  Sun,
-  Clock,
-  Info
-} from "lucide-react";
-import { ErrorBoundary, DatePickerModal, getCardinalDirection } from "./helpers";
-import { fetchWeatherData, getCondition } from "./WeatherService";
+import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermometer, Droplets, Waves, Sun, Clock, Calendar, Info } from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
-
-// Info tooltip component
-const InfoTooltip = ({ content }) => {
-  return (
-    <div className="group relative inline-block ml-1">
-      <Info className="h-4 w-4 text-blue-400 cursor-help" />
-      <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 bg-gray-800 text-white p-2 rounded-lg text-xs shadow-lg z-10">
-        <div className="relative">
-          {content}
-          <div className="absolute w-3 h-3 bg-gray-800 transform rotate-45 left-1 bottom-[-6px]"></div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Factor explanations for tooltips
-const factorExplanations = {
-  windSpeed: "Wind speed affects paddleboarding stability. Lower speeds (under 8 km/h) are ideal. Scores decrease as wind speed increases.",
-  waveHeight: "Wave height affects water choppiness. Waves under 0.2m are ideal for paddleboarding. Scores decrease with increasing wave height.",
-  swellHeight: "Swell represents longer-period waves. Values under 0.3m are best for paddleboarding. Higher swells make balance more difficult.",
-  precipitation: "Rain affects visibility and comfort. Any precipitation over 1mm reduces the score significantly.",
-  temperature: "Ideal temperature range is 22-30°C. Scores decrease below 22°C or above 30°C.",
-  cloudCover: "Lower cloud cover is preferred. Under 40% is ideal. Higher cover impacts experience but has minimal safety impact.",
-  geoProtection: "Geographic protection measures how sheltered the location is from open water. Higher scores mean better protection from winds and waves.",
-  bayEnclosure: "Measures how surrounded by land the location is. Well-enclosed bays provide better protection from winds and waves.",
-  windDirection: "Indicates if the current wind direction is blocked by nearby land features. Protected means land is blocking the wind.",
-  overallProtection: "Combined score considering bay enclosure, wind protection, and wave protection. Higher is better."
-};
+import { getCardinalDirection } from "./helpers";
 
 const FixedBeachView = ({ 
   beach, 
   homeBeach, 
   onSetHomeBeach, 
   setView, 
-  timeRange,
-  onTimeRangeChange,
   onDataUpdate,
-  debugMode
+  timeRange,
+  onTimeRangeChange
 }) => {
   const [weatherData, setWeatherData] = useState(null);
-  const [score, setScore] = useState(null);
+  const [marineData, setMarineData] = useState(null);
+  const [paddleScore, setPaddleScore] = useState(null);
   const [scoreBreakdown, setScoreBreakdown] = useState(null);
   const [geoProtection, setGeoProtection] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-
-  // Load weather data when component mounts
+  
+  // Load data on mount and when date/time changes
   useEffect(() => {
     if (beach) {
-      handleUpdateForecast();
+      fetchWeatherData();
     }
-  }, [beach?.id]);
-
-  // Handle update forecast button
-  const handleUpdateForecast = async () => {
+  }, [beach?.id, timeRange.date]);
+  
+  // Fetch real weather data
+  const fetchWeatherData = async () => {
     if (!beach) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      const result = await fetchWeatherData(beach, timeRange);
+      // Format dates for API
+      const today = new Date(timeRange.date);
+      const formattedDate = today.toISOString().split('T')[0];
       
-      setWeatherData(result.weatherData);
-      setScore(result.score);
-      setScoreBreakdown(result.scoreBreakdown);
-      setGeoProtection(result.weatherData.geoProtection);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const formattedTomorrow = tomorrow.toISOString().split('T')[0];
       
+      // API URLs
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m&daily=precipitation_sum,windspeed_10m_max&start_date=${formattedDate}&end_date=${formattedTomorrow}&timezone=auto`;
+      
+      const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,wave_direction&daily=wave_height_max,wave_direction_dominant&start_date=${formattedDate}&end_date=${formattedTomorrow}&timezone=auto`;
+      
+      // Fetch data
+      const [weatherRes, marineRes] = await Promise.all([
+        fetch(weatherUrl),
+        fetch(marineUrl)
+      ]);
+      
+      if (!weatherRes.ok) throw new Error(`Weather API error: ${weatherRes.status}`);
+      if (!marineRes.ok) throw new Error(`Marine API error: ${marineRes.status}`);
+      
+      const weatherData = await weatherRes.json();
+      const marineData = await marineRes.json();
+      
+      setWeatherData(weatherData);
+      setMarineData(marineData);
+      
+      // Calculate scores
+      await calculateScores(weatherData, marineData, beach);
+      
+      // Update last updated timestamp
       if (typeof onDataUpdate === 'function') {
         onDataUpdate();
       }
     } catch (err) {
-      console.error("Failed to update forecast:", err);
-      setError(err.message || "Failed to update forecast. Please try again.");
+      console.error("Error fetching data:", err);
+      setError(err.message || "Failed to fetch weather data");
     } finally {
       setLoading(false);
     }
   };
-
+  
+  // Calculate paddleboarding scores
+  const calculateScores = async (weather, marine, beach) => {
+    try {
+      // Get data for the selected time range
+      const startHour = parseInt(timeRange.startTime.split(":")[0]);
+      const endHour = parseInt(timeRange.endTime.split(":")[0]);
+      
+      // Find indices for relevant hours
+      const relevantIndices = [];
+      for (let i = 0; i < weather.hourly.time.length; i++) {
+        const time = new Date(weather.hourly.time[i]);
+        if (time.getHours() >= startHour && time.getHours() <= endHour) {
+          relevantIndices.push(i);
+        }
+      }
+      
+      // If no hours match, use default range
+      if (relevantIndices.length === 0) {
+        for (let i = 0; i < weather.hourly.time.length; i++) {
+          const time = new Date(weather.hourly.time[i]);
+          if (time.getDate() === new Date(timeRange.date).getDate()) {
+            relevantIndices.push(i);
+          }
+        }
+      }
+      
+      // Calculate averages
+      const avgTemp = relevantIndices.map(i => weather.hourly.temperature_2m[i])
+        .reduce((sum, val) => sum + val, 0) / relevantIndices.length;
+      
+      const avgWind = relevantIndices.map(i => weather.hourly.windspeed_10m[i])
+        .reduce((sum, val) => sum + val, 0) / relevantIndices.length;
+      
+      const avgCloud = relevantIndices.map(i => weather.hourly.cloudcover[i])
+        .reduce((sum, val) => sum + val, 0) / relevantIndices.length;
+      
+      const maxPrecip = Math.max(...relevantIndices.map(i => weather.hourly.precipitation[i]));
+      
+      const avgWindDir = relevantIndices.map(i => weather.hourly.winddirection_10m[i])
+        .reduce((sum, val) => sum + val, 0) / relevantIndices.length;
+      
+      // Get wave data from daily or calculate from hourly
+      const waveHeight = marine.daily.wave_height_max[0];
+      
+      const avgSwellHeight = relevantIndices.map(i => marine.hourly.swell_wave_height[i])
+        .reduce((sum, val) => sum + val, 0) / relevantIndices.length;
+      
+      // Calculate geographic protection
+      const waveDirection = marine.daily.wave_direction_dominant[0];
+      const protection = await calculateGeographicProtection(beach, avgWindDir, waveDirection);
+      setGeoProtection(protection);
+      
+      // Apply protection factors
+      const protectedWindSpeed = avgWind * (1 - (protection.windProtection * 0.9));
+      const protectedWaveHeight = waveHeight * (1 - (protection.waveProtection * 0.9));
+      const protectedSwellHeight = avgSwellHeight * (1 - (protection.waveProtection * 0.85));
+      
+      // Initialize score breakdown
+      const breakdown = {
+        windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 40 },
+        waveHeight: { raw: waveHeight, protected: protectedWaveHeight, score: 0, maxPossible: 20 },
+        swellHeight: { raw: avgSwellHeight, protected: protectedSwellHeight, score: 0, maxPossible: 10 },
+        precipitation: { value: maxPrecip, score: 0, maxPossible: 10 },
+        temperature: { value: avgTemp, score: 0, maxPossible: 10 },
+        cloudCover: { value: avgCloud, score: 0, maxPossible: 10 },
+        geoProtection: { value: protection.protectionScore, score: 0, maxPossible: 15 },
+        total: { score: 0, maxPossible: 100 }
+      };
+      
+      // Calculate individual scores
+      let totalScore = 0;
+      
+      // Wind speed score (0-40 points)
+      breakdown.windSpeed.score = protectedWindSpeed < 8 ? 40 : 
+                                 Math.max(0, 40 - (protectedWindSpeed - 8) * (40 / 12));
+      totalScore += breakdown.windSpeed.score;
+      
+      // Wave height score (0-20 points)
+      breakdown.waveHeight.score = protectedWaveHeight < 0.2 ? 20 : 
+                                  Math.max(0, 20 - (protectedWaveHeight - 0.2) * (20 / 0.4));
+      totalScore += breakdown.waveHeight.score;
+      
+      // Swell height score (0-10 points)
+      breakdown.swellHeight.score = protectedSwellHeight < 0.3 ? 10 : 
+                                   Math.max(0, 10 - (protectedSwellHeight - 0.3) * (10 / 0.3));
+      totalScore += breakdown.swellHeight.score;
+      
+      // Precipitation score (0-10 points)
+      breakdown.precipitation.score = maxPrecip < 1 ? 10 : 0;
+      totalScore += breakdown.precipitation.score;
+      
+      // Temperature score (0-10 points)
+      if (avgTemp >= 22 && avgTemp <= 30) {
+        breakdown.temperature.score = 10;
+      } else if (avgTemp < 22) {
+        breakdown.temperature.score = Math.max(0, 10 - (22 - avgTemp));
+      } else {
+        breakdown.temperature.score = Math.max(0, 10 - (avgTemp - 30));
+      }
+      totalScore += breakdown.temperature.score;
+      
+      // Cloud cover score (0-10 points)
+      breakdown.cloudCover.score = avgCloud < 40 ? 10 : 
+                                  Math.max(0, 10 - (avgCloud - 40) / 6);
+      totalScore += breakdown.cloudCover.score;
+      
+      // Geographic protection score (0-15 points)
+      breakdown.geoProtection.score = (protection.protectionScore / 100) * 15;
+      totalScore += breakdown.geoProtection.score;
+      
+      // Round scores for display
+      breakdown.windSpeed.score = Math.round(breakdown.windSpeed.score);
+      breakdown.waveHeight.score = Math.round(breakdown.waveHeight.score);
+      breakdown.swellHeight.score = Math.round(breakdown.swellHeight.score);
+      breakdown.precipitation.score = Math.round(breakdown.precipitation.score);
+      breakdown.temperature.score = Math.round(breakdown.temperature.score);
+      breakdown.cloudCover.score = Math.round(breakdown.cloudCover.score);
+      breakdown.geoProtection.score = Math.round(breakdown.geoProtection.score);
+      breakdown.total.score = Math.round(Math.min(100, totalScore));
+      
+      // Apply special conditions
+      if (maxPrecip >= 1.5) {
+        breakdown.precipitation.score = 0;
+        breakdown.total.score = Math.min(breakdown.total.score, 40);
+      }
+      
+      setPaddleScore(breakdown.total.score);
+      setScoreBreakdown(breakdown);
+      
+    } catch (err) {
+      console.error("Error calculating scores:", err);
+      setPaddleScore(null);
+      setScoreBreakdown(null);
+    }
+  };
+  
+  // Get condition based on score
+  const getCondition = (score) => {
+    if (score >= 85)
+      return {
+        label: "Perfect",
+        emoji: "✅",
+        message: "Flat like oil. Paddle on.",
+      };
+    if (score >= 70)
+      return {
+        label: "Okay-ish",
+        emoji: "⚠️",
+        message: "Minor chop. Go early.",
+      };
+    if (score >= 50)
+      return {
+        label: "Not Great",
+        emoji: "❌",
+        message: "Wind or waves make it tricky.",
+      };
+    return { label: "Nope", emoji: "🚫", message: "Not recommended." };
+  };
+  
   // Render score breakdown
   const renderScoreBreakdown = () => {
     if (!scoreBreakdown) return null;
@@ -109,7 +248,6 @@ const FixedBeachView = ({
         <h4 className="font-medium mb-4 flex items-center text-gray-800">
           <Info className="h-5 w-5 mr-2 text-blue-600" />
           Score Breakdown
-          <InfoTooltip content="How each factor contributes to the overall paddleboarding suitability score. Higher is better." />
         </h4>
         
         <div className="overflow-hidden rounded-lg border border-gray-200">
@@ -123,10 +261,7 @@ const FixedBeachView = ({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700 flex items-center">
-                  Wind Speed
-                  <InfoTooltip content={factorExplanations.windSpeed} />
-                </td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Wind Speed</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.windSpeed.raw.toFixed(1)} km/h 
                   <span className="text-xs text-gray-400 ml-1">
@@ -141,10 +276,7 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700 flex items-center">
-                  Wave Height
-                  <InfoTooltip content={factorExplanations.waveHeight} />
-                </td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Wave Height</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.waveHeight.raw.toFixed(2)} m
                   <span className="text-xs text-gray-400 ml-1">
@@ -159,10 +291,7 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700 flex items-center">
-                  Swell Height
-                  <InfoTooltip content={factorExplanations.swellHeight} />
-                </td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Swell Height</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.swellHeight.raw.toFixed(2)} m
                 </td>
@@ -174,10 +303,7 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700 flex items-center">
-                  Precipitation
-                  <InfoTooltip content={factorExplanations.precipitation} />
-                </td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Precipitation</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.precipitation.value.toFixed(1)} mm
                 </td>
@@ -188,10 +314,7 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700 flex items-center">
-                  Temperature
-                  <InfoTooltip content={factorExplanations.temperature} />
-                </td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Temperature</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.temperature.value.toFixed(1)} °C
                 </td>
@@ -202,10 +325,7 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700 flex items-center">
-                  Cloud Cover
-                  <InfoTooltip content={factorExplanations.cloudCover} />
-                </td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Cloud Cover</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.cloudCover.value.toFixed(0)}%
                 </td>
@@ -217,10 +337,7 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700 flex items-center">
-                  Geographic Protection
-                  <InfoTooltip content={factorExplanations.geoProtection} />
-                </td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Geographic Protection</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.geoProtection.value.toFixed(0)}/100
                 </td>
@@ -249,7 +366,7 @@ const FixedBeachView = ({
     );
   };
   
-  // Render geographic protection information
+  // Render geographic protection info
   const renderGeoProtectionInfo = () => {
     if (!geoProtection) return null;
     
@@ -262,16 +379,12 @@ const FixedBeachView = ({
         <h4 className="font-medium mb-4 text-lg flex items-center text-blue-800">
           <MapPin className="h-5 w-5 mr-2 text-blue-600" />
           Geographic Protection Analysis
-          <InfoTooltip content="Analysis of how protected this beach is based on surrounding land features." />
         </h4>
         
         <div className="grid md:grid-cols-2 gap-6">
           <ul className="space-y-3">
             <li className="flex justify-between items-center bg-white p-3 rounded border">
-              <span className="font-medium text-gray-700 flex items-center">
-                Bay Enclosure:
-                <InfoTooltip content={factorExplanations.bayEnclosure} />
-              </span>
+              <span className="font-medium text-gray-700">Bay Enclosure:</span>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 geoProtection.bayEnclosure > 0.6 
                   ? 'bg-green-100 text-green-800' 
@@ -287,10 +400,7 @@ const FixedBeachView = ({
               </span>
             </li>
             <li className="flex justify-between items-center bg-white p-3 rounded border">
-              <span className="font-medium text-gray-700 flex items-center">
-                Wind Direction:
-                <InfoTooltip content={factorExplanations.windDirection} />
-              </span>
+              <span className="font-medium text-gray-700">Wind Direction:</span>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 geoProtection.windProtection > 0.7 
                   ? 'bg-green-100 text-green-800' 
@@ -307,10 +417,7 @@ const FixedBeachView = ({
               </span>
             </li>
             <li className="flex justify-between items-center bg-white p-3 rounded border">
-              <span className="font-medium text-gray-700 flex items-center">
-                Overall Protection:
-                <InfoTooltip content={factorExplanations.overallProtection} />
-              </span>
+              <span className="font-medium text-gray-700">Overall Protection:</span>
               <div className="flex items-center">
                 <div className="w-24 h-3 bg-gray-200 rounded-full overflow-hidden mr-2">
                   <div 
@@ -363,19 +470,83 @@ const FixedBeachView = ({
       </div>
     );
   };
-
-  // Render hourly wind speed visualization
-  const renderWindSpeedVisualization = () => {
-    // ... your existing implementation ...
-  };
-
-  // Render beach comparison section
-  const renderBeachComparison = () => {
-    // ... your existing implementation ...
+  
+  // Render hourly wind data
+  const renderHourlyWind = () => {
+    if (!weatherData || !weatherData.hourly) return null;
+    
+    const startHour = parseInt(timeRange.startTime.split(":")[0]);
+    const endHour = parseInt(timeRange.endTime.split(":")[0]);
+    
+    // Find relevant hours
+    const relevantHours = [];
+    for (let i = 0; i < weatherData.hourly.time.length; i++) {
+      const hourDate = new Date(weatherData.hourly.time[i]);
+      const hour = hourDate.getHours();
+      
+      if (hour >= startHour && hour <= endHour) {
+        relevantHours.push({
+          hour,
+          index: i,
+          windSpeed: weatherData.hourly.windspeed_10m[i],
+          time: weatherData.hourly.time[i]
+        });
+      }
+    }
+    
+    if (relevantHours.length === 0) return null;
+    
+    return (
+      <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
+        <h4 className="font-medium mb-4 flex items-center text-gray-800">
+          <Clock className="h-5 w-5 mr-2 text-blue-600" /> 
+          Hourly Wind Speed
+        </h4>
+        
+        <div className="space-y-3">
+          {relevantHours.map(hour => {
+            const windSpeed = Math.round(hour.windSpeed);
+            const barWidth = Math.min(80, windSpeed * 6); // Cap at 80% width
+            
+            let barColor = "bg-green-500";
+            let textColor = "text-green-800";
+            let bgColor = "bg-green-100";
+            
+            if (windSpeed >= 12) {
+              barColor = "bg-red-500";
+              textColor = "text-red-800";
+              bgColor = "bg-red-100";
+            } else if (windSpeed >= 8) {
+              barColor = "bg-yellow-500";
+              textColor = "text-yellow-800";
+              bgColor = "bg-yellow-100";
+            }
+            
+            return (
+              <div key={hour.index} className="flex items-center">
+                <div className="w-12 text-gray-600 font-medium">
+                  {hour.hour}:00
+                </div>
+                <div className="flex-grow mx-3 bg-gray-200 h-6 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${barColor} rounded-l-full`} 
+                    style={{ width: `${barWidth}%` }} 
+                  ></div>
+                </div>
+                <div className={`px-2 py-1 rounded-md ${bgColor} ${textColor} font-medium text-sm min-w-[70px] text-center`}>
+                  {windSpeed} km/h
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+      {/* Header with beach info */}
       <div className="p-4 border-b flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-semibold flex items-center">
@@ -419,28 +590,20 @@ const FixedBeachView = ({
         </div>
       </div>
 
-      {/* Time Range Selector */}
+      {/* Time range selector */}
       <div className="p-4 border-b bg-gray-50">
         <h3 className="text-lg font-medium mb-4">Choose Date & Time Window</h3>
         
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-          <div 
-            className="relative cursor-pointer" 
-            onClick={() => setShowDatePicker(true)}
-          >
+          <div className="relative cursor-pointer">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Calendar className="h-5 w-5 text-gray-400" />
             </div>
             <input
-              type="text"
-              value={new Date(timeRange.date).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
-              readOnly
+              type="date"
+              value={timeRange.date}
+              onChange={(e) => onTimeRangeChange?.('date', e.target.value)}
               className="w-full pl-10 p-3 bg-white border rounded-lg cursor-pointer text-lg"
             />
           </div>
@@ -448,19 +611,16 @@ const FixedBeachView = ({
         
         <div className="flex space-x-4 mb-4">
           <button 
-            onClick={() => {
-              const today = new Date().toISOString().split('T')[0];
-              onTimeRangeChange('date', today);
-            }}
+            onClick={() => onTimeRangeChange?.('date', new Date().toISOString().split('T')[0])}
             className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-lg text-lg font-medium hover:bg-blue-600"
           >
             Today
           </button>
           <button 
-          onClick={() => {
+            onClick={() => {
               const tomorrow = new Date();
               tomorrow.setDate(tomorrow.getDate() + 1);
-              onTimeRangeChange('date', tomorrow.toISOString().split('T')[0]);
+              onTimeRangeChange?.('date', tomorrow.toISOString().split('T')[0]);
             }}
             className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-lg text-lg font-medium hover:bg-blue-600"
           >
@@ -475,7 +635,7 @@ const FixedBeachView = ({
             </label>
             <select
               value={timeRange.startTime}
-              onChange={(e) => onTimeRangeChange('startTime', e.target.value)}
+              onChange={(e) => onTimeRangeChange?.('startTime', e.target.value)}
               className="w-full p-2 border rounded appearance-none bg-white text-lg"
             >
               {Array.from({ length: 24 }, (_, i) => (
@@ -491,7 +651,7 @@ const FixedBeachView = ({
             </label>
             <select
               value={timeRange.endTime}
-              onChange={(e) => onTimeRangeChange('endTime', e.target.value)}
+              onChange={(e) => onTimeRangeChange?.('endTime', e.target.value)}
               className="w-full p-2 border rounded appearance-none bg-white text-lg"
             >
               {Array.from({ length: 24 }, (_, i) => (
@@ -504,22 +664,22 @@ const FixedBeachView = ({
         </div>
         
         <button 
-          onClick={handleUpdateForecast}
+          onClick={fetchWeatherData}
           className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center text-lg"
         >
           <RefreshCw className="h-5 w-5 mr-2" />
           Update Forecast
         </button>
       </div>
-
+      
       {/* Loading state */}
       {loading && (
         <div className="p-8 text-center">
           <div className="inline-block animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
-          <p className="text-gray-600">Loading weather data...</p>
+          <p className="text-gray-600">Loading real-time weather data...</p>
         </div>
       )}
-
+      
       {/* Error state */}
       {error && !loading && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-800 mx-4 my-4">
@@ -528,7 +688,7 @@ const FixedBeachView = ({
             {error}
           </p>
           <button 
-            onClick={handleUpdateForecast}
+            onClick={fetchWeatherData}
             className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 w-full flex items-center justify-center"
           >
             <RefreshCw className="h-5 w-5 mr-2" />
@@ -536,148 +696,158 @@ const FixedBeachView = ({
           </button>
         </div>
       )}
-
-      {/* Weather data display */}
-      {weatherData && !loading && !error && score !== null && (
+      
+      {/* Weather data with score */}
+      {weatherData && marineData && !loading && !error && (
         <div className="p-6">
-          {/* Debug info - only visible in debug mode */}
-          {debugMode && (
-            <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
-              <p>Debug info: Score: {score}, Using real data: {weatherData.isRealData ? 'yes' : 'no'}</p>
+          {/* Score display */}
+          {paddleScore !== null && (
+            <div className="flex flex-col md:flex-row gap-6 mb-6">
+              {/* Score card - LEFT SIDE */}
+              <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center flex flex-col justify-center">
+                <div
+                  className={`text-6xl mb-3 ${
+                    paddleScore >= 85
+                      ? "text-green-500"
+                      : paddleScore >= 70
+                      ? "text-yellow-500"
+                      : paddleScore >= 50
+                      ? "text-orange-500"
+                      : "text-red-500"
+                  }`}
+                >
+                  {getCondition(paddleScore).emoji}
+                </div>
+                <h3 className="text-3xl font-bold mb-2">
+                  {getCondition(paddleScore).label}
+                </h3>
+                <p className="text-gray-600 text-lg mb-4">{getCondition(paddleScore).message}</p>
+                <div className="mt-2 bg-gray-100 rounded-full h-5 overflow-hidden">
+                  <div
+                    className={`h-full ${
+                      paddleScore >= 85
+                        ? "bg-green-500"
+                        : paddleScore >= 70
+                        ? "bg-yellow-500"
+                        : paddleScore >= 50
+                        ? "bg-orange-500"
+                        : "bg-red-500"
+                    }`}
+                    style={{ width: `${paddleScore}%` }}
+                  ></div>
+                </div>
+                <p className="mt-2 text-lg font-medium text-gray-700">
+                  Score: {paddleScore}/100
+                </p>
+                <div className="mt-1 text-xs text-gray-500">
+                  Using real-time weather data
+                </div>
+              </div>
+              
+              {/* Weather Factors - RIGHT SIDE */}
+              <div className="md:w-2/3">
+                <div className="grid grid-cols-2 gap-3">
+                  {weatherData.hourly && (
+                    <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                      <Wind className="h-6 w-6 mr-3 text-blue-600" />
+                      <div className="flex-grow">
+                        <div className="text-sm text-gray-500">Wind</div>
+                        <div className={`text-lg font-medium ${
+                          weatherData.hourly.windspeed_10m[12] < 8
+                            ? "text-green-600"
+                            : weatherData.hourly.windspeed_10m[12] < 15
+                            ? "text-yellow-600"
+                            : "text-red-600"
+                        }`}>
+                          {Math.round(weatherData.hourly.windspeed_10m[12])} km/h
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {marineData.daily && (
+                    <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                      <Waves className="h-6 w-6 mr-3 text-blue-600" />
+                      <div className="flex-grow">
+                        <div className="text-sm text-gray-500">Wave Height</div>
+                        <div className={`text-lg font-medium ${
+                          marineData.daily.wave_height_max[0] < 0.2
+                            ? "text-green-600"
+                            : marineData.daily.wave_height_max[0] < 0.4
+                            ? "text-yellow-600"
+                            : "text-red-600"
+                        }`}>
+                          {marineData.daily.wave_height_max[0].toFixed(1)} m
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {weatherData.hourly && (
+                    <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                      <Thermometer className="h-6 w-6 mr-3 text-blue-600" />
+                      <div className="flex-grow">
+                        <div className="text-sm text-gray-500">Temperature</div>
+                        <div className={`text-lg font-medium ${
+                          weatherData.hourly.temperature_2m[12] >= 22 &&
+                          weatherData.hourly.temperature_2m[12] <= 30
+                            ? "text-green-600"
+                            : "text-yellow-600"
+                        }`}>
+                          {Math.round(weatherData.hourly.temperature_2m[12])}°C
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {weatherData.hourly && (
+                    <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                      <Droplets className="h-6 w-6 mr-3 text-blue-600" />
+                      <div className="flex-grow">
+                        <div className="text-sm text-gray-500">Precipitation</div>
+                        <div className={`text-lg font-medium ${
+                          weatherData.hourly.precipitation[12] < 1
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}>
+                          {weatherData.hourly.precipitation[12].toFixed(1)} mm
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           
-          {/* Main Score Overview */}
-          <div className="flex flex-col md:flex-row gap-6 mb-6">
-            {/* Score card - LEFT SIDE */}
-            <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center flex flex-col justify-center">
-              <div
-                className={`text-6xl mb-3 ${
-                  score >= 85
-                    ? "text-green-500"
-                    : score >= 70
-                    ? "text-yellow-500"
-                    : score >= 50
-                    ? "text-orange-500"
-                    : "text-red-500"
-                }`}
-              >
-                {getCondition(score).emoji}
-              </div>
-              <h3 className="text-3xl font-bold mb-2">
-                {getCondition(score).label}
-              </h3>
-              <p className="text-gray-600 text-lg mb-4">{getCondition(score).message}</p>
-              <div className="mt-2 bg-gray-100 rounded-full h-5 overflow-hidden">
-                <div
-                  className={`h-full ${
-                    score >= 85
-                      ? "bg-green-500"
-                      : score >= 70
-                      ? "bg-yellow-500"
-                      : score >= 50
-                      ? "bg-orange-500"
-                      : "bg-red-500"
-                  }`}
-                  style={{ width: `${score}%` }}
-                ></div>
-              </div>
-              <p className="mt-2 text-lg font-medium text-gray-700">
-                Score: {score}/100
+          {/* Safety alert */}
+          {scoreBreakdown && scoreBreakdown.windSpeed.raw > 30 && (
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200 mb-6">
+              <h4 className="font-bold text-red-700 flex items-center mb-2">
+                <AlertCircle className="h-5 w-5 mr-2" />
+                HIGH WIND ALERT
+              </h4>
+              <p className="text-red-700">
+                Wind speeds above 30 km/h can be unsafe for paddleboarding. Please exercise extreme caution.
               </p>
             </div>
-            
-            {/* Weather Factors - RIGHT SIDE */}
-            <div className="md:w-2/3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                  <Wind className="h-6 w-6 mr-3 text-blue-600" />
-                  <div className="flex-grow">
-                    <div className="text-sm text-gray-500">Wind</div>
-                    <div className={`text-lg font-medium ${
-                      weatherData.hourly?.windspeed_10m?.[12] < 8
-                        ? "text-green-600"
-                        : weatherData.hourly?.windspeed_10m?.[12] < 15
-                        ? "text-yellow-600"
-                        : "text-red-600"
-                    }`}>
-                      {Math.round(weatherData.hourly?.windspeed_10m?.[12] || 0)} km/h
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                  <Waves className="h-6 w-6 mr-3 text-blue-600" />
-                  <div className="flex-grow">
-                    <div className="text-sm text-gray-500">Wave Height</div>
-                    <div className={`text-lg font-medium ${
-                      weatherData.daily?.wave_height_max?.[0] < 0.2
-                        ? "text-green-600"
-                        : weatherData.daily?.wave_height_max?.[0] < 0.4
-                        ? "text-yellow-600"
-                        : "text-red-600"
-                    }`}>
-                      {(weatherData.daily?.wave_height_max?.[0] || 0).toFixed(1)} m
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                  <Thermometer className="h-6 w-6 mr-3 text-blue-600" />
-                  <div className="flex-grow">
-                    <div className="text-sm text-gray-500">Temperature</div>
-                    <div className={`text-lg font-medium ${
-                      (weatherData.hourly?.temperature_2m?.[12] >= 22 &&
-                      weatherData.hourly?.temperature_2m?.[12] <= 30)
-                        ? "text-green-600"
-                        : "text-yellow-600"
-                    }`}>
-                      {Math.round(weatherData.hourly?.temperature_2m?.[12] || 0)}°C
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                  <Droplets className="h-6 w-6 mr-3 text-blue-600" />
-                  <div className="flex-grow">
-                    <div className="text-sm text-gray-500">Precipitation</div>
-                    <div className={`text-lg font-medium ${
-                      (weatherData.hourly?.precipitation?.[12] || 0) < 1
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}>
-                      {(weatherData.hourly?.precipitation?.[12] || 0).toFixed(1)} mm
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          )}
+          
+          {/* Score Breakdown */}
+          {renderScoreBreakdown()}
+          
+          {/* Geographic Protection */}
+          {renderGeoProtectionInfo()}
+          
+          {/* Hourly Wind */}
+          {renderHourlyWind()}
+          
+          <div className="text-center mt-6">
+            <p className="text-sm text-gray-600">
+              This is real-time weather data from Open-Meteo API. Always verify conditions before paddleboarding.
+            </p>
           </div>
-          
-          {/* Score Breakdown Table */}
-          {scoreBreakdown && renderScoreBreakdown()}
-          
-          {/* Geographic Protection Analysis */}
-          {geoProtection && renderGeoProtectionInfo()}
-          
-          {/* Hourly Wind Speed Visualization */}
-          {weatherData.hourly?.windspeed_10m && renderWindSpeedVisualization()}
-
-          {/* Beach Comparison Section */}
-          {renderBeachComparison()}
         </div>
-      )}
-      
-      {/* Date Picker Modal */}
-      {showDatePicker && (
-        <DatePickerModal
-          currentDate={new Date(timeRange.date)}
-          onSelect={(date) => {
-            onTimeRangeChange('date', date);
-            setShowDatePicker(false);
-          }}
-          onClose={() => setShowDatePicker(false)}
-        />
       )}
     </div>
   );
