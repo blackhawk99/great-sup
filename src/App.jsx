@@ -434,13 +434,11 @@ const App = () => {
 
         {view === "detail" && selectedBeach && (
           <ErrorBoundary>
-            <BasicWeatherView 
+            <DebugWeatherView 
               beach={selectedBeach}
               homeBeach={homeBeach}
               onSetHomeBeach={handleSetHomeBeach}
               setView={setView}
-              timeRange={timeRange}
-              onTimeRangeChange={handleTimeRangeChange}
               onDataUpdate={handleDataUpdate}
             />
           </ErrorBoundary>
