@@ -20,13 +20,13 @@ const App = () => {
   // App version information
   const APP_VERSION = "1.0.3";
   
-  // Format last updated time
+  // Format last updated time for display
   const formattedUpdateTime = lastUpdated.toLocaleTimeString([], { 
     hour: '2-digit', 
     minute: '2-digit'
   });
   
-  // Format last updated date
+  // Format last updated date for display
   const formattedUpdateDate = lastUpdated.toLocaleDateString([], {
     year: 'numeric',
     month: 'long',
@@ -91,7 +91,7 @@ const App = () => {
     try {
       const beach = await addBeach(newBeach);
       toast.success(`Added ${beach.name} to your beaches!`);
-      setLastUpdated(new Date()); // Update the last updated time
+      setLastUpdated(new Date()); // Update timestamp when beach is added
       setView("dashboard");
     } catch (error) {
       toast.error(error.message);
@@ -103,7 +103,7 @@ const App = () => {
     try {
       const beach = await addSuggestedBeach(location);
       toast.success(`Added ${beach.name} to your beaches!`);
-      setLastUpdated(new Date()); // Update the last updated time
+      setLastUpdated(new Date()); // Update timestamp when beach is added
       setView("dashboard");
     } catch (error) {
       toast.error(error.message);
@@ -125,8 +125,13 @@ const App = () => {
       setView("dashboard");
     }
     
-    setLastUpdated(new Date()); // Update the last updated time
+    setLastUpdated(new Date()); // Update timestamp when beach is deleted
     toast.success(`Removed ${name}`);
+  };
+  
+  // Update timestamp when forecast is updated
+  const handleDataUpdate = () => {
+    setLastUpdated(new Date());
   };
 
   // Greek coastal locations with correct Google Maps URLs
@@ -436,13 +441,13 @@ const App = () => {
               beaches={beaches}
               toast={toast}
               debugMode={debugMode}
-              onDataUpdate={() => setLastUpdated(new Date())}
+              onDataUpdate={handleDataUpdate}  // Pass the function here
             />
           </ErrorBoundary>
         )}
       </main>
 
-      {/* Footer with Version and Last Updated Time */}
+      {/* Footer with Version Information and Last Updated Time */}
       <footer className="bg-blue-800 text-white p-4 mt-auto shadow-inner">
         <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center">
           <p className="text-sm">
