@@ -431,6 +431,7 @@ const App = () => {
           </div>
         )}
 
+// Then update the detail view section
 {view === "detail" && selectedBeach && (
   <ErrorBoundary>
     <FixedBeachView 
@@ -438,6 +439,8 @@ const App = () => {
       homeBeach={homeBeach}
       onSetHomeBeach={handleSetHomeBeach}
       setView={setView}
+      timeRange={timeRange}
+      onTimeRangeChange={handleTimeRangeChange}
       onDataUpdate={handleDataUpdate}
     />
   </ErrorBoundary>
