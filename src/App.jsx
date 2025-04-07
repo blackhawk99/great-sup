@@ -3,6 +3,7 @@ import { AlertCircle, Home, Map, MapPin, Plus, Trash2, ChevronLeft } from "lucid
 import { useBeachManager } from "./BeachManager";
 import BeachDetailView from "./BeachDetailView";
 import SimpleDetailView from "./SimpleDetailView";
+import BasicWeatherView from "./BasicWeatherView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers";
 
 const App = () => {
@@ -431,14 +432,19 @@ const App = () => {
           </div>
         )}
 
-{view === "detail" && selectedBeach && (
-  <SimpleDetailView 
-    beach={selectedBeach}
-    homeBeach={homeBeach}
-    onSetHomeBeach={handleSetHomeBeach}
-    setView={setView}
-  />
-)}
+        {view === "detail" && selectedBeach && (
+          <ErrorBoundary>
+            <BasicWeatherView 
+              beach={selectedBeach}
+              homeBeach={homeBeach}
+              onSetHomeBeach={handleSetHomeBeach}
+              setView={setView}
+              timeRange={timeRange}
+              onTimeRangeChange={handleTimeRangeChange}
+              onDataUpdate={handleDataUpdate}
+            />
+          </ErrorBoundary>
+        )}
       </main>
 
       {/* Footer with Version Information and Last Updated Time */}
