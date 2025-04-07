@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 
 // Configuration
 const INPUT_FILE = './gadm41_GRC_1.json';
-const OUTPUT_DIR = path.join(__dirname, '../src/data');
+const OUTPUT_DIR = path.join(__dirname, '../data');
 
 // Simplification settings
 const SIMPLIFY_TOLERANCE = 0.005; // Higher = more simplification, smaller files
