@@ -1,6 +1,6 @@
-// DebugWeatherView.jsx - Ultra robust with full debugging
+// DebugWeatherView.jsx - Enhanced to handle the exact API response format
 import React, { useState, useEffect } from "react";
-import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermometer, Droplets } from "lucide-react";
+import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermometer, Droplets, Waves } from "lucide-react";
 
 const DebugWeatherView = ({ beach, homeBeach, onSetHomeBeach, setView, onDataUpdate }) => {
   const [apiResponse, setApiResponse] = useState(null);
@@ -20,54 +20,45 @@ const DebugWeatherView = ({ beach, homeBeach, onSetHomeBeach, setView, onDataUpd
     setError(null);
     
     try {
-      // Direct API calls without any intermediate processing
-      console.log("Fetching data for:", beach.name, beach.latitude, beach.longitude);
-
-      // Date formatting
+      // Direct API calls
       const today = new Date().toISOString().split('T')[0];
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + 1);
       const tomorrow = endDate.toISOString().split('T')[0];
       
-      // Log the dates
-      console.log("Fetching for dates:", today, "to", tomorrow);
-      
-      // Weather API URL - fully expanded for clarity
+      // Weather API URL
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m&daily=precipitation_sum,windspeed_10m_max&start_date=${today}&end_date=${tomorrow}&timezone=auto`;
       
-      // Marine API URL - fully expanded for clarity
+      // Marine API URL
       const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,wave_direction&daily=wave_height_max,wave_direction_dominant&start_date=${today}&end_date=${tomorrow}&timezone=auto`;
       
-      console.log("Weather API URL:", weatherUrl);
-      console.log("Marine API URL:", marineUrl);
+      console.log("Fetching data from:", weatherUrl, marineUrl);
       
-      // Make the API calls
-      const weatherResponse = await fetch(weatherUrl);
-      const marineResponse = await fetch(marineUrl);
+      // Make API calls in parallel
+      const [weatherResponse, marineResponse] = await Promise.all([
+        fetch(weatherUrl),
+        fetch(marineUrl)
+      ]);
       
-      // Check for HTTP errors
       if (!weatherResponse.ok) {
         throw new Error(`Weather API error: ${weatherResponse.status}`);
       }
+      
       if (!marineResponse.ok) {
         throw new Error(`Marine API error: ${marineResponse.status}`);
       }
       
-      // Parse the JSON responses
       const weatherData = await weatherResponse.json();
       const marineData = await marineResponse.json();
       
-      // Log the raw API responses
-      console.log("Weather API response:", weatherData);
-      console.log("Marine API response:", marineData);
+      console.log("Weather data:", weatherData);
+      console.log("Marine data:", marineData);
       
-      // Store the combined response
       setApiResponse({
         weather: weatherData,
         marine: marineData
       });
       
-      // Update timestamp
       if (onDataUpdate) {
         onDataUpdate();
       }
@@ -79,6 +70,47 @@ const DebugWeatherView = ({ beach, homeBeach, onSetHomeBeach, setView, onDataUpd
       setLoading(false);
     }
   };
+
+  // Helper to find the current hour data
+  const getCurrentHourData = () => {
+    if (!apiResponse || !apiResponse.weather || !apiResponse.weather.hourly) {
+      return null;
+    }
+    
+    const currentHour = new Date().getHours();
+    
+    // Find the index for the current time
+    const timeIndex = apiResponse.weather.hourly.time.findIndex(time => {
+      const hourFromTime = new Date(time).getHours();
+      return hourFromTime === currentHour;
+    });
+    
+    // If found, return the data for that hour
+    if (timeIndex !== -1) {
+      return {
+        temperature: apiResponse.weather.hourly.temperature_2m[timeIndex],
+        windSpeed: apiResponse.weather.hourly.windspeed_10m[timeIndex],
+        precipitation: apiResponse.weather.hourly.precipitation[timeIndex],
+        cloudcover: apiResponse.weather.hourly.cloudcover[timeIndex],
+        windDirection: apiResponse.weather.hourly.winddirection_10m[timeIndex],
+        waveHeight: apiResponse.marine?.hourly?.wave_height?.[timeIndex] || 0,
+        swellWaveHeight: apiResponse.marine?.hourly?.swell_wave_height?.[timeIndex] || 0
+      };
+    }
+    
+    // Default to the middle of the day (noon)
+    return {
+      temperature: apiResponse.weather.hourly.temperature_2m[12] || 0,
+      windSpeed: apiResponse.weather.hourly.windspeed_10m[12] || 0,
+      precipitation: apiResponse.weather.hourly.precipitation[12] || 0,
+      cloudcover: apiResponse.weather.hourly.cloudcover[12] || 0,
+      windDirection: apiResponse.weather.hourly.winddirection_10m[12] || 0,
+      waveHeight: apiResponse.marine?.hourly?.wave_height?.[12] || 0,
+      swellWaveHeight: apiResponse.marine?.hourly?.swell_wave_height?.[12] || 0
+    };
+  };
+
+  const currentData = getCurrentHourData();
 
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
@@ -153,49 +185,64 @@ const DebugWeatherView = ({ beach, homeBeach, onSetHomeBeach, setView, onDataUpd
         </div>
       )}
 
-      {/* Data display with detailed debugger */}
+      {/* Data display */}
       {apiResponse && !loading && !error && (
         <div className="p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Current Weather at {beach?.name}</h3>
+          
           <div className="bg-blue-50 p-6 rounded-lg mb-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Current Weather at {beach?.name}</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+              {currentData && (
+                <>
+                  <div className="bg-white p-4 rounded-lg shadow-sm flex items-center">
+                    <Wind className="h-8 w-8 mr-3 text-blue-500" />
+                    <div>
+                      <div className="text-sm text-gray-500">Wind Speed</div>
+                      <div className="text-xl font-bold">
+                        {Math.round(currentData.windSpeed)} km/h
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-4 rounded-lg shadow-sm flex items-center">
+                    <Thermometer className="h-8 w-8 mr-3 text-blue-500" />
+                    <div>
+                      <div className="text-sm text-gray-500">Temperature</div>
+                      <div className="text-xl font-bold">
+                        {Math.round(currentData.temperature)}°C
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-4 rounded-lg shadow-sm flex items-center">
+                    <Droplets className="h-8 w-8 mr-3 text-blue-500" />
+                    <div>
+                      <div className="text-sm text-gray-500">Precipitation</div>
+                      <div className="text-xl font-bold">
+                        {currentData.precipitation.toFixed(1)} mm
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-4 rounded-lg shadow-sm flex items-center">
+                    <Waves className="h-8 w-8 mr-3 text-blue-500" />
+                    <div>
+                      <div className="text-sm text-gray-500">Wave Height</div>
+                      <div className="text-xl font-bold">
+                        {currentData.waveHeight.toFixed(1)} m
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              {/* First try to extract data from API */}
-              {apiResponse.weather?.hourly?.windspeed_10m && (
-                <div className="bg-white p-4 rounded-lg shadow-sm flex items-center">
-                  <Wind className="h-8 w-8 mr-3 text-blue-500" />
-                  <div>
-                    <div className="text-sm text-gray-500">Wind Speed</div>
-                    <div className="text-xl font-bold">
-                      {Math.round(apiResponse.weather.hourly.windspeed_10m[12] || 0)} km/h
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {apiResponse.weather?.hourly?.temperature_2m && (
-                <div className="bg-white p-4 rounded-lg shadow-sm flex items-center">
-                  <Thermometer className="h-8 w-8 mr-3 text-blue-500" />
-                  <div>
-                    <div className="text-sm text-gray-500">Temperature</div>
-                    <div className="text-xl font-bold">
-                      {Math.round(apiResponse.weather.hourly.temperature_2m[12] || 0)}°C
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {apiResponse.weather?.hourly?.precipitation && (
-                <div className="bg-white p-4 rounded-lg shadow-sm flex items-center">
-                  <Droplets className="h-8 w-8 mr-3 text-blue-500" />
-                  <div>
-                    <div className="text-sm text-gray-500">Precipitation</div>
-                    <div className="text-xl font-bold">
-                      {(apiResponse.weather.hourly.precipitation[12] || 0).toFixed(1)} mm
-                    </div>
-                  </div>
-                </div>
-              )}
+            <div className="bg-white p-4 rounded-lg shadow-sm mb-4">
+              <h4 className="font-semibold mb-2">Safety Rating</h4>
+              <p className="text-red-600 font-bold">
+                HIGH WIND ALERT: Wind speeds above 30 km/h can be unsafe for paddleboarding.
+                Please exercise extreme caution.
+              </p>
             </div>
             
             <button
@@ -203,22 +250,14 @@ const DebugWeatherView = ({ beach, homeBeach, onSetHomeBeach, setView, onDataUpd
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center w-full"
             >
               <RefreshCw className="h-5 w-5 mr-2" />
-              Refresh Weather Data
+              Refresh Real-Time Weather Data
             </button>
           </div>
           
           <div className="text-center">
             <p className="text-sm text-gray-500 mb-4">
-              Please verify conditions before paddleboarding. This is real weather data from Open-Meteo API.
+              This is real-time weather data from Open-Meteo API. Always verify conditions before paddleboarding.
             </p>
-          </div>
-          
-          {/* Debug output - raw API response */}
-          <div className="mt-4 border-t pt-4">
-            <h4 className="text-lg font-medium mb-2">API Response Debug Info</h4>
-            <div className="bg-gray-100 p-3 rounded-md text-xs overflow-auto max-h-64">
-              <pre>{JSON.stringify(apiResponse, null, 2)}</pre>
-            </div>
           </div>
         </div>
       )}
