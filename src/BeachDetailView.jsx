@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+// BeachDetailView.jsx - Fixed version with original UI
+import React, { useState, useEffect } from "react";
 import { 
   Home, 
   ChevronLeft, 
@@ -16,10 +17,8 @@ import {
   Clock
 } from "lucide-react";
 import { ErrorBoundary, DatePickerModal, getCardinalDirection } from "./helpers";
-import { fetchWeatherData, getCondition, filterHoursByTimeRange } from "./WeatherService";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 
-// Updated component declaration with onDataUpdate prop
 const BeachDetailView = ({ 
   beach, 
   homeBeach, 
@@ -46,7 +45,7 @@ const BeachDetailView = ({
     }
   }, [beach?.id]);
 
-  // Handle update forecast button - using REAL API data only
+  // Direct API fetch to Open-Meteo
   const handleUpdateForecast = async () => {
     if (!beach) return;
     
@@ -54,32 +53,268 @@ const BeachDetailView = ({
     setError(null);
     
     try {
-      // Fetch real weather data from the API
-      const result = await fetchWeatherData(beach, timeRange);
+      // Date formatting
+      const selectedDate = new Date(timeRange.date);
+      const formattedDate = selectedDate.toISOString().split("T")[0];
       
-      if (!result) {
-        throw new Error("No data returned from API");
+      const endDate = new Date(selectedDate);
+      endDate.setDate(endDate.getDate() + 1);
+      const formattedEndDate = endDate.toISOString().split('T')[0];
+      
+      console.log("Fetching weather data for dates:", formattedDate, "to", formattedEndDate);
+      
+      // Weather API URL
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m&daily=precipitation_sum,windspeed_10m_max&start_date=${formattedDate}&end_date=${formattedEndDate}&timezone=auto`;
+      
+      // Marine API URL
+      const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,wave_direction&daily=wave_height_max,wave_direction_dominant&start_date=${formattedDate}&end_date=${formattedEndDate}&timezone=auto`;
+      
+      // Make API calls in parallel
+      const [weatherResponse, marineResponse] = await Promise.all([
+        fetch(weatherUrl),
+        fetch(marineUrl)
+      ]);
+      
+      // Check for HTTP errors
+      if (!weatherResponse.ok) {
+        throw new Error(`Weather API error: ${weatherResponse.status}`);
       }
       
-      setWeatherData(result.weatherData);
-      setScore(result.score);
-      setScoreBreakdown(result.scoreBreakdown);
+      if (!marineResponse.ok) {
+        throw new Error(`Marine API error: ${marineResponse.status}`);
+      }
       
-      // Update last updated time in parent component if callback provided
+      const weatherData = await weatherResponse.json();
+      const marineData = await marineResponse.json();
+      
+      // Process and combine the data
+      const processedData = processApiData(weatherData, marineData, timeRange);
+      setWeatherData(processedData);
+      
+      // Calculate scores
+      const { calculatedScore, breakdown } = calculateScore(processedData, beach);
+      setScore(calculatedScore);
+      setScoreBreakdown(breakdown);
+      
+      // Update timestamp
       if (typeof onDataUpdate === 'function') {
         onDataUpdate();
       }
-    } catch (err) {
-      console.error("Failed to update forecast:", err);
-      setError(err.message || "Failed to update forecast. Please try again.");
       
-      // Don't set any default data, just show the error
-      setWeatherData(null);
-      setScore(null);
-      setScoreBreakdown(null);
+    } catch (err) {
+      console.error("Error fetching weather data:", err);
+      setError("Failed to load weather data: " + (err.message || "Unknown error"));
     } finally {
       setLoading(false);
     }
+  };
+
+  // Process the API data into the format expected by the UI
+  const processApiData = (weatherData, marineData, timeRange) => {
+    // Make sure we have data
+    if (!weatherData || !weatherData.hourly || !marineData || !marineData.hourly) {
+      console.error("Invalid API data structure");
+      throw new Error("Invalid data format from API");
+    }
+    
+    // Return the processed data in the format expected by the UI
+    return {
+      hourly: {
+        time: weatherData.hourly.time,
+        temperature_2m: weatherData.hourly.temperature_2m,
+        precipitation: weatherData.hourly.precipitation,
+        cloudcover: weatherData.hourly.cloudcover,
+        windspeed_10m: weatherData.hourly.windspeed_10m,
+        winddirection_10m: weatherData.hourly.winddirection_10m,
+        wave_height: marineData.hourly.wave_height,
+        swell_wave_height: marineData.hourly.swell_wave_height,
+        wave_direction: marineData.hourly.wave_direction
+      },
+      daily: {
+        wave_height_max: marineData.daily.wave_height_max,
+        wave_direction_dominant: marineData.daily.wave_direction_dominant
+      },
+      isRealData: true
+    };
+  };
+
+  // Calculate score based on weather data
+  const calculateScore = async (weatherData, beach) => {
+    try {
+      // Find relevant hours based on time range
+      const startHour = parseInt(timeRange.startTime.split(":")[0]);
+      const endHour = parseInt(timeRange.endTime.split(":")[0]);
+      
+      // Filter hourly data
+      const relevantHourIndices = [];
+      for (let i = 0; i < weatherData.hourly.time.length; i++) {
+        const hourTime = new Date(weatherData.hourly.time[i]);
+        const hour = hourTime.getHours();
+        if (hour >= startHour && hour <= endHour) {
+          relevantHourIndices.push(i);
+        }
+      }
+      
+      if (relevantHourIndices.length === 0) {
+        // Fallback to using a range of hours
+        for (let i = startHour; i <= Math.min(endHour, 23); i++) {
+          relevantHourIndices.push(i);
+        }
+      }
+      
+      // Extract data for relevant hours
+      const relevantHours = {
+        temperature_2m: relevantHourIndices.map(i => weatherData.hourly.temperature_2m[i]),
+        precipitation: relevantHourIndices.map(i => weatherData.hourly.precipitation[i]),
+        cloudcover: relevantHourIndices.map(i => weatherData.hourly.cloudcover[i]),
+        windspeed_10m: relevantHourIndices.map(i => weatherData.hourly.windspeed_10m[i]),
+        winddirection_10m: relevantHourIndices.map(i => weatherData.hourly.winddirection_10m[i]),
+        wave_height: relevantHourIndices.map(i => weatherData.hourly.wave_height[i]),
+        swell_wave_height: relevantHourIndices.map(i => weatherData.hourly.swell_wave_height[i])
+      };
+      
+      // Calculate averages safely
+      const avgTemp = relevantHours.temperature_2m.reduce((sum, val) => sum + val, 0) / relevantHours.temperature_2m.length;
+      const avgWind = relevantHours.windspeed_10m.reduce((sum, val) => sum + val, 0) / relevantHours.windspeed_10m.length;
+      const avgCloud = relevantHours.cloudcover.reduce((sum, val) => sum + val, 0) / relevantHours.cloudcover.length;
+      const maxPrecip = Math.max(...relevantHours.precipitation);
+      
+      // Get average wind direction
+      const avgWindDirection = relevantHours.winddirection_10m.reduce((sum, val) => sum + val, 0) / 
+                             relevantHours.winddirection_10m.length;
+      
+      // Get wave direction from daily data
+      const waveDirection = weatherData.daily.wave_direction_dominant[0];
+      
+      // Get daily wave height
+      const waveHeight = weatherData.daily.wave_height_max[0];
+      
+      // Get swell height
+      const swellHeight = relevantHours.swell_wave_height ? 
+                         relevantHours.swell_wave_height.reduce((sum, val) => sum + val, 0) / 
+                         relevantHours.swell_wave_height.length : 
+                         waveHeight * 0.7; // Fallback to 70% of wave height
+      
+      // Calculate geographic protection
+      let protection;
+      try {
+        protection = await calculateGeographicProtection(beach, avgWindDirection, waveDirection);
+      } catch (err) {
+        console.error("Error calculating protection:", err);
+        protection = {
+          protectionScore: 50,
+          windProtection: 0.5,
+          waveProtection: 0.5,
+          bayEnclosure: 0.5,
+          coastlineAngle: 180
+        };
+      }
+      
+      // Apply protection factors
+      const protectedWindSpeed = avgWind * (1 - (protection.windProtection * 0.9));
+      const protectedWaveHeight = waveHeight * (1 - (protection.waveProtection * 0.9));
+      const protectedSwellHeight = swellHeight * (1 - (protection.waveProtection * 0.85));
+      
+      // Prepare score breakdown
+      const breakdown = {
+        windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 40 },
+        waveHeight: { raw: waveHeight, protected: protectedWaveHeight, score: 0, maxPossible: 20 },
+        swellHeight: { raw: swellHeight, protected: protectedSwellHeight, score: 0, maxPossible: 10 },
+        precipitation: { value: maxPrecip, score: 0, maxPossible: 10 },
+        temperature: { value: avgTemp, score: 0, maxPossible: 10 },
+        cloudCover: { value: avgCloud, score: 0, maxPossible: 10 },
+        geoProtection: { value: protection.protectionScore, score: 0, maxPossible: 15 },
+        total: { score: 0, maxPossible: 100 }
+      };
+      
+      // Calculate scores
+      let score = 0;
+      
+      // Wind score (0-40)
+      breakdown.windSpeed.score = protectedWindSpeed < 8 ? 40 : 
+                                 Math.max(0, 40 - (protectedWindSpeed - 8) * (40 / 12));
+      score += breakdown.windSpeed.score;
+      
+      // Wave height score (0-20)
+      breakdown.waveHeight.score = protectedWaveHeight < 0.2 ? 20 : 
+                                  Math.max(0, 20 - (protectedWaveHeight - 0.2) * (20 / 0.4));
+      score += breakdown.waveHeight.score;
+      
+      // Swell height score (0-10)
+      breakdown.swellHeight.score = protectedSwellHeight < 0.3 ? 10 : 
+                                   Math.max(0, 10 - (protectedSwellHeight - 0.3) * (10 / 0.3));
+      score += breakdown.swellHeight.score;
+      
+      // Precipitation score (0-10)
+      breakdown.precipitation.score = maxPrecip < 1 ? 10 : 0;
+      score += breakdown.precipitation.score;
+      
+      // Temperature score (0-10)
+      if (avgTemp >= 22 && avgTemp <= 30) {
+        breakdown.temperature.score = 10;
+      } else if (avgTemp < 22) {
+        breakdown.temperature.score = Math.max(0, 10 - (22 - avgTemp));
+      } else {
+        breakdown.temperature.score = Math.max(0, 10 - (avgTemp - 30));
+      }
+      score += breakdown.temperature.score;
+      
+      // Cloud cover score (0-10)
+      breakdown.cloudCover.score = avgCloud < 40 ? 10 : 
+                                  Math.max(0, 10 - (avgCloud - 40) / 6);
+      score += breakdown.cloudCover.score;
+      
+      // Geographic protection score (0-15)
+      breakdown.geoProtection.score = (protection.protectionScore / 100) * 15;
+      score += breakdown.geoProtection.score;
+      
+      // Round scores for display
+      breakdown.windSpeed.score = Math.round(breakdown.windSpeed.score);
+      breakdown.waveHeight.score = Math.round(breakdown.waveHeight.score);
+      breakdown.swellHeight.score = Math.round(breakdown.swellHeight.score);
+      breakdown.precipitation.score = Math.round(breakdown.precipitation.score);
+      breakdown.temperature.score = Math.round(breakdown.temperature.score);
+      breakdown.cloudCover.score = Math.round(breakdown.cloudCover.score);
+      breakdown.geoProtection.score = Math.round(breakdown.geoProtection.score);
+      breakdown.total.score = Math.round(Math.min(100, score));
+      
+      // Rain penalty
+      if (maxPrecip >= 1.5) {
+        breakdown.precipitation.score = 0;
+        breakdown.total.score = Math.min(breakdown.total.score, 40);
+      }
+      
+      return {
+        calculatedScore: breakdown.total.score,
+        breakdown
+      };
+    } catch (err) {
+      console.error("Error calculating score:", err);
+      return { calculatedScore: 50, breakdown: null };
+    }
+  };
+
+  // Get condition text based on score
+  const getCondition = (score) => {
+    if (score >= 85)
+      return {
+        label: "Perfect",
+        emoji: "✅",
+        message: "Flat like oil. Paddle on.",
+      };
+    if (score >= 70)
+      return {
+        label: "Okay-ish",
+        emoji: "⚠️",
+        message: "Minor chop. Go early.",
+      };
+    if (score >= 50)
+      return {
+        label: "Not Great",
+        emoji: "❌",
+        message: "Wind or waves make it tricky.",
+      };
+    return { label: "Nope", emoji: "🚫", message: "Not recommended." };
   };
 
   // Render geographic protection information
@@ -422,22 +657,17 @@ const BeachDetailView = ({
     const startHour = parseInt(timeRange.startTime.split(":")[0]);
     const endHour = parseInt(timeRange.endTime.split(":")[0]);
     
-    // Get all hours in the range
-    const hours = [];
+    // Find hour indices in the data
+    const hourIndices = [];
     for (let i = 0; i < weatherData.hourly.time.length; i++) {
       const hourTime = new Date(weatherData.hourly.time[i]);
       const hour = hourTime.getHours();
       if (hour >= startHour && hour <= endHour) {
-        hours.push(hour);
+        hourIndices.push({ index: i, hour });
       }
     }
     
-    // If no matching hours found, use a fallback
-    if (hours.length === 0) {
-      for (let i = startHour; i <= endHour; i++) {
-        hours.push(i);
-      }
-    }
+    if (hourIndices.length === 0) return null;
     
     return (
       <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
@@ -447,19 +677,8 @@ const BeachDetailView = ({
         </h4>
         
         <div className="space-y-3">
-          {hours.map((hour, idx) => {
-            // Find this hour in the data
-            const hourIndex = weatherData.hourly.time.findIndex(t => {
-              const hourTime = new Date(t);
-              return hourTime.getHours() === hour;
-            });
-            
-            // Skip if data is missing for this hour
-            if (hourIndex === -1 || !weatherData.hourly.windspeed_10m[hourIndex]) {
-              return null;
-            }
-            
-            const windSpeed = Math.round(weatherData.hourly.windspeed_10m[hourIndex]);
+          {hourIndices.map(({ index, hour }) => {
+            const windSpeed = Math.round(weatherData.hourly.windspeed_10m[index]);
             const barWidth = Math.min(80, windSpeed * 6); // Cap at 80% width
             
             let barColor = "bg-green-500";
@@ -477,7 +696,7 @@ const BeachDetailView = ({
             }
             
             return (
-              <div key={idx} className="flex items-center">
+              <div key={index} className="flex items-center">
                 <div className="w-12 text-gray-600 font-medium">
                   {hour}:00
                 </div>
@@ -498,115 +717,18 @@ const BeachDetailView = ({
     );
   };
 
-  // Beach comparison section with better error handling
+  // Beach comparison section
   const renderBeachComparison = (selectedBeach, allBeaches, weatherData) => {
     if (!selectedBeach || !allBeaches || allBeaches.length <= 1 || !weatherData) {
       return null;
     }
     
-    // Safely check for required data
-    if (!weatherData.hourly || !weatherData.hourly.winddirection_10m || 
-        weatherData.hourly.winddirection_10m.length === 0) {
-      return null;
-    }
+    // Get other beaches (up to 4)
+    const otherBeaches = allBeaches
+      .filter(beach => beach.id !== selectedBeach.id)
+      .slice(0, 4);
     
-    const avgWindDirection = weatherData.hourly.winddirection_10m.reduce((sum, val) => sum + val, 0) / 
-                        weatherData.hourly.winddirection_10m.length;
-    
-    const waveDirection = weatherData.daily && weatherData.daily.wave_direction_dominant ? 
-                      weatherData.daily.wave_direction_dominant[0] : 
-                      avgWindDirection;
-    
-    // Use useState and useEffect with better error handling
-    const [beachComparisons, setBeachComparisons] = useState([]);
-    const [comparisonLoading, setComparisonLoading] = useState(true);
-    const [comparisonError, setComparisonError] = useState(null);
-    
-    useEffect(() => {
-      let isMounted = true;
-      
-      async function calculateComparisons() {
-        try {
-          setComparisonLoading(true);
-          setComparisonError(null);
-          
-          // Get current beach protection with error handling
-          let currentBeachProtection;
-          try {
-            currentBeachProtection = await calculateGeographicProtection(
-              selectedBeach, avgWindDirection, waveDirection
-            );
-          } catch (err) {
-            console.error("Error calculating protection for selected beach:", err);
-            currentBeachProtection = {
-              protectionScore: 50,
-              windProtection: 0.5,
-              waveProtection: 0.5,
-              bayEnclosure: 0.5
-            };
-          }
-          
-          // Only use beaches with valid data
-          const validBeaches = allBeaches.filter(b => 
-            b.id !== selectedBeach.id && 
-            b.latitude !== undefined && 
-            b.longitude !== undefined
-          ).slice(0, 4);
-          
-          // Calculate comparisons for each beach
-          const comparisons = await Promise.all(
-            validBeaches.map(async (otherBeach) => {
-              try {
-                const otherProtection = await calculateGeographicProtection(
-                  otherBeach, avgWindDirection, waveDirection
-                );
-                
-                const comparison = otherProtection.protectionScore - currentBeachProtection.protectionScore;
-                
-                return {
-                  beach: otherBeach,
-                  comparison,
-                  better: comparison > 10,
-                  worse: comparison < -10,
-                  similar: Math.abs(comparison) <= 10,
-                  error: false
-                };
-              } catch (err) {
-                console.error(`Error comparing beach ${otherBeach.name}:`, err);
-                return {
-                  beach: otherBeach,
-                  comparison: 0,
-                  better: false,
-                  worse: false,
-                  similar: true,
-                  error: true
-                };
-              }
-            })
-          );
-          
-          if (isMounted) {
-            setBeachComparisons(comparisons);
-            setComparisonLoading(false);
-          }
-        } catch (err) {
-          console.error("Error in beach comparison:", err);
-          if (isMounted) {
-            setComparisonError("Failed to compare beaches");
-            setComparisonLoading(false);
-          }
-        }
-      }
-      
-      calculateComparisons();
-      
-      return () => {
-        isMounted = false;
-      };
-    }, [selectedBeach, avgWindDirection, waveDirection, allBeaches]);
-    
-    // If there's no data, don't render anything
-    if (beachComparisons.length === 0 && !comparisonLoading) {
+    if (otherBeaches.length === 0) {
       return null;
     }
     
@@ -614,50 +736,27 @@ const BeachDetailView = ({
       <div className="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-200 shadow-inner">
         <h4 className="font-medium mb-3 flex items-center text-blue-800">
           <MapPin className="h-5 w-5 mr-2 text-blue-600" />
-          Compare with Nearby Beaches
+          Other Nearby Beaches
         </h4>
         
-        {comparisonLoading ? (
-          <div className="flex justify-center items-center p-4">
-            <div className="inline-block animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-            <span className="ml-2 text-blue-600">Comparing beaches...</span>
-          </div>
-        ) : comparisonError ? (
-          <div className="p-4 bg-red-50 rounded-lg border border-red-200 text-red-700">
-            <AlertCircle className="h-5 w-5 text-red-500 inline mr-2" />
-            {comparisonError}
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-4">
-            {beachComparisons.map((item) => (
-              <div key={item.beach.id} 
-                  className={`flex items-center justify-between p-3 bg-white rounded-lg border shadow-sm hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors ${
-                    item.error ? 'opacity-50' : ''
-                  }`}
-                  onClick={() => item.error ? toast?.error("Cannot compare this beach") : setView("dashboard")}>
-                <div className="flex items-center">
-                  <MapPin className="h-4 w-4 mr-2 text-blue-500" />
-                  <span className="font-medium">{item.beach.name}</span>
-                </div>
-                {item.error ? (
-                  <span className="text-sm px-3 py-1 rounded-full bg-gray-100 text-gray-800">
-                    Comparison unavailable
-                  </span>
-                ) : (
-                  <span className={`text-sm px-3 py-1 rounded-full ${
-                    item.better ? 'bg-green-100 text-green-800' : 
-                    item.worse ? 'bg-red-100 text-red-800' : 
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {item.better ? 'Better today' : 
-                    item.worse ? 'Worse today' : 
-                    'Similar'}
-                  </span>
-                )}
+        <div className="grid md:grid-cols-2 gap-4">
+          {otherBeaches.map((beach) => (
+            <div key={beach.id} 
+                className="flex items-center justify-between p-3 bg-white rounded-lg border shadow-sm hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors"
+                onClick={() => {
+                  setSelectedBeach?.(beach);
+                  handleUpdateForecast();
+                }}>
+              <div className="flex items-center">
+                <MapPin className="h-4 w-4 mr-2 text-blue-500" />
+                <span className="font-medium">{beach.name}</span>
               </div>
-            ))}
-          </div>
-        )}
+              <span className="text-sm px-3 py-1 rounded-full bg-blue-100 text-blue-800">
+                Check Conditions
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
@@ -667,10 +766,10 @@ const BeachDetailView = ({
       <div className="p-4 border-b flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-semibold flex items-center">
-            {beach && beach.id === homeBeach?.id && (
+            {beach?.id === homeBeach?.id && (
               <Home className="h-5 w-5 text-orange-500 mr-2" />
             )}
-            {beach ? beach.name : "Beach"}
+            {beach?.name || "Beach"}
           </h2>
           <div className="flex items-center mt-1">
             <p className="text-gray-600 mr-3">
@@ -692,14 +791,14 @@ const BeachDetailView = ({
         <div className="flex space-x-2">
           {beach && beach.id !== homeBeach?.id && (
             <button
-              onClick={() => onSetHomeBeach && typeof onSetHomeBeach === 'function' ? onSetHomeBeach(beach) : null}
+              onClick={() => onSetHomeBeach?.(beach)}
               className="bg-orange-500 text-white px-3 py-1 rounded-lg hover:bg-orange-600 transition-colors flex items-center"
             >
               <Home className="h-4 w-4 mr-1" /> Set as Home
             </button>
           )}
           <button
-            onClick={() => setView && typeof setView === 'function' ? setView("dashboard") : null}
+            onClick={() => setView?.("dashboard")}
             className="bg-gray-200 text-gray-800 px-3 py-1 rounded-lg hover:bg-gray-300 transition-colors flex items-center"
           >
             <ChevronLeft className="h-4 w-4 mr-1" /> Back
@@ -804,7 +903,7 @@ const BeachDetailView = ({
       {loading && (
         <div className="p-8 text-center">
           <div className="inline-block animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
-          <p className="text-gray-600">Loading real weather data...</p>
+          <p className="text-gray-600">Loading weather data...</p>
         </div>
       )}
 
@@ -815,217 +914,246 @@ const BeachDetailView = ({
             <AlertCircle className="w-5 h-5 mr-2 text-blue-600" />
             {error}
           </p>
-          <button 
-            onClick={handleUpdateForecast}
-            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 w-full flex items-center justify-center"
-          >
-            <RefreshCw className="h-5 w-5 mr-2" />
-            Try Again
-          </button>
         </div>
       )}
 
       {/* Weather data display */}
       {weatherData && !loading && !error && (
-        <ErrorBoundary>
-          <div className="p-6">
-            {/* Debug info - only visible in debug mode */}
-            {debugMode && (
-              <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
-                <p>Debug info: Score: {score !== null ? score : 'null'}, 
-                  Has breakdown: {scoreBreakdown ? 'yes' : 'no'}, 
-                  Using real data: {weatherData.isRealData ? 'yes' : 'no'}
-                </p>
-              </div>
-            )}
-            
-            {/* If there's no score but we have weather data, show analysis error */}
-            {(!score || score === null) && (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md mb-4">
-                <div className="flex items-center text-yellow-800">
-                  <AlertCircle className="h-5 w-5 mr-2 text-yellow-600" />
-                  <span>There was an issue calculating the score. Please try again:</span>
+        <div className="p-6">
+          {/* Debug info - only visible in debug mode */}
+          {debugMode && (
+            <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
+              <p>Debug info: Score: {score !== null ? score : 'null'}, 
+                Has breakdown: {scoreBreakdown ? 'yes' : 'no'}, 
+                Using real data: {weatherData.isRealData ? 'yes' : 'no'}</p>
+            </div>
+          )}
+          
+          {/* Main Score Overview */}
+          {score !== null && (
+            <>
+              <div className="flex flex-col md:flex-row gap-6 mb-6">
+                {/* Score card - LEFT SIDE */}
+                <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center flex flex-col justify-center">
+                  <div
+                    className={`text-6xl mb-3 ${
+                      score >= 85
+                        ? "text-green-500"
+                        : score >= 70
+                        ? "text-yellow-500"
+                        : score >= 50
+                        ? "text-orange-500"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {getCondition(score).emoji}
+                  </div>
+                  <h3 className="text-3xl font-bold mb-2">
+                    {getCondition(score).label}
+                  </h3>
+                  <p className="text-gray-600 text-lg mb-4">{getCondition(score).message}</p>
+                  <div className="mt-2 bg-gray-100 rounded-full h-5 overflow-hidden">
+                    <div
+                      className={`h-full ${
+                        score >= 85
+                          ? "bg-green-500"
+                          : score >= 70
+                          ? "bg-yellow-500"
+                          : score >= 50
+                          ? "bg-orange-500"
+                          : "bg-red-500"
+                      }`}
+                      style={{ width: `${score}%` }}
+                    ></div>
+                  </div>
+                  <p className="mt-2 text-lg font-medium text-gray-700">
+                    Score: {score}/100
+                  </p>
                 </div>
                 
-                <button
-                  onClick={handleUpdateForecast}
-                  className="mt-4 bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors flex items-center justify-center"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Try Again
-                </button>
-              </div>
-            )}
-            
-            {/* Main Score Overview - only show when score is available */}
-            {score !== null && (
-              <>
-                <div className="flex flex-col md:flex-row gap-6 mb-6">
-                  {/* Score card - LEFT SIDE */}
-                  <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center flex flex-col justify-center">
-                    <div
-                      className={`text-6xl mb-3 ${
-                        score >= 85
-                          ? "text-green-500"
-                          : score >= 70
-                          ? "text-yellow-500"
-                          : score >= 50
-                          ? "text-orange-500"
-                          : "text-red-500"
-                      }`}
-                    >
-                      {getCondition(score).emoji}
-                    </div>
-                    <h3 className="text-3xl font-bold mb-2">
-                      {getCondition(score).label}
-                    </h3>
-                    <p className="text-gray-600 text-lg mb-4">{getCondition(score).message}</p>
-                    <div className="mt-2 bg-gray-100 rounded-full h-5 overflow-hidden">
-                      <div
-                        className={`h-full ${
-                          score >= 85
-                            ? "bg-green-500"
-                            : score >= 70
-                            ? "bg-yellow-500"
-                            : score >= 50
-                            ? "bg-orange-500"
-                            : "bg-red-500"
-                        }`}
-                        style={{ width: `${score}%` }}
-                      ></div>
-                    </div>
-                    <p className="mt-2 text-lg font-medium text-gray-700">
-                      Score: {score}/100
-                    </p>
-                    <div className="mt-1 text-xs text-gray-500 flex items-center justify-center">
-                      {weatherData.isRealData ? (
-                        <>
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 mr-1 text-green-500">
-                            <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
-                          </svg>
-                          Using real weather data
-                        </>
-                      ) : (
-                        <>
-                          <AlertCircle className="w-4 h-4 mr-1 text-yellow-500" />
-                          Using simulated data with dynamic analysis
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Weather Factors - RIGHT SIDE */}
-                  <div className="md:w-2/3">
-                    <div className="grid grid-cols-2 gap-3">
+                {/* Weather Factors - RIGHT SIDE */}
+                <div className="md:w-2/3">
+                  <div className="grid grid-cols-2 gap-3">
+                    {weatherData.hourly && weatherData.hourly.windspeed_10m && (
                       <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
                         <Wind className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
                           <div className="text-sm text-gray-500">Wind</div>
                           <div className={`text-lg font-medium ${
-                            scoreBreakdown.windSpeed.raw < 8
+                            weatherData.hourly.windspeed_10m[12] < 8
                               ? "text-green-600"
-                              : scoreBreakdown.windSpeed.raw < 15
+                              : weatherData.hourly.windspeed_10m[12] < 15
                               ? "text-yellow-600"
                               : "text-red-600"
                           }`}>
-                            {Math.round(scoreBreakdown.windSpeed.raw)} km/h
+                            {Math.round(weatherData.hourly.windspeed_10m[12])} km/h
                           </div>
                         </div>
                       </div>
-                      
+                    )}
+                    
+                    {weatherData.daily && weatherData.daily.wave_height_max && (
                       <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
                         <Waves className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
                           <div className="text-sm text-gray-500">Wave Height</div>
                           <div className={`text-lg font-medium ${
-                            scoreBreakdown.waveHeight.raw < 0.2
+                            weatherData.daily.wave_height_max[0] < 0.2
                               ? "text-green-600"
-                              : scoreBreakdown.waveHeight.raw < 0.4
+                              : weatherData.daily.wave_height_max[0] < 0.4
                               ? "text-yellow-600"
                               : "text-red-600"
                           }`}>
-                            {scoreBreakdown.waveHeight.raw.toFixed(1)} m
+                            {weatherData.daily.wave_height_max[0].toFixed(1)} m
                           </div>
                         </div>
                       </div>
-                      
+                    )}
+                    
+                    {weatherData.hourly && weatherData.hourly.temperature_2m && (
                       <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
                         <Thermometer className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
                           <div className="text-sm text-gray-500">Temperature</div>
                           <div className={`text-lg font-medium ${
-                            scoreBreakdown.temperature.value >= 22 &&
-                            scoreBreakdown.temperature.value <= 30
+                            weatherData.hourly.temperature_2m[12] >= 22 &&
+                            weatherData.hourly.temperature_2m[12] <= 30
                               ? "text-green-600"
                               : "text-yellow-600"
                           }`}>
-                            {Math.round(scoreBreakdown.temperature.value)}°C
+                            {Math.round(weatherData.hourly.temperature_2m[12])}°C
                           </div>
                         </div>
                       </div>
-                      
+                    )}
+                    
+                    {weatherData.hourly && weatherData.hourly.precipitation && (
                       <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
                         <Droplets className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
                           <div className="text-sm text-gray-500">Precipitation</div>
                           <div className={`text-lg font-medium ${
-                            scoreBreakdown.precipitation.value < 1
+                            weatherData.hourly.precipitation[12] < 1
                               ? "text-green-600"
                               : "text-red-600"
                           }`}>
-                            {scoreBreakdown.precipitation.value.toFixed(1)} mm
+                            {weatherData.hourly.precipitation[12].toFixed(1)} mm
                           </div>
                         </div>
                       </div>
-                      
+                    )}
+                    
+                    {weatherData.hourly && weatherData.hourly.cloudcover && (
                       <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
                         <Sun className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
                           <div className="text-sm text-gray-500">Cloud Cover</div>
                           <div className={`text-lg font-medium ${
-                            scoreBreakdown.cloudCover.value < 40
+                            weatherData.hourly.cloudcover[12] < 40
                               ? "text-green-600"
-                              : scoreBreakdown.cloudCover.value < 70
+                              : weatherData.hourly.cloudcover[12] < 70
                               ? "text-yellow-600"
                               : "text-gray-600"
                           }`}>
-                            {Math.round(scoreBreakdown.cloudCover.value)}%
+                            {Math.round(weatherData.hourly.cloudcover[12])}%
                           </div>
                         </div>
                       </div>
-                      
+                    )}
+                    
+                    {weatherData.hourly && weatherData.hourly.swell_wave_height && (
                       <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
                         <Waves className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
                           <div className="text-sm text-gray-500">Swell Height</div>
                           <div className={`text-lg font-medium ${
-                            scoreBreakdown.swellHeight.raw < 0.3
+                            weatherData.hourly.swell_wave_height[12] < 0.3
                               ? "text-green-600"
                               : "text-yellow-600"
                           }`}>
-                            {scoreBreakdown.swellHeight.raw.toFixed(1)} m
+                            {weatherData.hourly.swell_wave_height[12].toFixed(1)} m
                           </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
-                
-                {/* Score Breakdown Table */}
-                {scoreBreakdown && renderScoreBreakdown(scoreBreakdown)}
-                
-                {/* Geographic Protection Analysis - with dynamic data */}
-                {renderGeographicInfo(beach, weatherData)}
-                
-                {/* Hourly Wind Speed Visualization */}
-                {renderWindSpeedVisualization(weatherData, timeRange)}
+              </div>
+              
+              {/* Safety Alert for high winds */}
+              {scoreBreakdown?.windSpeed?.raw > 30 && (
+                <div className="bg-red-50 p-4 rounded-lg border border-red-200 mb-6">
+                  <h4 className="font-bold text-red-700 flex items-center mb-2">
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    HIGH WIND ALERT
+                  </h4>
+                  <p className="text-red-700">
+                    Wind speeds above 30 km/h can be unsafe for paddleboarding. Please exercise extreme caution.
+                  </p>
+                </div>
+              )}
+              
+              {/* Score Breakdown Table */}
+              {scoreBreakdown && renderScoreBreakdown(scoreBreakdown)}
+              
+              {/* Geographic Protection Analysis */}
+              {renderGeographicInfo(beach, weatherData)}
+              
+              {/* Hourly Wind Speed Visualization */}
+              {renderWindSpeedVisualization(weatherData, timeRange)}
 
-                {/* Beach Comparison Section - with dynamic data */}
-                {renderBeachComparison(beach, beaches, weatherData)}
-              </>
-            )}
+              {/* Beach Comparison Section */}
+              {renderBeachComparison(beach, beaches, weatherData)}
+            </>
+          )}
+          
+          {/* If score calculation failed but we have data */}
+          {score === null && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md mb-4">
+              <div className="flex items-center text-yellow-800">
+                <AlertCircle className="h-5 w-5 mr-2 text-yellow-600" />
+                <span>There was an issue calculating the score. Here's the raw weather data:</span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                {weatherData.hourly && weatherData.hourly.temperature_2m && (
+                  <div className="bg-white rounded-lg p-3 border">
+                    <h3 className="font-medium mb-2">Temperature</h3>
+                    <p>{Math.round(weatherData.hourly.temperature_2m[12])}°C</p>
+                  </div>
+                )}
+                
+                {weatherData.hourly && weatherData.hourly.windspeed_10m && (
+                  <div className="bg-white rounded-lg p-3 border">
+                    <h3 className="font-medium mb-2">Wind Speed</h3>
+                    <p>{Math.round(weatherData.hourly.windspeed_10m[12])} km/h</p>
+                  </div>
+                )}
+                
+                {weatherData.daily && weatherData.daily.wave_height_max && (
+                  <div className="bg-white rounded-lg p-3 border">
+                    <h3 className="font-medium mb-2">Wave Height</h3>
+                    <p>{weatherData.daily.wave_height_max[0].toFixed(1)} m</p>
+                  </div>
+                )}
+              </div>
+              
+              <button
+                onClick={handleUpdateForecast}
+                className="mt-4 bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors flex items-center justify-center"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </button>
+            </div>
+          )}
+          
+          <div className="text-center mt-6">
+            <p className="text-sm text-gray-600">
+              This is real-time weather data from Open-Meteo API. Always verify conditions before paddleboarding.
+            </p>
           </div>
-        </ErrorBoundary>
+        </div>
       )}
       
       {/* Date Picker Modal */}
