@@ -1,6 +1,7 @@
 // src/utils/coastlineAnalysis.js
 import * as turf from '@turf/turf';
-import { greeceCoastline } from '../data/greece-coastline';
+import { greeceCoastlines } from '../data/greece-coastlines';
+import { greeceIslands } from '../data/greece-islands';
 
 // Generate rays from a point in all directions
 export function generateRays(center, numRays, distance) {
@@ -16,30 +17,66 @@ export function generateRays(center, numRays, distance) {
   return rays;
 }
 
-// Check if a ray intersects with the coastline
-export function intersectsCoastline(ray, coastline) {
+// Check if a ray intersects with coastlines or islands
+export function intersectsLandmass(ray, coastlines, islands) {
   let minDistance = Infinity;
   let intersection = null;
   
-  for (const feature of coastline.features) {
+  // Check coastlines
+  for (const feature of coastlines.features) {
     if (feature.geometry.type === 'LineString') {
-      const line = turf.lineString(feature.geometry.coordinates);
-      const intersects = turf.lineIntersect(ray, line);
-      
-      if (intersects.features.length > 0) {
-        // Find closest intersection
-        for (const point of intersects.features) {
-          const distance = turf.distance(
-            turf.point(ray.geometry.coordinates[0]), 
-            point, 
-            { units: 'kilometers' }
-          );
-          
-          if (distance < minDistance) {
-            minDistance = distance;
-            intersection = point;
+      try {
+        const line = turf.lineString(feature.geometry.coordinates);
+        const intersects = turf.lineIntersect(ray, line);
+        
+        if (intersects.features.length > 0) {
+          // Find closest intersection
+          for (const point of intersects.features) {
+            const distance = turf.distance(
+              turf.point(ray.geometry.coordinates[0]), 
+              point, 
+              { units: 'kilometers' }
+            );
+            
+            if (distance < minDistance) {
+              minDistance = distance;
+              intersection = point;
+            }
           }
         }
+      } catch (error) {
+        console.error("Error checking coastline intersection:", error);
+      }
+    }
+  }
+  
+  // Check islands - treat island boundaries as coastlines
+  for (const feature of islands.features) {
+    if (feature.geometry.type === 'Polygon') {
+      try {
+        // Convert polygon to line (its boundary)
+        const polygon = turf.polygon(feature.geometry.coordinates);
+        const boundary = turf.polygonToLine(polygon);
+        
+        const intersects = turf.lineIntersect(ray, boundary);
+        
+        if (intersects.features.length > 0) {
+          // Find closest intersection
+          for (const point of intersects.features) {
+            const distance = turf.distance(
+              turf.point(ray.geometry.coordinates[0]), 
+              point, 
+              { units: 'kilometers' }
+            );
+            
+            if (distance < minDistance) {
+              minDistance = distance;
+              intersection = point;
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error checking island intersection:`, error);
       }
     }
   }
@@ -52,21 +89,26 @@ export function intersectsCoastline(ray, coastline) {
 }
 
 // Find the nearest coastline segment to a beach
-export function findNearestCoastlineSegment(beachPoint, coastline) {
+export function findNearestCoastlineSegment(beachPoint, coastlines) {
   let minDistance = Infinity;
   let nearestSegment = null;
   
-  for (const feature of coastline.features) {
+  for (const feature of coastlines.features) {
     if (feature.geometry.type === 'LineString') {
       const coords = feature.geometry.coordinates;
       
       for (let i = 0; i < coords.length - 1; i++) {
-        const segment = turf.lineString([coords[i], coords[i+1]]);
-        const nearest = turf.nearestPointOnLine(segment, beachPoint);
-        
-        if (nearest.properties.dist < minDistance) {
-          minDistance = nearest.properties.dist;
-          nearestSegment = [coords[i], coords[i+1]];
+        try {
+          const segment = turf.lineString([coords[i], coords[i+1]]);
+          const nearest = turf.nearestPointOnLine(segment, beachPoint);
+          
+          if (nearest.properties.dist < minDistance) {
+            minDistance = nearest.properties.dist;
+            nearestSegment = [coords[i], coords[i+1]];
+          }
+        } catch (error) {
+          console.error("Error finding nearest coastline segment:", error);
+          // Continue to next segment
         }
       }
     }
@@ -75,29 +117,37 @@ export function findNearestCoastlineSegment(beachPoint, coastline) {
   return nearestSegment;
 }
 
-// Find relevant coastline segments
-export function findRelevantCoastlineSegments(beachPoint, coastline, maxDistance = 3) {
+// Find multiple relevant coastline segments near a beach
+export function findRelevantCoastlineSegments(beachPoint, coastlines, maxDistance = 3) {
   let relevantSegments = [];
   
-  for (const feature of coastline.features) {
+  for (const feature of coastlines.features) {
     if (feature.geometry.type === 'LineString') {
       const coords = feature.geometry.coordinates;
       
       for (let i = 0; i < coords.length - 1; i++) {
-        const segment = turf.lineString([coords[i], coords[i+1]]);
-        const nearest = turf.nearestPointOnLine(segment, beachPoint);
-        
-        if (nearest.properties.dist <= maxDistance) {
-          relevantSegments.push({
-            segment: [coords[i], coords[i+1]],
-            distance: nearest.properties.dist,
-            angle: turf.bearing(turf.point(coords[i]), turf.point(coords[i+1]))
-          });
+        try {
+          const segment = turf.lineString([coords[i], coords[i+1]]);
+          const nearest = turf.nearestPointOnLine(segment, beachPoint);
+          
+          // If within maxDistance km, include this segment
+          if (nearest.properties.dist <= maxDistance) {
+            relevantSegments.push({
+              segment: [coords[i], coords[i+1]],
+              distance: nearest.properties.dist,
+              angle: turf.bearing(turf.point(coords[i]), turf.point(coords[i+1])),
+              name: feature.properties?.name || 'Unknown coastline'
+            });
+          }
+        } catch (error) {
+          console.error("Error finding relevant coastline segments:", error);
+          // Continue to next segment
         }
       }
     }
   }
   
+  // Sort by distance (closest first)
   return relevantSegments.sort((a, b) => a.distance - b.distance);
 }
 
@@ -110,6 +160,86 @@ export function calculateDirectionalExposure(windDirection, coastlineAngle) {
   // Calculate the absolute angular difference
   const diff = Math.abs(windDirection - coastlineAngle);
   return Math.min(diff, 360 - diff);
+}
+
+// Check for island protection
+export function checkIslandProtection(beachPoint, windDirection, waveDirection) {
+  // Calculate which directions are shielded by islands
+  const shieldedDirections = [];
+  
+  for (const feature of greeceIslands.features) {
+    // For each island
+    if (feature.geometry.type === 'Polygon') {
+      try {
+        // Get island center
+        const center = turf.centroid(feature);
+        
+        // Direction from beach to island center
+        const bearing = turf.bearing(beachPoint, center);
+        
+        // Distance from beach to island
+        const distance = turf.distance(beachPoint, center, { units: 'kilometers' });
+        
+        // Skip islands that are too far away (optimization)
+        if (distance > 20) continue;
+        
+        // Approximate island's width perpendicular to the sight line
+        const islandPolygon = feature;
+        const islandArea = turf.area(islandPolygon);
+        const islandSize = Math.sqrt(islandArea) / 1000; // Approximate width in km
+        
+        // Island "angular width" as seen from beach (simple approximation)
+        const angularWidth = Math.atan2(islandSize, distance) * (180 / Math.PI) * 2;
+        
+        // Strength decreases with distance
+        const strengthFactor = Math.min(1, 5 / distance);
+        const sizeFactor = Math.min(1, islandSize / 3);
+        const strength = strengthFactor * sizeFactor;
+        
+        shieldedDirections.push({
+          name: feature.properties.name,
+          direction: bearing,
+          width: angularWidth,
+          distance: distance,
+          strength: strength,
+          size: islandSize
+        });
+      } catch (error) {
+        console.error(`Error processing island:`, error);
+        // Continue with next island
+      }
+    }
+  }
+  
+  // Calculate wind protection from islands
+  let windIslandProtection = 0;
+  let waveIslandProtection = 0;
+  
+  for (const shield of shieldedDirections) {
+    // Wind protection
+    const windShieldExposure = calculateDirectionalExposure(windDirection, shield.direction);
+    if (windShieldExposure <= shield.width / 2) {
+      const directionalFactor = 1 - (windShieldExposure / (shield.width / 2));
+      windIslandProtection += shield.strength * directionalFactor;
+    }
+    
+    // Wave protection
+    const waveShieldExposure = calculateDirectionalExposure(waveDirection, shield.direction);
+    if (waveShieldExposure <= shield.width / 2) {
+      const directionalFactor = 1 - (waveShieldExposure / (shield.width / 2));
+      waveIslandProtection += shield.strength * directionalFactor;
+    }
+  }
+  
+  // Cap at 0.8 (80% protection)
+  windIslandProtection = Math.min(0.8, windIslandProtection);
+  waveIslandProtection = Math.min(0.8, waveIslandProtection);
+  
+  return {
+    windIslandProtection,
+    waveIslandProtection,
+    shieldedDirections
+  };
 }
 
 // Generate a human-readable description of protection
@@ -146,14 +276,14 @@ export function getCardinalDirection(degrees) {
   return directions[(val % 16)];
 }
 
-// Enhanced main analysis function with multi-segment analysis
+// Enhanced main analysis function
 export async function analyzeBayProtection(latitude, longitude, windDirection, waveDirection) {
   try {
     // Create a point from the coordinates
     const beachPoint = turf.point([longitude, latitude]);
     
     // Find the nearest coastline segment
-    const nearestSegment = findNearestCoastlineSegment(beachPoint, greeceCoastline);
+    const nearestSegment = findNearestCoastlineSegment(beachPoint, greeceCoastlines);
     
     if (!nearestSegment) {
       throw new Error('Could not find nearby coastline');
@@ -167,11 +297,11 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     
     // Calculate bay enclosure by casting rays
     const rays = generateRays(beachPoint, 36, 1.5); // 36 rays, every 10 degrees, 1.5km each
-    const hits = rays.map(ray => intersectsCoastline(ray, greeceCoastline));
+    const hits = rays.map(ray => intersectsLandmass(ray, greeceCoastlines, greeceIslands));
     const enclosureScore = hits.filter(hit => hit.intersects && hit.distance < 1).length / rays.length;
     
     // Find multiple relevant coastline segments
-    const relevantSegments = findRelevantCoastlineSegments(beachPoint, greeceCoastline);
+    const relevantSegments = findRelevantCoastlineSegments(beachPoint, greeceCoastlines);
     
     // Calculate protection using multiple segments
     let bestWindProtection = 0;
@@ -194,9 +324,15 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
       if (waveProtection > bestWaveProtection) bestWaveProtection = waveProtection;
     }
     
-    // Apply enclosure factor
-    const totalWindProtection = bestWindProtection * (0.5 + 0.5 * enclosureScore);
-    const totalWaveProtection = bestWaveProtection * (0.5 + 0.5 * enclosureScore);
+    // Check for island protection
+    const islandProtection = checkIslandProtection(beachPoint, windDirection, waveDirection);
+    
+    // Calculate total protection (coastline + islands)
+    const totalWindProtection = Math.min(1, bestWindProtection + islandProtection.windIslandProtection) * 
+                               (0.5 + 0.5 * enclosureScore);
+    
+    const totalWaveProtection = Math.min(1, bestWaveProtection + islandProtection.waveIslandProtection) * 
+                               (0.5 + 0.5 * enclosureScore);
     
     // Compute final protection score
     const protectionScore = (
@@ -218,7 +354,8 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
         coastlineAngle, 
         totalWindProtection,
         totalWaveProtection
-      )
+      ),
+      nearbyIslands: islandProtection.shieldedDirections.map(d => d.name).join(', '),
     };
   } catch (error) {
     console.error("Error in coastline analysis:", error);
