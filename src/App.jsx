@@ -431,7 +431,7 @@ const App = () => {
           </div>
         )}
 
-// Then update the detail view section
+
 {view === "detail" && selectedBeach && (
   <ErrorBoundary>
     <FixedBeachView 
