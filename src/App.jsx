@@ -3,7 +3,7 @@ import { AlertCircle, Home, Map, MapPin, Plus, Trash2, ChevronLeft } from "lucid
 import { useBeachManager } from "./BeachManager";
 import BeachDetailView from "./BeachDetailView";
 import SimpleDetailView from "./SimpleDetailView";
-import BasicWeatherView from "./BasicWeatherView";
+import DebugWeatherView from "./DebugWeatherView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers";
 
 const App = () => {
