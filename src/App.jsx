@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { AlertCircle, Home, Map, MapPin, Plus, Trash2, ChevronLeft } from "lucide-react";
 import { useBeachManager } from "./BeachManager";
 import BeachDetailView from "./BeachDetailView";
@@ -16,23 +16,20 @@ const App = () => {
     startTime: "09:00",
     endTime: "13:00",
   });
-  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [dataUpdateCount, setDataUpdateCount] = useState(0);
   
   // App version information
   const APP_VERSION = "1.0.3";
   
-  // Format last updated time
-  const formattedUpdateTime = lastUpdated.toLocaleTimeString([], { 
-    hour: '2-digit', 
-    minute: '2-digit'
-  });
+  // Format last updated time strings
+  const formattedUpdateTime = lastUpdated ? 
+    lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
+    "-";
   
-  // Format last updated date
-  const formattedUpdateDate = lastUpdated.toLocaleDateString([], {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  const formattedUpdateDate = lastUpdated ?
+    lastUpdated.toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' }) :
+    "-";
   
   // Use beach manager
   const { 
@@ -68,7 +65,36 @@ const App = () => {
   // Function to update the last updated timestamp
   const handleDataUpdate = () => {
     setLastUpdated(new Date());
+    setDataUpdateCount(prev => prev + 1); // Track number of updates
   };
+  
+  // Toggle debug mode with actual effects
+  const toggleDebugMode = () => {
+    const newMode = !debugMode;
+    setDebugMode(newMode);
+    
+    // Store in localStorage to persist between page reloads
+    localStorage.setItem('weatherAdvisorDebugMode', newMode ? 'true' : 'false');
+    
+    // Show notification when toggled
+    toast.success(`Debug mode ${newMode ? 'enabled' : 'disabled'}`);
+    
+    // Apply debug-specific CSS class to body for global styling
+    if (newMode) {
+      document.body.classList.add('debug-mode');
+    } else {
+      document.body.classList.remove('debug-mode');
+    }
+  };
+  
+  // Load debug mode from localStorage on initial load
+  useEffect(() => {
+    const savedDebugMode = localStorage.getItem('weatherAdvisorDebugMode');
+    if (savedDebugMode === 'true') {
+      setDebugMode(true);
+      document.body.classList.add('debug-mode');
+    }
+  }, []);
   
   // Handle beach selection
   const handleBeachSelect = (beach) => {
@@ -85,7 +111,7 @@ const App = () => {
   const handleSetHomeBeach = (beach) => {
     setHomeBeach(beach);
     toast.success(`${beach.name} set as home beach!`);
-    handleDataUpdate(); // Update timestamp
+    handleDataUpdate();
   };
   
   // Handle time range change
@@ -98,7 +124,7 @@ const App = () => {
     try {
       const beach = await addBeach(newBeach);
       toast.success(`Added ${beach.name} to your beaches!`);
-      handleDataUpdate(); // Update timestamp
+      handleDataUpdate();
       setView("dashboard");
     } catch (error) {
       toast.error(error.message);
@@ -110,7 +136,7 @@ const App = () => {
     try {
       const beach = await addSuggestedBeach(location);
       toast.success(`Added ${beach.name} to your beaches!`);
-      handleDataUpdate(); // Update timestamp
+      handleDataUpdate();
       setView("dashboard");
     } catch (error) {
       toast.error(error.message);
@@ -132,7 +158,7 @@ const App = () => {
       setView("dashboard");
     }
     
-    handleDataUpdate(); // Update timestamp
+    handleDataUpdate();
     toast.success(`Removed ${name}`);
   };
 
@@ -143,6 +169,8 @@ const App = () => {
     { name: "Astir Beach", latitude: 37.8095, longitude: 23.7850, googleMapsUrl: "https://maps.app.goo.gl/6uUbtp31MQ63gGBSA" },
     { name: "Kapsali Beach", latitude: 36.1360, longitude: 22.9980, googleMapsUrl: "https://maps.app.goo.gl/xcs6EqYy8LbzYq2y6" },
     { name: "Palaiopoli Beach", latitude: 36.2260, longitude: 23.0410, googleMapsUrl: "https://maps.app.goo.gl/TPFetRbFcyAXdgNDA" },
+    // Adding a well-protected beach example
+    { name: "Vathy Bay", latitude: 36.9546, longitude: 24.7115, googleMapsUrl: "https://maps.app.goo.gl/gp5XWPpmG4mCNgJg8" },
   ];
 
   return (
@@ -431,20 +459,20 @@ const App = () => {
           </div>
         )}
 
-
-{view === "detail" && selectedBeach && (
-  <ErrorBoundary>
-    <FixedBeachView 
-      beach={selectedBeach}
-      homeBeach={homeBeach}
-      onSetHomeBeach={handleSetHomeBeach}
-      setView={setView}
-      timeRange={timeRange}
-      onTimeRangeChange={handleTimeRangeChange}
-      onDataUpdate={handleDataUpdate}
-    />
-  </ErrorBoundary>
-)}
+        {view === "detail" && selectedBeach && (
+          <ErrorBoundary>
+            <FixedBeachView 
+              beach={selectedBeach}
+              homeBeach={homeBeach}
+              onSetHomeBeach={handleSetHomeBeach}
+              setView={setView}
+              timeRange={timeRange}
+              onTimeRangeChange={handleTimeRangeChange}
+              onDataUpdate={handleDataUpdate}
+              debugMode={debugMode}
+            />
+          </ErrorBoundary>
+        )}
       </main>
 
       {/* Footer with Version Information and Last Updated Time */}
@@ -458,19 +486,19 @@ const App = () => {
               Version {APP_VERSION}
             </span>
             <span className="text-blue-300 border-r border-blue-600 pr-3 mr-3">
-              Last updated: {formattedUpdateDate} {formattedUpdateTime}
-            </span>
-            <span className="text-blue-300">
-              {debugMode ? (
-                <button onClick={() => setDebugMode(false)} className="text-blue-300 hover:text-white">
-                  Debug Mode On
-                </button>
+              {lastUpdated ? (
+                <>Last updated: {formattedUpdateDate} {formattedUpdateTime} </>
               ) : (
-                <button onClick={() => setDebugMode(true)} className="text-blue-300 hover:text-white">
-                  Enable Debug
-                </button>
+                <>No updates yet</>
               )}
+              {debugMode && <span className="ml-1">({dataUpdateCount} updates)</span>}
             </span>
+            <button 
+              onClick={toggleDebugMode} 
+              className="text-blue-300 hover:text-white px-3 py-1 rounded-lg hover:bg-blue-700"
+            >
+              {debugMode ? "Debug Mode On" : "Enable Debug"}
+            </button>
           </div>
         </div>
       </footer>
