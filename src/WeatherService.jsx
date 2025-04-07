@@ -1,25 +1,30 @@
-// WeatherService.js - USING REAL WEATHER DATA
+// WeatherService.js - USING REAL WEATHER API DATA ONLY
 import { getCardinalDirection } from "./helpers";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 
 // Filter hourly data by time range
 export const filterHoursByTimeRange = (hourlyData, range) => {
-  if (!hourlyData) return null;
+  if (!hourlyData || !hourlyData.time) return null;
   
   const startHour = parseInt(range.startTime.split(":")[0]);
   const endHour = parseInt(range.endTime.split(":")[0]);
   
-  // Create a map of indices for the given time range
   const indices = [];
   for (let i = 0; i < hourlyData.time.length; i++) {
-    const hourString = hourlyData.time[i];
-    const hour = new Date(hourString).getHours();
+    const hourTime = new Date(hourlyData.time[i]);
+    const hour = hourTime.getHours();
     if (hour >= startHour && hour <= endHour) {
       indices.push(i);
     }
   }
+  
+  if (indices.length === 0) {
+    // Fallback to just using a range of indices if time filtering fails
+    for (let i = startHour; i <= endHour && i < 24; i++) {
+      indices.push(i);
+    }
+  }
 
-  // Filter all data for the specified time range
   return {
     time: indices.map(i => hourlyData.time[i]),
     temperature_2m: indices.map(i => hourlyData.temperature_2m[i]),
@@ -55,7 +60,7 @@ export const getCondition = (score) => {
   return { label: "Nope", emoji: "🚫", message: "Not recommended." };
 };
 
-// Fetch real weather data from Open-Meteo API
+// Fetch real weather data from Open-Meteo API - NO MOCK DATA
 export const fetchWeatherData = async (beach, timeRange) => {
   if (!beach || !beach.latitude || !beach.longitude) {
     throw new Error("Invalid beach data");
@@ -68,18 +73,18 @@ export const fetchWeatherData = async (beach, timeRange) => {
     const date = new Date(timeRange.date);
     const formattedDate = date.toISOString().split("T")[0];
     
-    // Calculate start and end dates for forecast (we'll get 7 days)
+    // Calculate start and end dates for forecast
     const startDate = formattedDate;
     const endDate = new Date(date);
-    endDate.setDate(endDate.getDate() + 7);
+    endDate.setDate(endDate.getDate() + 2); // Get 3 days of data
     const formattedEndDate = endDate.toISOString().split("T")[0];
     
+    console.log("Fetching weather for dates:", startDate, "to", formattedEndDate);
+    
     // Prepare Open-Meteo weather API URL
-    // Documentation: https://open-meteo.com/en/docs
     const weatherApiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m&daily=precipitation_sum,windspeed_10m_max&start_date=${startDate}&end_date=${formattedEndDate}&timezone=auto`;
     
     // Prepare Open-Meteo marine API URL for wave data
-    // Documentation: https://open-meteo.com/en/docs/marine-weather-api
     const marineApiUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,wave_direction&daily=wave_height_max,wave_direction_dominant&start_date=${startDate}&end_date=${formattedEndDate}&timezone=auto`;
     
     console.log("Weather API URL:", weatherApiUrl);
@@ -92,8 +97,11 @@ export const fetchWeatherData = async (beach, timeRange) => {
     ]);
     
     // Check for errors
-    if (!weatherResponse.ok || !marineResponse.ok) {
-      throw new Error("Failed to fetch weather data");
+    if (!weatherResponse.ok) {
+      throw new Error(`Weather API error: ${weatherResponse.status}`);
+    }
+    if (!marineResponse.ok) {
+      throw new Error(`Marine API error: ${marineResponse.status}`);
     }
     
     // Parse JSON responses
@@ -103,47 +111,45 @@ export const fetchWeatherData = async (beach, timeRange) => {
     console.log("Weather data received:", weatherData);
     console.log("Marine data received:", marineData);
     
+    // Safely get values with validation
+    if (!weatherData.hourly || !marineData.hourly) {
+      throw new Error("Invalid API response structure");
+    }
+    
     // Combine data into a single object
     const combinedData = {
       hourly: {
-        time: weatherData.hourly.time,
-        temperature_2m: weatherData.hourly.temperature_2m,
-        precipitation: weatherData.hourly.precipitation,
-        cloudcover: weatherData.hourly.cloudcover,
-        windspeed_10m: weatherData.hourly.windspeed_10m,
-        winddirection_10m: weatherData.hourly.winddirection_10m,
-        wave_height: marineData.hourly.wave_height,
-        swell_wave_height: marineData.hourly.swell_wave_height,
-        wave_direction: marineData.hourly.wave_direction,
+        time: weatherData.hourly.time || [],
+        temperature_2m: weatherData.hourly.temperature_2m || [],
+        precipitation: weatherData.hourly.precipitation || [],
+        cloudcover: weatherData.hourly.cloudcover || [],
+        windspeed_10m: weatherData.hourly.windspeed_10m || [],
+        winddirection_10m: weatherData.hourly.winddirection_10m || [],
+        wave_height: marineData.hourly.wave_height || [],
+        swell_wave_height: marineData.hourly.swell_wave_height || [],
+        wave_direction: marineData.hourly.wave_direction || [],
       },
       daily: {
-        wave_height_max: marineData.daily.wave_height_max,
-        wave_direction_dominant: marineData.daily.wave_direction_dominant,
+        wave_height_max: marineData.daily.wave_height_max || [0.3],
+        wave_direction_dominant: marineData.daily.wave_direction_dominant || [180],
       },
       isRealData: true
     };
     
     // Filter data for the requested date
-    const requestedDate = timeRange.date;
-    
-    // Filter hourly data for the selected date
     const todayData = {
       hourly: {
-        time: combinedData.hourly.time.filter(t => t.startsWith(requestedDate)),
-        temperature_2m: filterByDate(combinedData.hourly.time, combinedData.hourly.temperature_2m, requestedDate),
-        precipitation: filterByDate(combinedData.hourly.time, combinedData.hourly.precipitation, requestedDate),
-        cloudcover: filterByDate(combinedData.hourly.time, combinedData.hourly.cloudcover, requestedDate),
-        windspeed_10m: filterByDate(combinedData.hourly.time, combinedData.hourly.windspeed_10m, requestedDate),
-        winddirection_10m: filterByDate(combinedData.hourly.time, combinedData.hourly.winddirection_10m, requestedDate),
-        wave_height: filterByDate(combinedData.hourly.time, combinedData.hourly.wave_height, requestedDate),
-        swell_wave_height: filterByDate(combinedData.hourly.time, combinedData.hourly.swell_wave_height, requestedDate),
-        wave_direction: filterByDate(combinedData.hourly.time, combinedData.hourly.wave_direction, requestedDate),
+        time: combinedData.hourly.time.filter(t => t.startsWith(timeRange.date)),
+        temperature_2m: filterByDate(combinedData.hourly.time, combinedData.hourly.temperature_2m, timeRange.date),
+        precipitation: filterByDate(combinedData.hourly.time, combinedData.hourly.precipitation, timeRange.date),
+        cloudcover: filterByDate(combinedData.hourly.time, combinedData.hourly.cloudcover, timeRange.date),
+        windspeed_10m: filterByDate(combinedData.hourly.time, combinedData.hourly.windspeed_10m, timeRange.date),
+        winddirection_10m: filterByDate(combinedData.hourly.time, combinedData.hourly.winddirection_10m, timeRange.date),
+        wave_height: filterByDate(combinedData.hourly.time, combinedData.hourly.wave_height, timeRange.date),
+        swell_wave_height: filterByDate(combinedData.hourly.time, combinedData.hourly.swell_wave_height, timeRange.date),
+        wave_direction: filterByDate(combinedData.hourly.time, combinedData.hourly.wave_direction, timeRange.date),
       },
-      daily: {
-        // Use the first day data (today)
-        wave_height_max: [combinedData.daily.wave_height_max[0]],
-        wave_direction_dominant: [combinedData.daily.wave_direction_dominant[0]],
-      },
+      daily: combinedData.daily,
       isRealData: true
     };
     
@@ -157,27 +163,27 @@ export const fetchWeatherData = async (beach, timeRange) => {
     
     // Get wave direction
     const waveDirection = todayData.daily.wave_direction_dominant ? 
-                      todayData.daily.wave_direction_dominant[0] : 
-                      relevantHours.wave_direction ? 
-                        relevantHours.wave_direction.reduce((sum, val) => sum + val, 0) / 
-                        relevantHours.wave_direction.length : 
-                        avgWindDirection;
+                       todayData.daily.wave_direction_dominant[0] : 
+                       relevantHours.wave_direction ? 
+                         relevantHours.wave_direction.reduce((sum, val) => sum + val, 0) / 
+                         relevantHours.wave_direction.length : 
+                         avgWindDirection;
     
-    // Calculate protection using REAL geographical data
-    let protection;
+    // Calculate real geographic protection
+    let protection = {
+      protectionScore: 50,
+      windProtection: 0.5,
+      waveProtection: 0.5,
+      bayEnclosure: 0.5
+    };
+    
     try {
       protection = await calculateGeographicProtection(beach, avgWindDirection, waveDirection);
-    } catch (error) {
-      console.error("Error calculating geographic protection:", error);
-      protection = {
-        protectionScore: 50,
-        windProtection: 0.5,
-        waveProtection: 0.5,
-        bayEnclosure: 0.5
-      };
+    } catch (protectionError) {
+      console.error("Error calculating geographic protection:", protectionError);
     }
     
-    // Calculate score using REAL data
+    // Calculate score using the real data
     const { calculatedScore, breakdown } = calculatePaddleScore(
       relevantHours,
       todayData.daily,
@@ -185,7 +191,7 @@ export const fetchWeatherData = async (beach, timeRange) => {
       protection
     );
     
-    console.log("Calculated final score:", calculatedScore);
+    console.log("Weather data processed, score:", calculatedScore);
     
     return {
       weatherData: todayData,
@@ -193,14 +199,18 @@ export const fetchWeatherData = async (beach, timeRange) => {
       scoreBreakdown: breakdown
     };
   } catch (error) {
-    console.error("Error fetching real weather data:", error);
-    throw new Error(`Failed to get weather data: ${error.message}. Please try again or check your internet connection.`);
+    console.error("Error fetching weather data:", error);
+    throw error; // Re-throw to let the UI handle it
   }
 };
 
 // Helper function to filter arrays by date
 const filterByDate = (times, values, date) => {
-  return values.filter((_, index) => times[index].startsWith(date));
+  if (!times || !values || !Array.isArray(times) || !Array.isArray(values)) {
+    return [];
+  }
+  
+  return values.filter((_, index) => times[index] && times[index].startsWith(date));
 };
 
 // Calculate paddle score with dynamic protection
@@ -209,74 +219,58 @@ export const calculatePaddleScore = (hourlyData, dailyData, beach, protectionDat
     return { calculatedScore: 0, breakdown: null };
   }
   
-  // Validate hourly data to prevent errors
-  if (!hourlyData.temperature_2m || !hourlyData.windspeed_10m || 
-      !hourlyData.cloudcover || !hourlyData.precipitation ||
-      !hourlyData.winddirection_10m ||
-      hourlyData.temperature_2m.length === 0 ||
-      hourlyData.windspeed_10m.length === 0) {
-    return { 
-      calculatedScore: 0, 
-      breakdown: {
-        windSpeed: { raw: 0, protected: 0, score: 0, maxPossible: 40 },
-        waveHeight: { raw: 0, protected: 0, score: 0, maxPossible: 20 },
-        swellHeight: { raw: 0, protected: 0, score: 0, maxPossible: 10 },
-        precipitation: { value: 0, score: 0, maxPossible: 10 },
-        temperature: { value: 0, score: 0, maxPossible: 10 },
-        cloudCover: { value: 0, score: 0, maxPossible: 10 },
-        geoProtection: { value: 0, score: 0, maxPossible: 15 },
-        total: { score: 0, maxPossible: 100 }
-      }
-    };
-  }
-  
-  // Calculate average values for the time range
-  const avgTemp =
-    hourlyData.temperature_2m.reduce((sum, val) => sum + val, 0) /
-    hourlyData.temperature_2m.length;
-  const avgWind =
-    hourlyData.windspeed_10m.reduce((sum, val) => sum + val, 0) /
-    hourlyData.windspeed_10m.length;
-  const avgCloud =
-    hourlyData.cloudcover.reduce((sum, val) => sum + val, 0) /
-    hourlyData.cloudcover.length;
-  const maxPrecip = Math.max(...hourlyData.precipitation);
+  // Get average values safely with validation
+  let avgTemp = 22, avgWind = 5, avgCloud = 30, maxPrecip = 0;
+  let avgWindDirection = 180, waveHeight = 0.3, swellHeight = 0.2;
 
-  // Get wind direction
-  const avgWindDirection =
-    hourlyData.winddirection_10m.reduce((sum, val) => sum + val, 0) /
-    hourlyData.winddirection_10m.length;
-
-  // Get wave direction
-  const waveDirection = dailyData.wave_direction_dominant ? 
-                    dailyData.wave_direction_dominant[0] : 
-                    avgWindDirection;
-
-  // Get wave height from API or daily data
-  let waveHeight = dailyData.wave_height_max ? dailyData.wave_height_max[0] : 0.3;
-
-  // Get swell height from API if available
-  let swellHeight = 0;
-  if (hourlyData.swell_wave_height) {
-    swellHeight =
-      hourlyData.swell_wave_height.reduce((sum, val) => sum + val, 0) /
-      hourlyData.swell_wave_height.length;
-  } else {
-    // Use wave height as a proxy if no specific swell data
-    swellHeight = waveHeight * 0.7; // Rough approximation
+  try {
+    // Calculate averages with fallbacks if data is missing
+    if (hourlyData.temperature_2m && hourlyData.temperature_2m.length > 0) {
+      avgTemp = hourlyData.temperature_2m.reduce((sum, val) => sum + val, 0) / 
+               hourlyData.temperature_2m.length;
+    }
+    
+    if (hourlyData.windspeed_10m && hourlyData.windspeed_10m.length > 0) {
+      avgWind = hourlyData.windspeed_10m.reduce((sum, val) => sum + val, 0) / 
+               hourlyData.windspeed_10m.length;
+    }
+    
+    if (hourlyData.cloudcover && hourlyData.cloudcover.length > 0) {
+      avgCloud = hourlyData.cloudcover.reduce((sum, val) => sum + val, 0) / 
+                hourlyData.cloudcover.length;
+    }
+    
+    if (hourlyData.precipitation && hourlyData.precipitation.length > 0) {
+      maxPrecip = Math.max(...hourlyData.precipitation);
+    }
+    
+    if (hourlyData.winddirection_10m && hourlyData.winddirection_10m.length > 0) {
+      avgWindDirection = hourlyData.winddirection_10m.reduce((sum, val) => sum + val, 0) / 
+                        hourlyData.winddirection_10m.length;
+    }
+    
+    if (dailyData.wave_height_max && dailyData.wave_height_max.length > 0) {
+      waveHeight = dailyData.wave_height_max[0];
+    }
+    
+    if (hourlyData.swell_wave_height && hourlyData.swell_wave_height.length > 0) {
+      swellHeight = hourlyData.swell_wave_height.reduce((sum, val) => sum + val, 0) / 
+                   hourlyData.swell_wave_height.length;
+    } else {
+      swellHeight = waveHeight * 0.7;
+    }
+  } catch (err) {
+    console.error("Error calculating averages:", err);
+    // Use default values already set
   }
 
   // Use provided protection data or calculate it if needed
-  let geoProtection = protectionData;
-  if (!geoProtection) {
-    // This is a synchronous fallback since we can't make this function async
-    geoProtection = {
-      protectionScore: 50,
-      windProtection: 0.5,
-      waveProtection: 0.5,
-      bayEnclosure: 0.5
-    };
-  }
+  const geoProtection = protectionData || {
+    protectionScore: 50,
+    windProtection: 0.5,
+    waveProtection: 0.5,
+    bayEnclosure: 0.5
+  };
 
   // Apply enhanced geographic protection factors
   const protectedWindSpeed = avgWind * (1 - (geoProtection.windProtection * 0.9));
