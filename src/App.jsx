@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { AlertCircle, Home, Map, MapPin, Plus, Trash2, ChevronLeft } from "lucide-react";
 import { useBeachManager } from "./BeachManager";
 import BeachDetailView from "./BeachDetailView";
@@ -169,8 +169,11 @@ const App = () => {
     { name: "Astir Beach", latitude: 37.8095, longitude: 23.7850, googleMapsUrl: "https://maps.app.goo.gl/6uUbtp31MQ63gGBSA" },
     { name: "Kapsali Beach", latitude: 36.1360, longitude: 22.9980, googleMapsUrl: "https://maps.app.goo.gl/xcs6EqYy8LbzYq2y6" },
     { name: "Palaiopoli Beach", latitude: 36.2260, longitude: 23.0410, googleMapsUrl: "https://maps.app.goo.gl/TPFetRbFcyAXdgNDA" },
-    // Adding a well-protected beach example
-    { name: "Vathy Bay", latitude: 36.9546, longitude: 24.7115, googleMapsUrl: "https://maps.app.goo.gl/gp5XWPpmG4mCNgJg8" },
+    // CORRECTED Vathy Bay coordinates pointing to the inner harbor
+    { name: "Vathy Bay (Sifnos)", latitude: 36.9386, longitude: 24.6750, googleMapsUrl: "https://www.google.com/maps/place/Vathy+Bay/@36.9386,24.6750,15z" },
+    // Additional highly protected bays
+    { name: "Naoussa Bay (Paros)", latitude: 37.1232, longitude: 25.2355, googleMapsUrl: "https://www.google.com/maps/place/Naoussa+Bay/@37.1232,25.2355,15z" },
+    { name: "Vlikhos Bay (Hydra)", latitude: 37.3255, longitude: 23.4486, googleMapsUrl: "https://www.google.com/maps/place/Vlikhos+Bay/@37.3255,23.4486,15z" },
   ];
 
   return (
