@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { AlertCircle, Home, Map, MapPin, Plus, Trash2, ChevronLeft } from "lucide-react";
 import { useBeachManager } from "./BeachManager";
 import BeachDetailView from "./BeachDetailView";
+import FixedBeachView from "./FixedBeachView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers";
 
 const App = () => {
@@ -432,16 +433,11 @@ const App = () => {
 
 {view === "detail" && selectedBeach && (
   <ErrorBoundary>
-    <BeachDetailView 
+    <FixedBeachView 
       beach={selectedBeach}
       homeBeach={homeBeach}
       onSetHomeBeach={handleSetHomeBeach}
-      timeRange={timeRange}
-      onTimeRangeChange={handleTimeRangeChange}
       setView={setView}
-      beaches={beaches}
-      toast={toast}
-      debugMode={debugMode}
       onDataUpdate={handleDataUpdate}
     />
   </ErrorBoundary>
