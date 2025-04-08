@@ -472,77 +472,96 @@ const FixedBeachView = ({
   };
   
   // Render hourly wind data
-  const renderHourlyWind = () => {
-    if (!weatherData || !weatherData.hourly) return null;
+// Inside FixedBeachView.jsx, replace the renderHourlyWind function with this:
+const renderHourlyWind = () => {
+  if (!weatherData || !weatherData.hourly) return null;
+  
+  const startHour = parseInt(timeRange.startTime.split(":")[0]);
+  const endHour = parseInt(timeRange.endTime.split(":")[0]);
+  
+  // Find relevant hours
+  const relevantHours = [];
+  const today = new Date(timeRange.date);
+  const tomorrow = new Date(timeRange.date);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  // Map to keep track of days
+  const dayMap = {};
+  
+  for (let i = 0; i < weatherData.hourly.time.length; i++) {
+    const hourTime = new Date(weatherData.hourly.time[i]);
+    const hour = hourTime.getHours();
+    const dateStr = hourTime.toDateString();
     
-    const startHour = parseInt(timeRange.startTime.split(":")[0]);
-    const endHour = parseInt(timeRange.endTime.split(":")[0]);
-    
-    // Find relevant hours
-    const relevantHours = [];
-    for (let i = 0; i < weatherData.hourly.time.length; i++) {
-      const hourDate = new Date(weatherData.hourly.time[i]);
-      const hour = hourDate.getHours();
+    // Check if hour matches our time range
+    if (hour >= startHour && hour <= endHour) {
+      // Create a unique key for this time slot
+      const timeKey = `${dateStr}-${hour}`;
       
-      if (hour >= startHour && hour <= endHour) {
+      // Only add if we haven't already added this exact time slot
+      if (!dayMap[timeKey]) {
+        dayMap[timeKey] = true;
+        
         relevantHours.push({
           hour,
           index: i,
           windSpeed: weatherData.hourly.windspeed_10m[i],
-          time: weatherData.hourly.time[i]
+          time: weatherData.hourly.time[i],
+          day: dateStr === today.toDateString() ? "Today" : "Tomorrow"
         });
       }
     }
-    
-    if (relevantHours.length === 0) return null;
-    
-    return (
-      <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
-        <h4 className="font-medium mb-4 flex items-center text-gray-800">
-          <Clock className="h-5 w-5 mr-2 text-blue-600" /> 
-          Hourly Wind Speed
-        </h4>
-        
-        <div className="space-y-3">
-          {relevantHours.map(hour => {
-            const windSpeed = Math.round(hour.windSpeed);
-            const barWidth = Math.min(80, windSpeed * 6); // Cap at 80% width
-            
-            let barColor = "bg-green-500";
-            let textColor = "text-green-800";
-            let bgColor = "bg-green-100";
-            
-            if (windSpeed >= 12) {
-              barColor = "bg-red-500";
-              textColor = "text-red-800";
-              bgColor = "bg-red-100";
-            } else if (windSpeed >= 8) {
-              barColor = "bg-yellow-500";
-              textColor = "text-yellow-800";
-              bgColor = "bg-yellow-100";
-            }
-            
-            return (
-              <div key={hour.index} className="flex items-center">
-                <div className="w-12 text-gray-600 font-medium">
-                  {hour.hour}:00
-                </div>
-                <div className="flex-grow mx-3 bg-gray-200 h-6 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full ${barColor} rounded-l-full`} 
-                    style={{ width: `${barWidth}%` }} 
-                  ></div>
-                </div>
-                <div className={`px-2 py-1 rounded-md ${bgColor} ${textColor} font-medium text-sm min-w-[70px] text-center`}>
-                  {windSpeed} km/h
-                </div>
+  }
+  
+  if (relevantHours.length === 0) return null;
+  
+  return (
+    <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
+      <h4 className="font-medium mb-4 flex items-center text-gray-800">
+        <Clock className="h-5 w-5 mr-2 text-blue-600" /> 
+        Hourly Wind Speed
+      </h4>
+      
+      <div className="space-y-3">
+        {relevantHours.map(hour => {
+          const windSpeed = Math.round(hour.windSpeed);
+          const barWidth = Math.min(80, windSpeed * 6); // Cap at 80% width
+          
+          let barColor = "bg-green-500";
+          let textColor = "text-green-800";
+          let bgColor = "bg-green-100";
+          
+          if (windSpeed >= 12) {
+            barColor = "bg-red-500";
+            textColor = "text-red-800";
+            bgColor = "bg-red-100";
+          } else if (windSpeed >= 8) {
+            barColor = "bg-yellow-500";
+            textColor = "text-yellow-800";
+            bgColor = "bg-yellow-100";
+          }
+          
+          return (
+            <div key={hour.time} className="flex items-center">
+              <div className="w-24 text-gray-600 font-medium">
+                {hour.day} {hour.hour}:00
               </div>
-            );
-          })}
-        </div>
+              <div className="flex-grow mx-3 bg-gray-200 h-6 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${barColor} rounded-l-full`} 
+                  style={{ width: `${barWidth}%` }} 
+                ></div>
+              </div>
+              <div className={`px-2 py-1 rounded-md ${bgColor} ${textColor} font-medium text-sm min-w-[70px] text-center`}>
+                {windSpeed} km/h
+              </div>
+            </div>
+          );
+        })}
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
