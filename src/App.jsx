@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { AlertCircle, Home, Map, MapPin, Plus, Trash2, ChevronLeft } from "lucide-react";
+import { AlertCircle, Home, Map, MapPin, Plus, Trash2, ChevronLeft, HelpCircle } from "lucide-react";
 import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers";
+import FAQ from "./FAQ"; // Import the new FAQ component
 
 const App = () => {
   // State
@@ -17,9 +18,11 @@ const App = () => {
   });
   const [lastUpdated, setLastUpdated] = useState(null);
   const [dataUpdateCount, setDataUpdateCount] = useState(0);
+  const [showFAQ, setShowFAQ] = useState(false); // New state for FAQ visibility
   
   // App version information
   const APP_VERSION = "1.0.3";
+  const BUILD_DATE = "April 9, 2025"; // Add build date for last update info
   
   // Format last updated time strings
   const formattedUpdateTime = lastUpdated ? 
@@ -94,6 +97,11 @@ const App = () => {
       document.body.classList.add('debug-mode');
     }
   }, []);
+  
+  // Function to toggle FAQ visibility
+  const toggleFAQ = () => {
+    setShowFAQ(!showFAQ);
+  };
   
   // Handle beach selection
   const handleBeachSelect = (beach) => {
@@ -196,6 +204,9 @@ const App = () => {
         />
       )}
       
+      {/* FAQ Modal */}
+      <FAQ isOpen={showFAQ} onClose={() => setShowFAQ(false)} />
+      
       {/* Header */}
       <header className="bg-blue-600 text-white p-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
@@ -206,7 +217,14 @@ const App = () => {
             <div className="mr-2 text-3xl">🌊</div> 
             Paddleboard Weather Advisor
           </h1>
-          <nav className="flex space-x-4">
+          <nav className="flex items-center space-x-4">
+            <button
+              onClick={toggleFAQ}
+              className="p-2 rounded-full hover:bg-blue-700 transition"
+              title="Help & FAQ"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </button>
             <button
               onClick={() => setView("dashboard")}
               className={`px-3 py-1 rounded-lg ${
@@ -461,20 +479,20 @@ const App = () => {
           </div>
         )}
 
-{view === "detail" && selectedBeach && (
-  <ErrorBoundary>
-    <FixedBeachView 
-      beach={selectedBeach}
-      homeBeach={homeBeach}
-      onSetHomeBeach={handleSetHomeBeach}
-      setView={setView}
-      timeRange={timeRange}
-      onTimeRangeChange={handleTimeRangeChange}
-      onDataUpdate={handleDataUpdate}
-      debugMode={debugMode}
-    />
-  </ErrorBoundary>
-)}
+        {view === "detail" && selectedBeach && (
+          <ErrorBoundary>
+            <FixedBeachView 
+              beach={selectedBeach}
+              homeBeach={homeBeach}
+              onSetHomeBeach={handleSetHomeBeach}
+              setView={setView}
+              timeRange={timeRange}
+              onTimeRangeChange={handleTimeRangeChange}
+              onDataUpdate={handleDataUpdate}
+              debugMode={debugMode}
+            />
+          </ErrorBoundary>
+        )}
       </main>
 
       {/* Footer with Version Information and Last Updated Time */}
@@ -485,7 +503,7 @@ const App = () => {
           </p>
           <div className="flex items-center mt-2 sm:mt-0 text-xs">
             <span className="text-blue-300 border-r border-blue-600 pr-3 mr-3">
-              Version {APP_VERSION}
+              Version {APP_VERSION} ({BUILD_DATE})
             </span>
             <span className="text-blue-300 border-r border-blue-600 pr-3 mr-3">
               {lastUpdated ? (
@@ -500,6 +518,12 @@ const App = () => {
               className="text-blue-300 hover:text-white px-3 py-1 rounded-lg hover:bg-blue-700"
             >
               {debugMode ? "Debug Mode On" : "Enable Debug"}
+            </button>
+            <button
+              onClick={toggleFAQ}
+              className="text-blue-300 hover:text-white px-3 py-1 rounded-lg hover:bg-blue-700 ml-3"
+            >
+              FAQ
             </button>
           </div>
         </div>
