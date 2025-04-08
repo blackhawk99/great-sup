@@ -37,27 +37,105 @@ export const filterHoursByTimeRange = (hourlyData, range) => {
   };
 };
 
-// Get condition based on score
-export const getCondition = (score) => {
-  if (score >= 85)
-    return {
-      label: "Perfect",
-      emoji: "✅",
-      message: "Flat like oil. Paddle on.",
-    };
-  if (score >= 70)
+// Get condition based on score and actual conditions
+export const getCondition = (score, weatherConditions) => {
+  // Extract key metrics from weather conditions
+  const temp = weatherConditions?.temperature || 0;
+  const windSpeed = weatherConditions?.protectedWindSpeed || 0;
+  const precipitation = weatherConditions?.precipitation || 0;
+  const waveHeight = weatherConditions?.protectedWaveHeight || 0;
+
+  // Base conditions on score
+  if (score >= 85) {
+    // Perfect score, but check for non-perfect conditions
+    if (temp < 18) {
+      return {
+        label: "Chilly but Calm",
+        emoji: "🧊",
+        message: "Great conditions, but bring a wetsuit.",
+        color: "text-blue-500"
+      };
+    } else if (precipitation >= 0.5) {
+      return {
+        label: "Calm but Wet",
+        emoji: "🌧️",
+        message: "Light rain, but excellent water conditions.",
+        color: "text-blue-500"
+      };
+    } else if (windSpeed > 15) {
+      return {
+        label: "Excellent",
+        emoji: "✅",
+        message: "Some wind, but well-protected location.",
+        color: "text-green-500"
+      };
+    } else {
+      return {
+        label: "Perfect",
+        emoji: "✅",
+        message: "Flat like oil. Paddle on.",
+        color: "text-green-500"
+      };
+    }
+  } else if (score >= 70) {
     return {
       label: "Okay-ish",
       emoji: "⚠️",
       message: "Minor chop. Go early.",
+      color: "text-yellow-500"
     };
-  if (score >= 50)
+  } else if (score >= 50) {
     return {
       label: "Not Great",
       emoji: "❌",
       message: "Wind or waves make it tricky.",
+      color: "text-orange-500" 
     };
-  return { label: "Nope", emoji: "🚫", message: "Not recommended." };
+  } else {
+    return { 
+      label: "Nope", 
+      emoji: "🚫", 
+      message: "Not recommended.",
+      color: "text-red-500"
+    };
+  }
+};
+
+// Generate condition details tooltip content
+export const getConditionDetails = (score, weatherConditions) => {
+  const temp = weatherConditions?.temperature || 0;
+  const windSpeed = weatherConditions?.protectedWindSpeed || 0;
+  const precipitation = weatherConditions?.precipitation || 0;
+  const cloudCover = weatherConditions?.cloudCover || 0;
+  
+  // Create array of condition notes
+  const notes = [];
+  
+  if (temp < 16) {
+    notes.push("Water will be quite cold");
+  } else if (temp < 20) {
+    notes.push("Water will be cool");
+  }
+  
+  if (precipitation > 0 && precipitation < 1) {
+    notes.push("Light rain possible");
+  }
+  
+  if (cloudCover > 60) {
+    notes.push("Mostly cloudy");
+  }
+  
+  if (windSpeed > 10 && windSpeed < 20) {
+    notes.push("Some wind, but manageable");
+  }
+  
+  // Join with bullet points if we have notes
+  if (notes.length > 0) {
+    return notes.join(" • ");
+  }
+  
+  // Default message if no specific notes
+  return score >= 80 ? "Great overall conditions" : "Check individual factors";
 };
 
 // Fetch real weather data from Open-Meteo API - NO MOCK DATA
@@ -272,10 +350,10 @@ export const calculatePaddleScore = (hourlyData, dailyData, beach, protectionDat
     bayEnclosure: 0.5
   };
 
-  // Apply enhanced geographic protection factors
-  const protectedWindSpeed = avgWind * (1 - (geoProtection.windProtection * 0.9));
-  const protectedWaveHeight = waveHeight * (1 - (geoProtection.waveProtection * 0.9));
-  const protectedSwellHeight = swellHeight * (1 - (geoProtection.waveProtection * 0.85));
+  // Apply enhanced geographic protection factors - with Math.min to avoid negative values
+  const protectedWindSpeed = avgWind * Math.max(0, 1 - Math.min(1, geoProtection.windProtection * 0.9));
+  const protectedWaveHeight = waveHeight * Math.max(0, 1 - Math.min(1, geoProtection.waveProtection * 0.9));
+  const protectedSwellHeight = swellHeight * Math.max(0, 1 - Math.min(1, geoProtection.waveProtection * 0.85));
 
   // Initialize breakdown for score tabulation
   const breakdown = {
