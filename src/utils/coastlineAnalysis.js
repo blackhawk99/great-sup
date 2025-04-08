@@ -419,25 +419,25 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     let bestWaveProtection = 0;
     
     // Consider up to 5 closest segments
-    for (const segment of relevantSegments.slice(0, 5)) {
-      const segmentAngle = segment.angle;
-      
-      // Calculate wind protection
-      const windExposure = calculateDirectionalExposure(windDirection, segmentAngle);
-      const windProtection = 1 - Math.cos(windExposure * Math.PI / 180);
-      
-      // Calculate wave protection
-      const waveExposure = calculateDirectionalExposure(waveDirection, segmentAngle);
-      const waveProtection = 1 - Math.cos(waveExposure * Math.PI / 180);
+for (const segment of relevantSegments.slice(0, 5)) {
+  const segmentAngle = segment.angle;
+  
+  // Calculate wind protection
+  const windExposure = calculateDirectionalExposure(windDirection, segmentAngle);
+  const windProtection = Math.min(1.0, 1 - Math.cos(windExposure * Math.PI / 180));
+  
+  // Calculate wave protection
+  const waveExposure = calculateDirectionalExposure(waveDirection, segmentAngle);
+  const waveProtection = Math.min(1.0, 1 - Math.cos(waveExposure * Math.PI / 180));
       
       // Keep the best protection values
       if (windProtection > bestWindProtection) bestWindProtection = windProtection;
       if (waveProtection > bestWaveProtection) bestWaveProtection = waveProtection;
     }
     
-    // Calculate total protection
-    const totalWindProtection = bestWindProtection * (0.5 + 0.5 * enclosureScore);
-    const totalWaveProtection = bestWaveProtection * (0.5 + 0.5 * enclosureScore);
+// Calculate total protection
+const totalWindProtection = Math.min(1.0, bestWindProtection * (0.5 + 0.5 * enclosureScore));
+const totalWaveProtection = Math.min(1.0, bestWaveProtection * (0.5 + 0.5 * enclosureScore));
     
     // Compute final protection score
     const protectionScore = (
@@ -449,13 +449,13 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     // Special case for Vathy - ensure highest protection
     const finalScore = isVathySifnos ? 95 : protectionScore;
     
-    return {
-      protectionScore: finalScore,
-      coastlineAngle,
-      enclosureScore,
-      windProtection: totalWindProtection,
-      waveProtection: totalWaveProtection,
-      bayEnclosure: enclosureScore,
+return {
+  protectionScore: finalScore,
+  coastlineAngle,
+  enclosureScore,
+  windProtection: Math.min(1.0, totalWindProtection),
+  waveProtection: Math.min(1.0, totalWaveProtection),
+  bayEnclosure: enclosureScore,
       isProtected: protectionScore > 50,
       description: generateProtectionDescription(
         enclosureScore, 
