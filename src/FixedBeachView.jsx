@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermometer, Droplets, Waves, Sun, Clock, Calendar, Info } from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection } from "./helpers";
-import { calculatePaddleScore, getCondition, getConditionDetails } from "./WeatherService";
 
 const FixedBeachView = ({ 
   beach, 
@@ -134,10 +133,11 @@ const FixedBeachView = ({
       const protection = await calculateGeographicProtection(beach, avgWindDir, waveDirection);
       setGeoProtection(protection);
       
-      // Apply protection factors
-      const protectedWindSpeed = avgWind * (1 - (protection.windProtection * 0.9));
-      const protectedWaveHeight = waveHeight * (1 - (protection.waveProtection * 0.9));
-      const protectedSwellHeight = avgSwellHeight * (1 - (protection.waveProtection * 0.85));
+      // Apply protection factors - ensuring we don't get negative values
+      const protectionFactor = Math.min(0.9, protection.windProtection); // Limit to 90% protection max
+      const protectedWindSpeed = avgWind * (1 - protectionFactor);
+      const protectedWaveHeight = waveHeight * (1 - Math.min(0.9, protection.waveProtection));
+      const protectedSwellHeight = avgSwellHeight * (1 - Math.min(0.85, protection.waveProtection));
       
       // Initialize score breakdown
       const breakdown = {
@@ -217,129 +217,28 @@ const FixedBeachView = ({
       setScoreBreakdown(null);
     }
   };
-
-  // Calculate weather conditions for condition labeling
-  const weatherConditions = weatherData && scoreBreakdown ? {
-    temperature: weatherData.hourly.temperature_2m[12],
-    protectedWindSpeed: scoreBreakdown.windSpeed.protected,
-    precipitation: weatherData.hourly.precipitation[12],
-    cloudCover: weatherData.hourly.cloudcover[12],
-    protectedWaveHeight: scoreBreakdown.waveHeight.protected
-  } : null;
   
-  // Get condition details based on weather conditions
-  const condition = paddleScore !== null && weatherConditions ? 
-    getCondition(paddleScore, weatherConditions) : 
-    { label: "Loading", emoji: "⏳", message: "Checking conditions...", color: "text-gray-500" };
-  
-  // Get additional condition details for tooltip
-  const conditionDetails = paddleScore !== null && weatherConditions ?
-    getConditionDetails(paddleScore, weatherConditions) :
-    "";
-  
-  // Render geographic protection information
-  const renderGeoProtectionInfo = () => {
-    if (!geoProtection) return null;
-    
-    // Calculate the bonus points added to score
-    const geoBonus = Math.round((geoProtection.protectionScore / 100) * 15);
-    const avgWindDirection = weatherData?.hourly?.winddirection_10m?.[12] || 0;
-    
-    return (
-      <div className="bg-blue-50 p-5 rounded-lg mt-4 border border-blue-200 shadow-inner">
-        <h4 className="font-medium mb-4 text-lg flex items-center text-blue-800">
-          <MapPin className="h-5 w-5 mr-2 text-blue-600" />
-          Geographic Protection Analysis
-        </h4>
-        
-        <div className="grid md:grid-cols-2 gap-6">
-          <ul className="space-y-3">
-            <li className="flex justify-between items-center bg-white p-3 rounded border">
-              <span className="font-medium text-gray-700">Bay Enclosure:</span>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                geoProtection.bayEnclosure > 0.6 
-                  ? 'bg-green-100 text-green-800' 
-                  : geoProtection.bayEnclosure > 0.3 
-                    ? 'bg-yellow-100 text-yellow-800' 
-                    : 'bg-red-100 text-red-800'
-              }`}>
-                {geoProtection.bayEnclosure > 0.7 
-                  ? 'Well Protected' 
-                  : geoProtection.bayEnclosure > 0.4 
-                    ? 'Moderately Protected' 
-                    : 'Exposed'}
-              </span>
-            </li>
-            <li className="flex justify-between items-center bg-white p-3 rounded border">
-              <span className="font-medium text-gray-700">Wind Direction:</span>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                geoProtection.windProtection > 0.7 
-                  ? 'bg-green-100 text-green-800' 
-                  : geoProtection.windProtection > 0.3 
-                    ? 'bg-yellow-100 text-yellow-800' 
-                    : 'bg-red-100 text-red-800'
-              }`}>
-                {getCardinalDirection(avgWindDirection)} 
-                {geoProtection.windProtection > 0.7 
-                  ? ' (Protected)' 
-                  : geoProtection.windProtection > 0.3 
-                    ? ' (Partially Exposed)' 
-                    : ' (Fully Exposed)'}
-              </span>
-            </li>
-            <li className="flex justify-between items-center bg-white p-3 rounded border">
-              <span className="font-medium text-gray-700">Overall Protection:</span>
-              <div className="flex items-center">
-                <div className="w-24 h-3 bg-gray-200 rounded-full overflow-hidden mr-2">
-                  <div 
-                    className={`h-full ${
-                      geoProtection.protectionScore > 70 
-                        ? 'bg-green-500' 
-                        : geoProtection.protectionScore > 40 
-                          ? 'bg-yellow-500' 
-                          : 'bg-red-500'
-                    }`}
-                    style={{ width: `${geoProtection.protectionScore}%` }}
-                  />
-                </div>
-                <span className={`font-medium ${
-                  geoProtection.protectionScore > 70 
-                    ? 'text-green-600' 
-                    : geoProtection.protectionScore > 40 
-                      ? 'text-yellow-600' 
-                      : 'text-red-600'
-                }`}>
-                  {Math.round(geoProtection.protectionScore)}/100
-                </span>
-              </div>
-            </li>
-          </ul>
-          
-          <div className="bg-white p-4 rounded border">
-            <h5 className="font-medium mb-2 text-gray-800">Impact on Score</h5>
-            <p className="text-gray-700 mb-3">
-              Geographic protection is contributing <span className="font-bold text-blue-600">
-              +{geoBonus} points</span> to your overall score.
-            </p>
-            <div className={`p-3 rounded-lg ${
-              geoProtection.protectionScore > 60 
-                ? 'bg-green-50 border border-green-200' 
-                : geoProtection.protectionScore > 30 
-                  ? 'bg-yellow-50 border border-yellow-200' 
-                  : 'bg-red-50 border border-red-200'
-            }`}>
-              <p className="text-sm">
-                {geoProtection.protectionScore > 60 
-                  ? `${beach.name} is well protected from ${getCardinalDirection(avgWindDirection)} winds, making it an excellent choice today.` 
-                  : geoProtection.protectionScore > 30 
-                    ? `${beach.name} has moderate protection from ${getCardinalDirection(avgWindDirection)} winds.` 
-                    : `${beach.name} is exposed to ${getCardinalDirection(avgWindDirection)} winds today, consider an alternative beach.`}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  // Get condition based on score
+  const getCondition = (score) => {
+    if (score >= 85)
+      return {
+        label: "Perfect",
+        emoji: "✅",
+        message: "Flat like oil. Paddle on.",
+      };
+    if (score >= 70)
+      return {
+        label: "Okay-ish",
+        emoji: "⚠️",
+        message: "Minor chop. Go early.",
+      };
+    if (score >= 50)
+      return {
+        label: "Not Great",
+        emoji: "❌",
+        message: "Wind or waves make it tricky.",
+      };
+    return { label: "Nope", emoji: "🚫", message: "Not recommended." };
   };
   
   // Render score breakdown
@@ -468,8 +367,113 @@ const FixedBeachView = ({
       </div>
     );
   };
-
-  // Render hourly wind data with fixed day labels
+  
+  // Render geographic protection info
+  const renderGeoProtectionInfo = () => {
+    if (!geoProtection) return null;
+    
+    // Calculate the bonus points added to score
+    const geoBonus = Math.round((geoProtection.protectionScore / 100) * 15);
+    const avgWindDirection = weatherData?.hourly?.winddirection_10m?.[12] || 0;
+    
+    return (
+      <div className="bg-blue-50 p-5 rounded-lg mt-4 border border-blue-200 shadow-inner">
+        <h4 className="font-medium mb-4 text-lg flex items-center text-blue-800">
+          <MapPin className="h-5 w-5 mr-2 text-blue-600" />
+          Geographic Protection Analysis
+        </h4>
+        
+        <div className="grid md:grid-cols-2 gap-6">
+          <ul className="space-y-3">
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Bay Enclosure:</span>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                geoProtection.bayEnclosure > 0.6 
+                  ? 'bg-green-100 text-green-800' 
+                  : geoProtection.bayEnclosure > 0.3 
+                    ? 'bg-yellow-100 text-yellow-800' 
+                    : 'bg-red-100 text-red-800'
+              }`}>
+                {geoProtection.bayEnclosure > 0.7 
+                  ? 'Well Protected' 
+                  : geoProtection.bayEnclosure > 0.4 
+                    ? 'Moderately Protected' 
+                    : 'Exposed'}
+              </span>
+            </li>
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Wind Direction:</span>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                geoProtection.windProtection > 0.7 
+                  ? 'bg-green-100 text-green-800' 
+                  : geoProtection.windProtection > 0.3 
+                    ? 'bg-yellow-100 text-yellow-800' 
+                    : 'bg-red-100 text-red-800'
+              }`}>
+                {getCardinalDirection(avgWindDirection)} 
+                {geoProtection.windProtection > 0.7 
+                  ? ' (Protected)' 
+                  : geoProtection.windProtection > 0.3 
+                    ? ' (Partially Exposed)' 
+                    : ' (Fully Exposed)'}
+              </span>
+            </li>
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Overall Protection:</span>
+              <div className="flex items-center">
+                <div className="w-24 h-3 bg-gray-200 rounded-full overflow-hidden mr-2">
+                  <div 
+                    className={`h-full ${
+                      geoProtection.protectionScore > 70 
+                        ? 'bg-green-500' 
+                        : geoProtection.protectionScore > 40 
+                          ? 'bg-yellow-500' 
+                          : 'bg-red-500'
+                    }`}
+                    style={{ width: `${geoProtection.protectionScore}%` }}
+                  />
+                </div>
+                <span className={`font-medium ${
+                  geoProtection.protectionScore > 70 
+                    ? 'text-green-600' 
+                    : geoProtection.protectionScore > 40 
+                      ? 'text-yellow-600' 
+                      : 'text-red-600'
+                }`}>
+                  {Math.round(geoProtection.protectionScore)}/100
+                </span>
+              </div>
+            </li>
+          </ul>
+          
+          <div className="bg-white p-4 rounded border">
+            <h5 className="font-medium mb-2 text-gray-800">Impact on Score</h5>
+            <p className="text-gray-700 mb-3">
+              Geographic protection is contributing <span className="font-bold text-blue-600">
+              +{geoBonus} points</span> to your overall score.
+            </p>
+            <div className={`p-3 rounded-lg ${
+              geoProtection.protectionScore > 60 
+                ? 'bg-green-50 border border-green-200' 
+                : geoProtection.protectionScore > 30 
+                  ? 'bg-yellow-50 border border-yellow-200' 
+                  : 'bg-red-50 border border-red-200'
+            }`}>
+              <p className="text-sm">
+                {geoProtection.protectionScore > 60 
+                  ? `${beach.name} is well protected from ${getCardinalDirection(avgWindDirection)} winds, making it an excellent choice today.` 
+                  : geoProtection.protectionScore > 30 
+                    ? `${beach.name} has moderate protection from ${getCardinalDirection(avgWindDirection)} winds.` 
+                    : `${beach.name} is exposed to ${getCardinalDirection(avgWindDirection)} winds today, consider an alternative beach.`}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  // Render hourly wind data - FIXED VERSION
   const renderHourlyWind = () => {
     if (!weatherData || !weatherData.hourly) return null;
     
@@ -488,7 +492,7 @@ const FixedBeachView = ({
     // Format dates for comparison
     const todayStr = todayDate.toISOString().split('T')[0];
     const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
-  
+
     // Process hourly data
     for (let i = 0; i < weatherData.hourly.time.length; i++) {
       const hourTime = new Date(weatherData.hourly.time[i]);
@@ -731,35 +735,35 @@ const FixedBeachView = ({
           {paddleScore !== null && (
             <div className="flex flex-col md:flex-row gap-6 mb-6">
               {/* Score card - LEFT SIDE */}
-              <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center flex flex-col justify-center relative">
+              <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center flex flex-col justify-center">
                 <div
-                  className={`text-6xl mb-3 ${condition.color}`}
+                  className={`text-6xl mb-3 ${
+                    paddleScore >= 85
+                      ? "text-green-500"
+                      : paddleScore >= 70
+                      ? "text-yellow-500"
+                      : paddleScore >= 50
+                      ? "text-orange-500"
+                      : "text-red-500"
+                  }`}
                 >
-                  {condition.emoji}
+                  {getCondition(paddleScore).emoji}
                 </div>
-                <h3 className="text-3xl font-bold mb-2 flex items-center justify-center">
-                  {condition.label}
-                  <div className="group relative ml-2">
-                    <div className="cursor-help">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" 
-                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" 
-                          className="text-gray-400">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                      </svg>
-                    </div>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 
-                                  absolute z-10 w-64 p-3 -left-24 bottom-8 bg-white 
-                                  border border-gray-200 rounded-lg shadow-lg text-sm text-left">
-                      {conditionDetails}
-                    </div>
-                  </div>
+                <h3 className="text-3xl font-bold mb-2">
+                  {getCondition(paddleScore).label}
                 </h3>
-                <p className="text-gray-600 text-lg mb-4">{condition.message}</p>
+                <p className="text-gray-600 text-lg mb-4">{getCondition(paddleScore).message}</p>
                 <div className="mt-2 bg-gray-100 rounded-full h-5 overflow-hidden">
                   <div
-                    className={`h-full ${condition.color}`}
+                    className={`h-full ${
+                      paddleScore >= 85
+                        ? "bg-green-500"
+                        : paddleScore >= 70
+                        ? "bg-yellow-500"
+                        : paddleScore >= 50
+                        ? "bg-orange-500"
+                        : "bg-red-500"
+                    }`}
                     style={{ width: `${paddleScore}%` }}
                   ></div>
                 </div>
@@ -787,11 +791,6 @@ const FixedBeachView = ({
                             : "text-red-600"
                         }`}>
                           {Math.round(weatherData.hourly.windspeed_10m[12])} km/h
-                          {scoreBreakdown && scoreBreakdown.windSpeed && (
-                            <span className="text-xs ml-2 text-gray-500">
-                              (Protected: {Math.round(scoreBreakdown.windSpeed.protected)} km/h)
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -810,11 +809,6 @@ const FixedBeachView = ({
                             : "text-red-600"
                         }`}>
                           {marineData.daily.wave_height_max[0].toFixed(1)} m
-                          {scoreBreakdown && scoreBreakdown.waveHeight && (
-                            <span className="text-xs ml-2 text-gray-500">
-                              (Protected: {scoreBreakdown.waveHeight.protected.toFixed(2)} m)
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -829,9 +823,7 @@ const FixedBeachView = ({
                           weatherData.hourly.temperature_2m[12] >= 22 &&
                           weatherData.hourly.temperature_2m[12] <= 30
                             ? "text-green-600"
-                            : weatherData.hourly.temperature_2m[12] >= 18
-                            ? "text-yellow-600"
-                            : "text-blue-600"
+                            : "text-yellow-600"
                         }`}>
                           {Math.round(weatherData.hourly.temperature_2m[12])}°C
                         </div>
