@@ -272,81 +272,82 @@ export const calculatePaddleScore = (hourlyData, dailyData, beach, protectionDat
     bayEnclosure: 0.5
   };
 
-  // Apply enhanced geographic protection factors
-  const protectedWindSpeed = avgWind * (1 - (geoProtection.windProtection * 0.9));
-  const protectedWaveHeight = waveHeight * (1 - (geoProtection.waveProtection * 0.9));
-  const protectedSwellHeight = swellHeight * (1 - (geoProtection.waveProtection * 0.85));
-
-  // Initialize breakdown for score tabulation
-  const breakdown = {
-    windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 40 },
+   const breakdown = {
     waveHeight: { raw: waveHeight, protected: protectedWaveHeight, score: 0, maxPossible: 20 },
     swellHeight: { raw: swellHeight, protected: protectedSwellHeight, score: 0, maxPossible: 10 },
-    precipitation: { value: maxPrecip, score: 0, maxPossible: 10 },
+    precipitation: { value: maxPrecip, score: 0, maxPossible: 15 },
     temperature: { value: avgTemp, score: 0, maxPossible: 10 },
     cloudCover: { value: avgCloud, score: 0, maxPossible: 10 },
     geoProtection: { value: geoProtection.protectionScore, score: 0, maxPossible: 15 },
     total: { score: 0, maxPossible: 100 }
   };
 
-  // Score calculation based on the table in the requirements
-  let score = 0;
+   // Apply geographic protection to wind speed
+   let protectedWindSpeed = avgWind * (1 - (geoProtection.windProtection * 0.9));
 
-  // Wind speed (up to 40 points) - now uses protected wind speed
-  breakdown.windSpeed.score = protectedWindSpeed < 8 ? 40 : Math.max(0, 40 - (protectedWindSpeed - 8) * (40 / 12));
-  score += breakdown.windSpeed.score;
+   // Wind Speed Score
+   if (protectedWindSpeed < 8) {
+       breakdown.windSpeed.score = 20;
+   } else if (protectedWindSpeed <= 18) {
+       breakdown.windSpeed.score = Math.max(0, 20 - (protectedWindSpeed - 8) * 2);
+   }
 
-  // Wave height (up to 20 points) - now uses protected wave height
-  breakdown.waveHeight.score =
-    protectedWaveHeight < 0.2 ? 20 : Math.max(0, 20 - (protectedWaveHeight - 0.2) * (20 / 0.4));
-  score += breakdown.waveHeight.score;
+   // Wave Height Score
+   let protectedWaveHeight = waveHeight * (1 - (geoProtection.waveProtection * 0.9));
+   if (protectedWaveHeight < 0.2) {
+       breakdown.waveHeight.score = 20;
+   } else if (protectedWaveHeight <= 0.6) {
+       breakdown.waveHeight.score = Math.max(0, 20 - (protectedWaveHeight - 0.2) * (20 / 0.4));
+   }
 
-  // Swell height (up to 10 points) - now uses protected swell height
-  breakdown.swellHeight.score =
-    protectedSwellHeight < 0.3
-      ? 10
-      : Math.max(0, 10 - (protectedSwellHeight - 0.3) * (10 / 0.3));
-  score += breakdown.swellHeight.score;
+   // Swell Height Score
+   let protectedSwellHeight = swellHeight * (1 - (geoProtection.waveProtection * 0.85));
+   if (protectedSwellHeight < 0.3) {
+       breakdown.swellHeight.score = 10;
+   } else if (protectedSwellHeight <= 0.6) {
+       breakdown.swellHeight.score = Math.max(0, 10 - (protectedSwellHeight - 0.3) * (10 / 0.3));
+   }
 
-  // Precipitation (10 points)
-  breakdown.precipitation.score = maxPrecip < 1 ? 10 : 0;
-  score += breakdown.precipitation.score;
+   // Precipitation Score
+   breakdown.precipitation.score = maxPrecip < 1 ? 15 : 0;
 
-  // Air temperature (up to 10 points)
-  if (avgTemp >= 22 && avgTemp <= 30) {
-    breakdown.temperature.score = 10;
-  } else if (avgTemp < 22) {
-    breakdown.temperature.score = Math.max(0, 10 - (22 - avgTemp));
-  } else {
-    breakdown.temperature.score = Math.max(0, 10 - (avgTemp - 30));
-  }
-  score += breakdown.temperature.score;
+   // Temperature Score
+   if (avgTemp >= 22 && avgTemp <= 30) {
+       breakdown.temperature.score = 10;
+   } else if (avgTemp < 22) {
+       breakdown.temperature.score = Math.max(0, 10 - (22 - avgTemp));
+   } else {
+       breakdown.temperature.score = Math.max(0, 10 - (avgTemp - 30));
+   }
 
-  // Cloud cover (up to 10 points)
-  breakdown.cloudCover.score = avgCloud < 40 ? 10 : Math.max(0, 10 - (avgCloud - 40) / 6);
-  score += breakdown.cloudCover.score;
+   // Cloud Cover Score
+   if (avgCloud < 40) {
+       breakdown.cloudCover.score = 10;
+   } else if (avgCloud <= 100) {
+       breakdown.cloudCover.score = Math.max(0, 10 - (avgCloud - 40) / 6);
+   }
 
-  // Add ENHANCED geographic protection bonus (up to 15 points)
-  breakdown.geoProtection.score = (geoProtection.protectionScore / 100) * 15;
-  score += breakdown.geoProtection.score;
-  
-  // Round all score components for clean display
-  breakdown.windSpeed.score = Math.round(breakdown.windSpeed.score);
-  breakdown.waveHeight.score = Math.round(breakdown.waveHeight.score);
-  breakdown.swellHeight.score = Math.round(breakdown.swellHeight.score);
-  breakdown.precipitation.score = Math.round(breakdown.precipitation.score);
-  breakdown.temperature.score = Math.round(breakdown.temperature.score);
-  breakdown.cloudCover.score = Math.round(breakdown.cloudCover.score);
-  breakdown.geoProtection.score = Math.round(breakdown.geoProtection.score);
-  
-  // Store the total
-  breakdown.total.score = Math.round(Math.min(100, score));
+   // Geographic Protection Score
+   breakdown.geoProtection.score = (geoProtection.protectionScore / 100) * 15;
 
-  // If it's raining significantly, override the score to be bad
-  if (maxPrecip >= 1.5) {
-    breakdown.precipitation.score = 0;
-    breakdown.total.score = Math.min(breakdown.total.score, 40); // Cap score at 40 for rainy conditions
-  }
+   // Calculate total score before rounding
+   let score = breakdown.windSpeed.score + breakdown.waveHeight.score + breakdown.swellHeight.score +
+       breakdown.precipitation.score + breakdown.temperature.score + breakdown.cloudCover.score +
+       breakdown.geoProtection.score;
 
-  return { calculatedScore: Math.round(Math.min(100, score)), breakdown };
+   // Apply heavy rain override before rounding
+   if (maxPrecip >= 1.5) {
+       score = Math.min(score, 40);
+   }
+
+   // Round scores for display in breakdown
+   for (const key in breakdown) {
+       if (breakdown[key].score !== undefined) {
+           breakdown[key].score = Math.round(breakdown[key].score);
+       }
+   }
+
+   breakdown.total.score = Math.round(score);
+
+   return { calculatedScore: Math.round(score), breakdown };
 };

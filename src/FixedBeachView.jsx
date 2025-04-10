@@ -139,10 +139,10 @@ const FixedBeachView = ({
       
       // Initialize score breakdown
       const breakdown = {
-        windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 40 },
+        windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 20 },
         waveHeight: { raw: waveHeight, protected: protectedWaveHeight, score: 0, maxPossible: 20 },
         swellHeight: { raw: avgSwellHeight, protected: protectedSwellHeight, score: 0, maxPossible: 10 },
-        precipitation: { value: maxPrecip, score: 0, maxPossible: 10 },
+        precipitation: { value: maxPrecip, score: 0, maxPossible: 15 },
         temperature: { value: avgTemp, score: 0, maxPossible: 10 },
         cloudCover: { value: avgCloud, score: 0, maxPossible: 10 },
         geoProtection: { value: protection.protectionScore, score: 0, maxPossible: 15 },
@@ -153,8 +153,8 @@ const FixedBeachView = ({
       let totalScore = 0;
       
       // Wind speed score (0-40 points)
-      breakdown.windSpeed.score = protectedWindSpeed < 8 ? 40 : 
-                                 Math.max(0, 40 - (protectedWindSpeed - 8) * (40 / 12));
+      breakdown.windSpeed.score = protectedWindSpeed < 8 ? breakdown.windSpeed.maxPossible : 
+                                 Math.max(0, breakdown.windSpeed.maxPossible - (protectedWindSpeed - 8) * (breakdown.windSpeed.maxPossible / 10));
       totalScore += breakdown.windSpeed.score;
       
       // Wave height score (0-20 points)
@@ -168,7 +168,7 @@ const FixedBeachView = ({
       totalScore += breakdown.swellHeight.score;
       
       // Precipitation score (0-10 points)
-      breakdown.precipitation.score = maxPrecip < 1 ? 10 : 0;
+      breakdown.precipitation.score = maxPrecip < 1 ? breakdown.precipitation.maxPossible : 0; // Corrected maxPossible
       totalScore += breakdown.precipitation.score;
       
       // Temperature score (0-10 points)
@@ -182,7 +182,7 @@ const FixedBeachView = ({
       totalScore += breakdown.temperature.score;
       
       // Cloud cover score (0-10 points)
-      breakdown.cloudCover.score = avgCloud < 40 ? 10 : 
+      breakdown.cloudCover.score = avgCloud < 40 ? breakdown.cloudCover.maxPossible : 
                                   Math.max(0, 10 - (avgCloud - 40) / 6);
       totalScore += breakdown.cloudCover.score;
       
@@ -199,7 +199,7 @@ const FixedBeachView = ({
       breakdown.cloudCover.score = Math.round(breakdown.cloudCover.score);
       breakdown.geoProtection.score = Math.round(breakdown.geoProtection.score);
       breakdown.total.score = Math.round(Math.min(100, totalScore));
-      
+
       // Apply special conditions
       if (maxPrecip >= 1.5) {
         breakdown.precipitation.score = 0;
@@ -268,10 +268,9 @@ const FixedBeachView = ({
                     (Protected: {scoreBreakdown.windSpeed.protected.toFixed(1)})
                   </span>
                 </td>
-                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
-                  scoreBreakdown.windSpeed.score > 30 ? 'text-green-600' : 
-                  scoreBreakdown.windSpeed.score > 20 ? 'text-yellow-600' : 'text-red-600'
-                }`}>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${scoreBreakdown.windSpeed.score === scoreBreakdown.windSpeed.maxPossible ? 'text-green-600' :
+                    scoreBreakdown.windSpeed.score > 0 ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
                   {scoreBreakdown.windSpeed.score}/{scoreBreakdown.windSpeed.maxPossible}
                 </td>
               </tr>
@@ -308,7 +307,7 @@ const FixedBeachView = ({
                   {scoreBreakdown.precipitation.value.toFixed(1)} mm
                 </td>
                 <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
-                  scoreBreakdown.precipitation.value < 1 ? 'text-green-600' : 'text-red-600'
+                  scoreBreakdown.precipitation.score === scoreBreakdown.precipitation.maxPossible ? 'text-green-600' : 'text-red-600'
                 }`}>
                   {scoreBreakdown.precipitation.score}/{scoreBreakdown.precipitation.maxPossible}
                 </td>
@@ -319,7 +318,9 @@ const FixedBeachView = ({
                   {scoreBreakdown.temperature.value.toFixed(1)} °C
                 </td>
                 <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
-                  scoreBreakdown.temperature.score > 7 ? 'text-green-600' : 'text-yellow-600'
+                  scoreBreakdown.temperature.score === scoreBreakdown.temperature.maxPossible ? 'text-green-600' :
+                  scoreBreakdown.temperature.score > 0 ? 'text-yellow-600' : 'text-red-600'
+
                 }`}>
                   {scoreBreakdown.temperature.score}/{scoreBreakdown.temperature.maxPossible}
                 </td>
@@ -330,8 +331,9 @@ const FixedBeachView = ({
                   {scoreBreakdown.cloudCover.value.toFixed(0)}%
                 </td>
                 <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
-                  scoreBreakdown.cloudCover.score > 7 ? 'text-green-600' : 
-                  scoreBreakdown.cloudCover.score > 5 ? 'text-yellow-600' : 'text-gray-600'
+                  scoreBreakdown.cloudCover.score === scoreBreakdown.cloudCover.maxPossible ? 'text-green-600' :
+                  scoreBreakdown.cloudCover.score > 0 ? 'text-yellow-600' : 'text-gray-600'
+
                 }`}>
                   {scoreBreakdown.cloudCover.score}/{scoreBreakdown.cloudCover.maxPossible}
                 </td>
@@ -772,7 +774,7 @@ const renderHourlyWind = () => {
                       <div className="flex-grow">
                         <div className="text-sm text-gray-500">Wind</div>
                         <div className={`text-lg font-medium ${
-                          weatherData.hourly.windspeed_10m[12] < 8
+                          scoreBreakdown.windSpeed.protected < 8
                             ? "text-green-600"
                             : weatherData.hourly.windspeed_10m[12] < 15
                             ? "text-yellow-600"
@@ -790,14 +792,14 @@ const renderHourlyWind = () => {
                       <div className="flex-grow">
                         <div className="text-sm text-gray-500">Wave Height</div>
                         <div className={`text-lg font-medium ${
-                          marineData.daily.wave_height_max[0] < 0.2
+                          scoreBreakdown.waveHeight.protected < 0.2
                             ? "text-green-600"
-                            : marineData.daily.wave_height_max[0] < 0.4
+                            : scoreBreakdown.waveHeight.protected < 0.4
                             ? "text-yellow-600"
                             : "text-red-600"
                         }`}>
-                          {marineData.daily.wave_height_max[0].toFixed(1)} m
-                        </div>
+                            {scoreBreakdown.waveHeight.protected.toFixed(1)} m
+                          </div>
                       </div>
                     </div>
                   )}
