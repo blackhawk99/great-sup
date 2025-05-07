@@ -217,21 +217,120 @@ const FixedBeachView = ({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {/* existing rows... */}
+              <tr>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Wind Speed</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {scoreBreakdown.windSpeed.raw.toFixed(1)} km/h <span className="text-xs text-gray-400 ml-1">(Protected: {scoreBreakdown.windSpeed.protected.toFixed(1)})</span>
+                </td>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
+                  scoreBreakdown.windSpeed.score > 30 ? 'text-green-600' :
+                  scoreBreakdown.windSpeed.score > 20 ? 'text-yellow-600' : 'text-red-600'
+                }`}>
+                  {scoreBreakdown.windSpeed.score}/{scoreBreakdown.windSpeed.maxPossible}
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Wave Height</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {scoreBreakdown.waveHeight.raw.toFixed(2)} m <span className="text-xs text-gray-400 ml-1">(Protected: {scoreBreakdown.waveHeight.protected.toFixed(2)})</span>
+                </td>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
+                  scoreBreakdown.waveHeight.score > 15 ? 'text-green-600' :
+                  scoreBreakdown.waveHeight.score > 10 ? 'text-yellow-600' : 'text-red-600'
+                }`}>
+                  {scoreBreakdown.waveHeight.score}/{scoreBreakdown.waveHeight.maxPossible}
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Swell Height</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {scoreBreakdown.swellHeight.raw.toFixed(2)} m
+                </td>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
+                  scoreBreakdown.swellHeight.score > 7 ? 'text-green-600' :
+                  scoreBreakdown.swellHeight.score > 5 ? 'text-yellow-600' : 'text-red-600'
+                }`}>
+                  {scoreBreakdown.swellHeight.score}/{scoreBreakdown.swellHeight.maxPossible}
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Precipitation</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {scoreBreakdown.precipitation.value.toFixed(1)} mm
+                </td>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
+                  scoreBreakdown.precipitation.value < 1 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {scoreBreakdown.precipitation.score}/{scoreBreakdown.precipitation.maxPossible}
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Temperature</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {scoreBreakdown.temperature.value.toFixed(1)} °C
+                </td>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
+                  scoreBreakdown.temperature.score > 7 ? 'text-green-600' : 'text-yellow-600'
+                }`}>
+                  {scoreBreakdown.temperature.score}/{scoreBreakdown.temperature.maxPossible}
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Cloud Cover</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {scoreBreakdown.cloudCover.value.toFixed(0)}%
+                </td>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
+                  scoreBreakdown.cloudCover.score > 7 ? 'text-green-600' :
+                  scoreBreakdown.cloudCover.score > 5 ? 'text-yellow-600' : 'text-gray-600'
+                }`}>
+                  {scoreBreakdown.cloudCover.score}/{scoreBreakdown.cloudCover.maxPossible}
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Geographic Protection</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {scoreBreakdown.geoProtection.value.toFixed(0)}/100
+                </td>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
+                  scoreBreakdown.geoProtection.score > 10 ? 'text-green-600' :
+                  scoreBreakdown.geoProtection.score > 5 ? 'text-yellow-600' : 'text-red-600'
+                }`}>
+                  {scoreBreakdown.geoProtection.score}/{scoreBreakdown.geoProtection.maxPossible}
+                </td>
+              </tr>
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Tide</td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">{sb.tide.raw.toFixed(2)} m</td>
-                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${sb.tide.score>7?'text-green-600':'text-red-600'}`}>{sb.tide.score}/{sb.tide.maxPossible}</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {scoreBreakdown.tide.value.toFixed(2)} m
+                </td>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
+                  scoreBreakdown.tide.score > 7 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {scoreBreakdown.tide.score}/{scoreBreakdown.tide.maxPossible}
+                </td>
               </tr>
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Currents</td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">{sb.currents.raw.toFixed(2)} m/s</td>
-                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${sb.currents.score>3?'text-green-600':'text-red-600'}`}>{sb.currents.score}/{sb.currents.maxPossible}</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {scoreBreakdown.currents.value.toFixed(2)} m/s
+                </td>
+                <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
+                  scoreBreakdown.currents.score > 3 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {scoreBreakdown.currents.score}/{scoreBreakdown.currents.maxPossible}
+                </td>
               </tr>
               <tr className="bg-blue-50">
                 <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">TOTAL SCORE</td>
                 <td className="px-4 py-3 whitespace-nowrap"></td>
-                <td className={`px-4 py-3 whitespace-nowrap text-sm font-bold text-right ${sb.total.score>=85?'text-green-600':sb.total.score>=70?'text-yellow-600':sb.total.score>=50?'text-orange-600':'text-red-600'}`}>{sb.total.score}/{sb.total.maxPossible}</td>
+                <td className={`px-4 py-3 whitespace-nowrap text-sm font-bold text-right ${
+                  scoreBreakdown.total.score >= 85 ? 'text-green-600' :
+                  scoreBreakdown.total.score >= 70 ? 'text-yellow-600' :
+                  scoreBreakdown.total.score >= 50 ? 'text-orange-600' : 'text-red-600'
+                }`}>
+                  {scoreBreakdown.total.score}/{scoreBreakdown.total.maxPossible}
+                </td>
               </tr>
             </tbody>
           </table>
