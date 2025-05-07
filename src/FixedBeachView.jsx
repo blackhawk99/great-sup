@@ -37,6 +37,11 @@ const FixedBeachView = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Compute display-ready condition (fallback when loading)
+  const condition = paddleScore !== null && weatherData
+    ? getCondition(paddleScore)
+    : { emoji: '⏳', label: 'Loading', message: 'Calculating conditions...', color: 'text-gray-500' };
+
   // Fetch data when beach or timeRange changes
   useEffect(() => {
     if (beach) fetchWeatherData();
