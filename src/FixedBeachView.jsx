@@ -256,7 +256,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Precipitation</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.precipitation.value.toFixed(1)} mm
+                  {scoreBreakdown.precipitation.raw.toFixed(1)} mm
                 </td>
                 <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
                   scoreBreakdown.precipitation.value < 1 ? 'text-green-600' : 'text-red-600'
@@ -267,7 +267,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Temperature</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.temperature.value.toFixed(1)} °C
+                  {scoreBreakdown.temperature.raw.toFixed(1)} °C
                 </td>
                 <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
                   scoreBreakdown.temperature.score > 7 ? 'text-green-600' : 'text-yellow-600'
@@ -278,7 +278,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Cloud Cover</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.cloudCover.value.toFixed(0)}%
+                  {scoreBreakdown.cloudCover.raw.toFixed(0)}%
                 </td>
                 <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
                   scoreBreakdown.cloudCover.score > 7 ? 'text-green-600' :
@@ -290,7 +290,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Geographic Protection</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.geoProtection.value.toFixed(0)}/100
+                  {scoreBreakdown.geoProtection.raw.toFixed(0)}/100
                 </td>
                 <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
                   scoreBreakdown.geoProtection.score > 10 ? 'text-green-600' :
