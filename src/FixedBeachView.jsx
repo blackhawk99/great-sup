@@ -302,7 +302,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Tide</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.tide.value.toFixed(2)} m
+                  {scoreBreakdown.tide.raw.toFixed(2)} m
                 </td>
                 <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
                   scoreBreakdown.tide.score > 7 ? 'text-green-600' : 'text-red-600'
@@ -313,7 +313,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Currents</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.currents.value.toFixed(2)} m/s
+                  {scoreBreakdown.currents.raw.toFixed(2)} m/s
                 </td>
                 <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium text-right ${
                   scoreBreakdown.currents.score > 3 ? 'text-green-600' : 'text-red-600'
