@@ -122,7 +122,6 @@ export const DatePickerModal = ({ currentDate = new Date(), onSelect, onClose })
   
   // Add the days of the month
   for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month, day);
     const isSelected = 
       selectedDate.getDate() === day &&
       selectedDate.getMonth() === month &&
