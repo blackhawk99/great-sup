@@ -6,7 +6,6 @@ import { greeceIslands } from '../data/greece-islands';
 // Generate rays from a point in all directions
 export function generateRays(center, numRays, distance) {
   const rays = [];
-  const [lng, lat] = center.geometry.coordinates;
   
   for (let i = 0; i < numRays; i++) {
     const angle = (i * 360) / numRays;

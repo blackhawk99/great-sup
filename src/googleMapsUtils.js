@@ -4,7 +4,7 @@
 const extractNameFromUrl = (url) => {
   try {
     // Try pattern: /place/Name/ in the URL
-    let placeMatch = url.match(/\/place\/([^\/]+)\//);
+    let placeMatch = url.match(/\/place\/([^/]+)\//);
     if (placeMatch && placeMatch[1]) {
       const decoded = decodeURIComponent(placeMatch[1]);
       // Clean up the name (replace + and remove coordinates)

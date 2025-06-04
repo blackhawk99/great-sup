@@ -15,7 +15,7 @@ export const resolveGoogleMapsShortUrl = async (shortUrl) => {
     
     // Extract location name from the final URL
     let locationName = "New Beach";
-    const placeMatch = finalUrl.match(/\/place\/([^\/]+)\//);
+    const placeMatch = finalUrl.match(/\/place\/([^/]+)\//);
     if (placeMatch && placeMatch[1]) {
       locationName = decodeURIComponent(placeMatch[1])
         .replace(/\+/g, ' ')
