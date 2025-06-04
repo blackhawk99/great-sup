@@ -18,6 +18,7 @@ export function calculatePaddleScore(beach, hours, range) {
   // Averages
   const windSpeed   = avg('windSpeed');
   const windDir     = avg('windDirection');
+  const waveDir     = avg('waveDirection');
   const waveHeight  = avg('waveHeight');
   const swellHeight = avg('swellHeight');
   const precip      = avg('precipitation');
@@ -28,7 +29,7 @@ export function calculatePaddleScore(beach, hours, range) {
 
   // Geographic protection
   const { protectedWindSpeed, protectedWaveHeight } =
-    calculateGeographicProtection(beach, windDir, waveHeight);
+    calculateGeographicProtection(beach, windDir, waveDir);
 
   // Scoring buckets (max points in parentheses)
   const ptsWind   = linearScore(protectedWindSpeed, 0, 20) * 40;    // 40 pts
