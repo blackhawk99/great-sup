@@ -22,7 +22,11 @@ const App = () => {
   
   // App version information
   const APP_VERSION = "1.0.3";
-  const BUILD_DATE = "April 9, 2025"; // Add build date for last update info
+  const BUILD_DATE = new Date(__LAST_COMMIT_DATE__).toLocaleDateString([], {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
   
   // Format last updated time strings
   const formattedUpdateTime = lastUpdated ? 
@@ -504,7 +508,7 @@ const App = () => {
           </p>
           <div className="flex items-center mt-2 sm:mt-0 text-xs">
             <span className="text-blue-300 border-r border-blue-600 pr-3 mr-3">
-              Version {APP_VERSION} ({BUILD_DATE})
+              Version {APP_VERSION} • Code updated {BUILD_DATE}
             </span>
             <span className="text-blue-300 border-r border-blue-600 pr-3 mr-3">
               {lastUpdated ? (
