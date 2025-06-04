@@ -1,6 +1,6 @@
 // FixedBeachView.jsx - Production-ready with all required features
 import React, { useState, useEffect } from "react";
-import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermometer, Droplets, Waves, Sun, Clock, Calendar, Info } from "lucide-react";
+import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermometer, Droplets, Waves, Clock, Calendar, Info } from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection } from "./helpers.jsx";
 
@@ -11,8 +11,7 @@ const FixedBeachView = ({
   setView, 
   onDataUpdate,
   timeRange,
-  onTimeRangeChange,
-  debugMode
+  onTimeRangeChange
 }) => {
   const [weatherData, setWeatherData] = useState(null);
   const [marineData, setMarineData] = useState(null);
@@ -21,14 +20,12 @@ const FixedBeachView = ({
   const [geoProtection, setGeoProtection] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   
   // Load data on mount and when date/time changes
   useEffect(() => {
     if (beach) {
       fetchWeatherData();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beach?.id, timeRange.date]);
   
   // Fetch real weather data

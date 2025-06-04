@@ -16,10 +16,8 @@ export function calculatePaddleScore(beach, hours, range) {
   const avg   = key => slice.reduce((s, h) => s + (h[key] ?? 0), 0) / n;
 
   // Averages
-  const windSpeed   = avg('windSpeed');
   const windDir     = avg('windDirection');
   const waveDir     = avg('waveDirection');
-  const waveHeight  = avg('waveHeight');
   const swellHeight = avg('swellHeight');
   const precip      = avg('precipitation');
   const temp        = avg('temperature');
