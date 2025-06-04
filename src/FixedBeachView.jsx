@@ -553,7 +553,7 @@ const FixedBeachView = ({
     );
   };
 
-  // Render hourly wind speed visualization (FIXED VERSION)
+  // Render hourly wind speed visualization for the selected time range
   const renderHourlyWind = () => {
     if (!weatherData || !weatherData.hourly) return null;
     
