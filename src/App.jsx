@@ -181,6 +181,7 @@ const App = () => {
     // Additional highly protected bays
     { name: "Naoussa Bay (Paros)", latitude: 37.1232, longitude: 25.2355, googleMapsUrl: "https://www.google.com/maps/place/Naoussa+Bay/@37.1232,25.2355,15z" },
     { name: "Vlikhos Bay (Hydra)", latitude: 37.3255, longitude: 23.4486, googleMapsUrl: "https://www.google.com/maps/place/Vlikhos+Bay/@37.3255,23.4486,15z" },
+    { name: "Portello Beach", latitude: 36.6870, longitude: 23.0563, googleMapsUrl: "https://www.google.com/maps/place/Portello+Beach/@36.6869999,23.0562731,17z/data=!3m1!4b1!4m6!3m5!1s0x149e41849bab6a23:0xaa5fecae3027dece!8m2!3d36.6869999!4d23.0562731!16s%2Fg%2F11j_6hrp8k" },
   ];
 
   return (

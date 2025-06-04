@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight, AlertCircle } from "lucide-react";
 
+/* eslint react-refresh/only-export-components: off */
+
 // Helper function to convert degrees to cardinal directions
 export const getCardinalDirection = (degrees) => {
   const val = Math.floor((degrees / 22.5) + 0.5);

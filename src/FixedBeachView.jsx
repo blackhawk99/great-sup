@@ -28,6 +28,7 @@ const FixedBeachView = ({
     if (beach) {
       fetchWeatherData();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beach?.id, timeRange.date]);
   
   // Fetch real weather data
