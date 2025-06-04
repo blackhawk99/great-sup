@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { analyzeBayProtection } from "./utils/coastlineAnalysis";
-import { parseGoogleMapsUrl } from "./helpers";
+import { parseGoogleMapsUrl } from "./helpers.jsx";
 import { resolveGoogleMapsShortUrl } from "./proxy";
-import { getCardinalDirection } from "./helpers";
+import { getCardinalDirection } from "./helpers.jsx";
 
 export const useBeachManager = () => {
   const [beaches, setBeaches] = useState([]);
