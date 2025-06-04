@@ -20,9 +20,6 @@ const App = () => {
   const [dataUpdateCount, setDataUpdateCount] = useState(0);
   const [showFAQ, setShowFAQ] = useState(false); // New state for FAQ visibility
   
-  // App version information
-  const APP_VERSION = "1.0.3";
-  const BUILD_DATE = "April 9, 2025"; // Add build date for last update info
   
   // Format last updated time strings
   const formattedUpdateTime = lastUpdated ? 
@@ -496,16 +493,13 @@ const App = () => {
         )}
       </main>
 
-      {/* Footer with Version Information and Last Updated Time */}
+      {/* Footer with Last Updated Time */}
       <footer className="bg-blue-800 text-white p-4 mt-auto shadow-inner">
         <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center">
           <p className="text-sm">
             © 2025 Paddleboard Weather Advisor | Ladi Thalassa
           </p>
           <div className="flex items-center mt-2 sm:mt-0 text-xs">
-            <span className="text-blue-300 border-r border-blue-600 pr-3 mr-3">
-              Version {APP_VERSION} ({BUILD_DATE})
-            </span>
             <span className="text-blue-300 border-r border-blue-600 pr-3 mr-3">
               {lastUpdated ? (
                 <>Last updated: {formattedUpdateDate} {formattedUpdateTime} </>
