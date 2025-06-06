@@ -10,7 +10,7 @@ import { calculateGeographicProtection } from './coastlineAnalysis';
  * @returns { totalScore, breakdown: { wind, waves, swell, precipitation,
  *   temperature, cloudcover, geographic, tide, currents } }
  */
-export function calculatePaddleScore(beach, hours, range) {
+export async function calculatePaddleScore(beach, hours, range) {
   const slice = hours.slice(range.startIndex, range.endIndex + 1);
   const n     = slice.length;
   const avg   = key => slice.reduce((s, h) => s + (h[key] ?? 0), 0) / n;
@@ -26,8 +26,11 @@ export function calculatePaddleScore(beach, hours, range) {
   const currentSpd  = avg('currentSpeed');
 
   // Geographic protection
-  const { protectedWindSpeed, protectedWaveHeight } =
-    calculateGeographicProtection(beach, windDir, waveDir);
+  const { windProtection, waveProtection } =
+    await calculateGeographicProtection(beach, windDir, waveDir);
+
+  const protectedWindSpeed  = windSpeed * (1 - (windProtection * 0.9));
+  const protectedWaveHeight = waveHeight * (1 - (waveProtection * 0.9));
 
   // Scoring buckets (max points in parentheses)
   const ptsWind   = linearScore(protectedWindSpeed, 0, 20) * 40;    // 40 pts

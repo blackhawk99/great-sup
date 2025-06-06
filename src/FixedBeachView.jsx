@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermometer, Droplets, Waves, Clock, Calendar, Info } from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
-import { getCardinalDirection } from "./helpers.jsx";
+import { getCardinalDirection } from "./helpers.js";
 
 const FixedBeachView = ({ 
   beach, 

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Home, Map, MapPin, Plus, Trash2, HelpCircle } from "lucide-react";
 import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
-import { ErrorBoundary, DeleteConfirmationModal } from "./helpers.jsx";
+import { ErrorBoundary, DeleteConfirmationModal } from "./helpers.js";
 import FAQ from "./FAQ"; // Import the new FAQ component
 
 const App = () => {
