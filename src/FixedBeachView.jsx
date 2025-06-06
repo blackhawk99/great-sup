@@ -119,8 +119,15 @@ const FixedBeachView = ({
       
       const maxPrecip = Math.max(...relevantIndices.map(i => weather.hourly.precipitation[i]));
       
-      const avgWindDir = relevantIndices.map(i => weather.hourly.winddirection_10m[i])
-        .reduce((sum, val) => sum + val, 0) / relevantIndices.length;
+      // Average wind direction using vector mean to handle circular data
+      let sinSum = 0;
+      let cosSum = 0;
+      relevantIndices.forEach(i => {
+        const rad = weather.hourly.winddirection_10m[i] * Math.PI / 180;
+        sinSum += Math.sin(rad);
+        cosSum += Math.cos(rad);
+      });
+      const avgWindDir = (Math.atan2(sinSum / relevantIndices.length, cosSum / relevantIndices.length) * 180 / Math.PI + 360) % 360;
       
       // Get wave data from daily or calculate from hourly
       const waveHeight = marine.daily.wave_height_max[0];
