@@ -145,7 +145,7 @@ const FixedBeachView = ({
         temperature: { value: avgTemp, score: 0, maxPossible: 10 },
         cloudCover: { value: avgCloud, score: 0, maxPossible: 10 },
         geoProtection: { value: protection.protectionScore, score: 0, maxPossible: 15 },
-        total: { score: 0, maxPossible: 100 }
+        total: { score: 0, rawScore: 0, bonus: 0, maxPossible: 100 }
       };
       
       // Calculate individual scores
@@ -197,6 +197,8 @@ const FixedBeachView = ({
       breakdown.temperature.score = Math.round(breakdown.temperature.score);
       breakdown.cloudCover.score = Math.round(breakdown.cloudCover.score);
       breakdown.geoProtection.score = Math.round(breakdown.geoProtection.score);
+      breakdown.total.rawScore = Math.round(totalScore);
+      breakdown.total.bonus = Math.max(0, breakdown.total.rawScore - 100);
       breakdown.total.score = Math.round(Math.min(100, totalScore));
       
       // Apply special conditions
@@ -534,18 +536,28 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr className="bg-blue-50">
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">TOTAL SCORE</td>
+                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
+                  TOTAL SCORE
+                </td>
                 <td className="px-4 py-3 whitespace-nowrap"></td>
                 <td className={`px-4 py-3 whitespace-nowrap text-sm font-bold text-right ${
-                  scoreBreakdown.total.score >= 85 ? 'text-green-600' : 
+                  scoreBreakdown.total.score >= 85 ? 'text-green-600' :
                   scoreBreakdown.total.score >= 70 ? 'text-yellow-600' :
                   scoreBreakdown.total.score >= 50 ? 'text-orange-600' : 'text-red-600'
                 }`}>
                   {scoreBreakdown.total.score}/{scoreBreakdown.total.maxPossible}
+                  {scoreBreakdown.total.rawScore > scoreBreakdown.total.maxPossible && (
+                    <span className="text-xs text-gray-500 ml-1">
+                      (raw {scoreBreakdown.total.rawScore})
+                    </span>
+                  )}
                 </td>
               </tr>
             </tbody>
           </table>
+          <p className="text-xs text-gray-500 mt-2 px-4">
+            Scores above 100 are capped. Geographic protection can add up to 15 bonus points.
+          </p>
         </div>
       </div>
     );
