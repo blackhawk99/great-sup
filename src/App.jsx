@@ -118,9 +118,22 @@ const App = () => {
     handleDataUpdate();
   };
   
-  // Handle time range change
+  // Handle time range change with basic validation
   const handleTimeRangeChange = (field, value) => {
-    setTimeRange({ ...timeRange, [field]: value });
+    const updated = { ...timeRange, [field]: value };
+    const start = parseInt(updated.startTime.split(':')[0], 10);
+    const end = parseInt(updated.endTime.split(':')[0], 10);
+
+    // Prevent selecting a start time after the end time or vice versa
+    if (start > end) {
+      if (field === 'startTime') {
+        updated.endTime = value;
+      } else if (field === 'endTime') {
+        updated.startTime = value;
+      }
+    }
+
+    setTimeRange(updated);
   };
   
   // Handle add beach
