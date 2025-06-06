@@ -505,8 +505,8 @@ const FixedBeachView = ({
         </h4>
 
         <p className="text-sm text-gray-600 mb-3">
-          Each factor adds points toward a total score of 100. The bars show how many
-          points were earned out of the maximum for that factor.
+          Each factor contributes to a total of 100 points. The number in parentheses
+          shows the most points that factor can add.
         </p>
 
         <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -520,7 +520,9 @@ const FixedBeachView = ({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Wind Speed</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">
+                  Wind Speed (max {MAX_WIND_SCORE})
+                </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.windSpeed.raw.toFixed(1)} km/h
                   <span className="text-xs text-gray-400 ml-1">
@@ -555,7 +557,9 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Wave Height</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">
+                  Wave Height (max {MAX_WAVE_SCORE})
+                </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.waveHeight.raw.toFixed(2)} m
                   <span className="text-xs text-gray-400 ml-1">
@@ -590,7 +594,9 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Swell Height</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">
+                  Swell Height (max {MAX_SWELL_SCORE})
+                </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.swellHeight.raw.toFixed(2)} m
                 </td>
@@ -622,7 +628,9 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Precipitation</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">
+                  Precipitation (max {MAX_PRECIP_SCORE})
+                </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.precipitation.value.toFixed(1)} mm
                 </td>
@@ -642,7 +650,9 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Temperature</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">
+                  Temperature (max {MAX_TEMP_SCORE})
+                </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.temperature.value.toFixed(1)} °C
                 </td>
@@ -670,7 +680,9 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Cloud Cover</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">
+                  Cloud Cover (max {MAX_CLOUD_SCORE})
+                </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.cloudCover.value.toFixed(0)}%
                 </td>
@@ -702,7 +714,9 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">Geographic Protection</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">
+                  Geographic Protection (max {MAX_GEO_SCORE})
+                </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.geoProtection.value.toFixed(0)}/100
                 </td>
