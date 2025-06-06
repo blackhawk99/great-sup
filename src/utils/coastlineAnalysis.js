@@ -487,20 +487,30 @@ return {
 }
 
 // Main geographic protection analysis function
-export const calculateGeographicProtection = async (beach, windDirection, waveDirection) => {
+import { getCachedProtection, setCachedProtection } from './protectionCache';
+import { adjustDirectionForSeason } from './seasonal';
+
+export const calculateGeographicProtection = async (beach, windDirection, waveDirection, date = new Date()) => {
   if (!beach || !beach.latitude || !beach.longitude) {
     throw new Error('Invalid beach data for protection calculation');
   }
+
+  const adjustedWind = adjustDirectionForSeason(windDirection, date);
+  const adjustedWave = adjustDirectionForSeason(waveDirection, date);
+  const cacheKey = `${beach.latitude.toFixed(3)},${beach.longitude.toFixed(3)}-${Math.round(adjustedWind)}-${Math.round(adjustedWave)}-${date.getMonth()}`;
+  const cached = getCachedProtection(cacheKey);
+  if (cached) return cached;
   
   try {
     // Use dynamic analysis for all beaches
     const dynamicAnalysis = await analyzeBayProtection(
       beach.latitude,
       beach.longitude,
-      windDirection,
-      waveDirection
+      adjustedWind,
+      adjustedWave
     );
-    
+
+    setCachedProtection(cacheKey, dynamicAnalysis);
     return dynamicAnalysis;
   } catch (error) {
     console.error("Dynamic protection analysis failed:", error);

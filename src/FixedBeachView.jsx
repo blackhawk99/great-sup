@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermometer, Droplets, Waves, Clock, Calendar, Info } from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
-import { getCardinalDirection } from "./helpers.jsx";
+import { getCardinalDirection, DatePickerModal } from "./helpers.jsx";
 
 const FixedBeachView = ({ 
   beach, 
@@ -20,6 +20,8 @@ const FixedBeachView = ({
   const [geoProtection, setGeoProtection] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   
   // Load data on mount and when date/time changes
   useEffect(() => {
@@ -128,7 +130,12 @@ const FixedBeachView = ({
       
       // Calculate geographic protection
       const waveDirection = marine.daily.wave_direction_dominant[0];
-      const protection = await calculateGeographicProtection(beach, avgWindDir, waveDirection);
+      const protection = await calculateGeographicProtection(
+        beach,
+        avgWindDir,
+        waveDirection,
+        new Date(timeRange.date)
+      );
       setGeoProtection(protection);
       
       // Apply protection factors
@@ -145,7 +152,7 @@ const FixedBeachView = ({
         temperature: { value: avgTemp, score: 0, maxPossible: 10 },
         cloudCover: { value: avgCloud, score: 0, maxPossible: 10 },
         geoProtection: { value: protection.protectionScore, score: 0, maxPossible: 15 },
-        total: { score: 0, maxPossible: 100 }
+        total: { score: 0, rawScore: 0, bonus: 0, maxPossible: 100 }
       };
       
       // Calculate individual scores
@@ -197,6 +204,8 @@ const FixedBeachView = ({
       breakdown.temperature.score = Math.round(breakdown.temperature.score);
       breakdown.cloudCover.score = Math.round(breakdown.cloudCover.score);
       breakdown.geoProtection.score = Math.round(breakdown.geoProtection.score);
+      breakdown.total.rawScore = Math.round(totalScore);
+      breakdown.total.bonus = Math.max(0, breakdown.total.rawScore - 100);
       breakdown.total.score = Math.round(Math.min(100, totalScore));
       
       // Apply special conditions
@@ -332,6 +341,12 @@ const FixedBeachView = ({
         <h4 className="font-medium mb-4 text-lg flex items-center text-blue-800">
           <MapPin className="h-5 w-5 mr-2 text-blue-600" />
           Geographic Protection Analysis
+          <button
+            onClick={() => setShowDebug(!showDebug)}
+            className="ml-auto text-xs text-blue-600 underline"
+          >
+            {showDebug ? 'Hide debug' : 'Show debug'}
+          </button>
         </h4>
         
         <div className="grid md:grid-cols-2 gap-6">
@@ -418,6 +433,11 @@ const FixedBeachView = ({
                     : `${beach.name} is exposed to ${getCardinalDirection(avgWindDirection)} winds today, consider an alternative beach.`}
               </p>
             </div>
+            {showDebug && (
+              <pre className="mt-3 text-xs bg-gray-100 p-2 rounded overflow-x-auto">
+{JSON.stringify(geoProtection.debugInfo, null, 2)}
+              </pre>
+            )}
           </div>
         </div>
       </div>
@@ -534,18 +554,28 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr className="bg-blue-50">
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">TOTAL SCORE</td>
+                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
+                  TOTAL SCORE
+                </td>
                 <td className="px-4 py-3 whitespace-nowrap"></td>
                 <td className={`px-4 py-3 whitespace-nowrap text-sm font-bold text-right ${
-                  scoreBreakdown.total.score >= 85 ? 'text-green-600' : 
+                  scoreBreakdown.total.score >= 85 ? 'text-green-600' :
                   scoreBreakdown.total.score >= 70 ? 'text-yellow-600' :
                   scoreBreakdown.total.score >= 50 ? 'text-orange-600' : 'text-red-600'
                 }`}>
                   {scoreBreakdown.total.score}/{scoreBreakdown.total.maxPossible}
+                  {scoreBreakdown.total.rawScore > scoreBreakdown.total.maxPossible && (
+                    <span className="text-xs text-gray-500 ml-1">
+                      (raw {scoreBreakdown.total.rawScore})
+                    </span>
+                  )}
                 </td>
               </tr>
             </tbody>
           </table>
+          <p className="text-xs text-gray-500 mt-2 px-4">
+            Scores above 100 are capped. Geographic protection can add up to 15 bonus points.
+          </p>
         </div>
       </div>
     );
@@ -672,6 +702,16 @@ const FixedBeachView = ({
 
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+      {showDatePicker && (
+        <DatePickerModal
+          currentDate={new Date(timeRange.date)}
+          onSelect={(date) => {
+            onTimeRangeChange?.('date', date);
+            setShowDatePicker(false);
+          }}
+          onClose={() => setShowDatePicker(false)}
+        />
+      )}
       {/* Header with beach info */}
       <div className="p-4 border-b flex justify-between items-center">
         <div>
@@ -722,14 +762,14 @@ const FixedBeachView = ({
         
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-          <div className="relative cursor-pointer">
+          <div className="relative cursor-pointer" onClick={() => setShowDatePicker(true)}>
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Calendar className="h-5 w-5 text-gray-400" />
             </div>
             <input
-              type="date"
+              type="text"
+              readOnly
               value={timeRange.date}
-              onChange={(e) => onTimeRangeChange?.('date', e.target.value)}
               className="w-full pl-10 p-3 bg-white border rounded-lg cursor-pointer text-lg"
             />
           </div>
