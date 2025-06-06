@@ -803,11 +803,19 @@ const FixedBeachView = ({
               onChange={(e) => onTimeRangeChange?.('startTime', e.target.value)}
               className="w-full p-2 border rounded appearance-none bg-white text-lg"
             >
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
-                  {`${String(i).padStart(2, '0')}:00`}
-                </option>
-              ))}
+              {Array.from({ length: 24 }, (_, i) => {
+                const hourLabel = `${String(i).padStart(2, '0')}:00`;
+                const endHour = parseInt(timeRange.endTime.split(':')[0], 10);
+                return (
+                  <option
+                    key={i}
+                    value={hourLabel}
+                    disabled={i > endHour}
+                  >
+                    {hourLabel}
+                  </option>
+                );
+              })}
             </select>
           </div>
           <div>
@@ -819,11 +827,19 @@ const FixedBeachView = ({
               onChange={(e) => onTimeRangeChange?.('endTime', e.target.value)}
               className="w-full p-2 border rounded appearance-none bg-white text-lg"
             >
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
-                  {`${String(i).padStart(2, '0')}:00`}
-                </option>
-              ))}
+              {Array.from({ length: 24 }, (_, i) => {
+                const hourLabel = `${String(i).padStart(2, '0')}:00`;
+                const startHour = parseInt(timeRange.startTime.split(':')[0], 10);
+                return (
+                  <option
+                    key={i}
+                    value={hourLabel}
+                    disabled={i < startHour}
+                  >
+                    {hourLabel}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>
