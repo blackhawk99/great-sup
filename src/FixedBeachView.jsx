@@ -633,8 +633,14 @@ const FixedBeachView = ({
             
             return (
               <div key={`${hour.date}-${hour.hour}`} className="flex items-center">
-                <div className="w-28 text-gray-600 font-medium">
-                  {hour.label} {hour.hour}:00
+                <div className="w-32 text-gray-600 font-medium">
+                  {new Date(hour.time).toLocaleString([], {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                  })}
                 </div>
                 <div className="flex-grow mx-3 bg-gray-200 h-6 rounded-full overflow-hidden">
                   <div 
