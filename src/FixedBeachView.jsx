@@ -20,6 +20,7 @@ const FixedBeachView = ({
   const [geoProtection, setGeoProtection] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showDebug, setShowDebug] = useState(false);
   
   // Load data on mount and when date/time changes
   useEffect(() => {
@@ -128,7 +129,12 @@ const FixedBeachView = ({
       
       // Calculate geographic protection
       const waveDirection = marine.daily.wave_direction_dominant[0];
-      const protection = await calculateGeographicProtection(beach, avgWindDir, waveDirection);
+      const protection = await calculateGeographicProtection(
+        beach,
+        avgWindDir,
+        waveDirection,
+        new Date(timeRange.date)
+      );
       setGeoProtection(protection);
       
       // Apply protection factors
@@ -334,6 +340,12 @@ const FixedBeachView = ({
         <h4 className="font-medium mb-4 text-lg flex items-center text-blue-800">
           <MapPin className="h-5 w-5 mr-2 text-blue-600" />
           Geographic Protection Analysis
+          <button
+            onClick={() => setShowDebug(!showDebug)}
+            className="ml-auto text-xs text-blue-600 underline"
+          >
+            {showDebug ? 'Hide debug' : 'Show debug'}
+          </button>
         </h4>
         
         <div className="grid md:grid-cols-2 gap-6">
@@ -420,6 +432,11 @@ const FixedBeachView = ({
                     : `${beach.name} is exposed to ${getCardinalDirection(avgWindDirection)} winds today, consider an alternative beach.`}
               </p>
             </div>
+            {showDebug && (
+              <pre className="mt-3 text-xs bg-gray-100 p-2 rounded overflow-x-auto">
+{JSON.stringify(geoProtection.debugInfo, null, 2)}
+              </pre>
+            )}
           </div>
         </div>
       </div>
