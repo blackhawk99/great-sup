@@ -10,14 +10,12 @@ const App = () => {
   const [view, setView] = useState("dashboard");
   const [selectedBeach, setSelectedBeach] = useState(null);
   const [notification, setNotification] = useState(null);
-  const [debugMode, setDebugMode] = useState(false);
   const [timeRange, setTimeRange] = useState({
     date: new Date().toISOString().split("T")[0],
     startTime: "09:00",
     endTime: "13:00",
   });
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [dataUpdateCount, setDataUpdateCount] = useState(0);
   const [showFAQ, setShowFAQ] = useState(false); // New state for FAQ visibility
   
   
@@ -64,36 +62,8 @@ const App = () => {
   // Function to update the last updated timestamp
   const handleDataUpdate = () => {
     setLastUpdated(new Date());
-    setDataUpdateCount(prev => prev + 1); // Track number of updates
   };
   
-  // Toggle debug mode with actual effects
-  const toggleDebugMode = () => {
-    const newMode = !debugMode;
-    setDebugMode(newMode);
-    
-    // Store in localStorage to persist between page reloads
-    localStorage.setItem('weatherAdvisorDebugMode', newMode ? 'true' : 'false');
-    
-    // Show notification when toggled
-    toast.success(`Debug mode ${newMode ? 'enabled' : 'disabled'}`);
-    
-    // Apply debug-specific CSS class to body for global styling
-    if (newMode) {
-      document.body.classList.add('debug-mode');
-    } else {
-      document.body.classList.remove('debug-mode');
-    }
-  };
-  
-  // Load debug mode from localStorage on initial load
-  useEffect(() => {
-    const savedDebugMode = localStorage.getItem('weatherAdvisorDebugMode');
-    if (savedDebugMode === 'true') {
-      setDebugMode(true);
-      document.body.classList.add('debug-mode');
-    }
-  }, []);
   
   // Function to toggle FAQ visibility
   const toggleFAQ = () => {
@@ -500,7 +470,6 @@ const App = () => {
               timeRange={timeRange}
               onTimeRangeChange={handleTimeRangeChange}
               onDataUpdate={handleDataUpdate}
-              debugMode={debugMode}
             />
           </ErrorBoundary>
         )}
@@ -519,14 +488,7 @@ const App = () => {
               ) : (
                 <>No updates yet</>
               )}
-              {debugMode && <span className="ml-1">({dataUpdateCount} updates)</span>}
             </span>
-            <button 
-              onClick={toggleDebugMode} 
-              className="text-blue-300 hover:text-white px-3 py-1 rounded-lg hover:bg-blue-700"
-            >
-              {debugMode ? "Debug Mode On" : "Enable Debug"}
-            </button>
             <button
               onClick={toggleFAQ}
               className="text-blue-300 hover:text-white px-3 py-1 rounded-lg hover:bg-blue-700 ml-3"
