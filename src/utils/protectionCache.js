@@ -14,7 +14,9 @@ function saveCache(cache) {
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-  } catch {}
+  } catch {
+    // Ignore write errors (e.g., storage quota exceeded)
+  }
 }
 
 const cache = loadCache();
