@@ -472,8 +472,8 @@ const FixedBeachView = ({
         </h4>
 
         <p className="text-sm text-gray-600 mb-3">
-          Each factor adds points toward the final paddle score. The progress bar shows
-          how close it is to its maximum value.
+          Each factor adds points toward the total paddle score. The bars show how many
+          points were earned out of the maximum for that factor.
         </p>
 
         <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -665,11 +665,6 @@ const FixedBeachView = ({
                   }`}>
                     <span>
                       {scoreBreakdown.total.score}/{scoreBreakdown.total.maxPossible}
-                      {scoreBreakdown.total.rawScore > scoreBreakdown.total.maxPossible && (
-                        <span className="text-xs text-gray-500 ml-1">
-                          (raw {scoreBreakdown.total.rawScore})
-                        </span>
-                      )}
                     </span>
                     <Progress
                       score={scoreBreakdown.total.score}
@@ -685,9 +680,6 @@ const FixedBeachView = ({
               </tr>
             </tbody>
           </table>
-          <p className="text-xs text-gray-500 mt-2 px-4">
-            Scores above 100 are capped. Geographic protection can add up to 15 bonus points.
-          </p>
         </div>
       </div>
     );
