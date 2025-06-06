@@ -32,6 +32,10 @@ To create a production build:
 npm run build
 ```
 
+The built files appear in the `dist/` directory. Run `npm run preview` to test
+the production build locally and redeploy the contents of `dist` to update the
+live site.
+
 ## About the data
 
 Weather and marine forecasts are provided by Open‑Meteo. Geographic protection calculations rely on coastline and island data processed from GADM datasets. Always verify local conditions before heading out.
