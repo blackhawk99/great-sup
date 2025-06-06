@@ -632,8 +632,18 @@ const FixedBeachView = ({
       ...tomorrowHours.map(h => ({ ...h, label: "Tomorrow" }))
     ];
     
-    // Exit if no hours to display
-    if (allHours.length === 0) return null;
+    // Exit gracefully if no hours to display
+    if (allHours.length === 0) {
+      return (
+        <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
+          <h4 className="font-medium mb-4 flex items-center text-gray-800">
+            <Clock className="h-5 w-5 mr-2 text-blue-600" />
+            Hourly Wind Speed
+          </h4>
+          <p className="text-gray-600">No wind data available for this period.</p>
+        </div>
+      );
+    }
     
     return (
       <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
