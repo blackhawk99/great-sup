@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { ChevronDown, ChevronUp, HelpCircle, X } from "lucide-react";
 
 const FAQ = ({ isOpen, onClose }) => {
-  const [expandedSection, setExpandedSection] = useState("scoring");
+  const [expandedSection, setExpandedSection] = useState("usage");
   
   if (!isOpen) return null;
   
@@ -32,6 +32,40 @@ const FAQ = ({ isOpen, onClose }) => {
         </div>
         
         <div className="p-6">
+          {/* Using the App */}
+          <div className="border rounded-lg mb-4 overflow-hidden">
+            <button
+              className={`w-full text-left p-4 flex justify-between items-center ${
+                expandedSection === "usage" ? "bg-blue-50" : "bg-white"
+              }`}
+              onClick={() => toggleSection("usage")}
+            >
+              <span className="font-semibold">How do I use this app?</span>
+              {expandedSection === "usage" ? <ChevronUp /> : <ChevronDown />}
+            </button>
+
+            {expandedSection === "usage" && (
+              <div className="p-4 bg-blue-50 border-t">
+                <p className="mb-3">
+                  Add beaches via a Google Maps link or by typing coordinates manually on the
+                  <strong className="mx-1">Add Beach</strong> page. The app extracts the latitude
+                  and longitude, then analyses local geography to suggest a name and protection
+                  score.
+                </p>
+                <p className="mb-3">
+                  Your beaches and chosen <em>home beach</em> are stored in your browser's local
+                  storage so they reappear next time you visit. Select a beach on the dashboard and
+                  click <strong>Check Conditions</strong> to fetch the latest forecast and see the
+                  paddle score.
+                </p>
+                <p>
+                  Scores combine weather, marine and geographic data for the selected time range.
+                  Use the date picker on a beach page to adjust the forecast window.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Scoring System */}
           <div className="border rounded-lg mb-4 overflow-hidden">
             <button
