@@ -117,7 +117,7 @@ export const DatePickerModal = ({ currentDate = new Date(), onSelect, onClose })
   
   // Add empty cells for days before the first day of the month
   for (let i = 0; i < firstDayOfMonth; i++) {
-    days.push(<div key={`empty-${i}`} className="h-10"></div>);
+    days.push(<div key={`empty-${i}`} className="h-12"></div>);
   }
   
   // Add the days of the month
@@ -135,7 +135,7 @@ export const DatePickerModal = ({ currentDate = new Date(), onSelect, onClose })
     days.push(
       <div
         key={day}
-        className={`h-10 w-10 flex items-center justify-center rounded-full cursor-pointer
+        className={`h-12 w-12 flex items-center justify-center rounded-full cursor-pointer text-lg
           ${isSelected ? 'bg-blue-500 text-white' : ''}
           ${isToday && !isSelected ? 'border border-blue-500 text-blue-600' : ''}
           ${!isSelected && !isToday ? 'hover:bg-gray-100' : ''}
@@ -149,7 +149,7 @@ export const DatePickerModal = ({ currentDate = new Date(), onSelect, onClose })
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-5 w-full max-w-md">
+      <div className="bg-white rounded-xl p-6 w-full max-w-lg">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Select Date</h2>
           <button
@@ -178,15 +178,15 @@ export const DatePickerModal = ({ currentDate = new Date(), onSelect, onClose })
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
             <button onClick={handlePrevMonth} className="p-1 rounded-full hover:bg-gray-100">
-              <ArrowLeft className="h-6 w-6" />
+              <ArrowLeft className="h-7 w-7" />
             </button>
             <span className="text-lg font-medium">{monthNames[month]} {year}</span>
             <button onClick={handleNextMonth} className="p-1 rounded-full hover:bg-gray-100">
-              <ArrowRight className="h-6 w-6" />
+              <ArrowRight className="h-7 w-7" />
             </button>
           </div>
           
-          <div className="grid grid-cols-7 gap-1 text-center mb-2">
+          <div className="grid grid-cols-7 gap-2 text-center mb-2">
             <div className="text-gray-500">Su</div>
             <div className="text-gray-500">Mo</div>
             <div className="text-gray-500">Tu</div>
@@ -196,7 +196,7 @@ export const DatePickerModal = ({ currentDate = new Date(), onSelect, onClose })
             <div className="text-gray-500">Sa</div>
           </div>
           
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-2">
             {days}
           </div>
         </div>
