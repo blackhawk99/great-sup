@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermometer, Droplets, Waves, Clock, Calendar, Info } from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection } from "./helpers.jsx";
+import { timeStringToMinutes } from "./timeUtils.js";
 
 const FixedBeachView = ({
   beach, 
@@ -21,10 +22,6 @@ const FixedBeachView = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const timeToMinutes = (time) => {
-    const [h, m] = time.split(":").map(Number);
-    return h * 60 + m;
-  };
   
   // Load data on mount and when date/time changes
   useEffect(() => {
@@ -88,8 +85,8 @@ const FixedBeachView = ({
   const calculateScores = async (weather, marine, beach) => {
     try {
       // Get data for the selected time range
-      const startMinute = timeToMinutes(timeRange.startTime);
-      const endMinute = timeToMinutes(timeRange.endTime);
+      const startMinute = timeStringToMinutes(timeRange.startTime);
+      const endMinute = timeStringToMinutes(timeRange.endTime);
       const startHour = Math.floor(startMinute / 60);
       const endHour = Math.floor(endMinute / 60);
       
@@ -562,8 +559,8 @@ const FixedBeachView = ({
   const renderHourlyWind = () => {
     if (!weatherData || !weatherData.hourly) return null;
     
-    const startMinute = timeToMinutes(timeRange.startTime);
-    const endMinute = timeToMinutes(timeRange.endTime);
+    const startMinute = timeStringToMinutes(timeRange.startTime);
+    const endMinute = timeStringToMinutes(timeRange.endTime);
     const startHour = Math.floor(startMinute / 60);
     const endHour = Math.floor(endMinute / 60);
     
@@ -775,7 +772,7 @@ const FixedBeachView = ({
             >
               {Array.from({ length: 24 }, (_, i) => {
                 const value = `${String(i).padStart(2, "0")}:00`;
-                const disabled = i * 60 > timeToMinutes(timeRange.endTime);
+                const disabled = i * 60 > timeStringToMinutes(timeRange.endTime);
                 return (
                   <option key={i} value={value} disabled={disabled}>
                     {value}
@@ -795,7 +792,7 @@ const FixedBeachView = ({
             >
               {Array.from({ length: 24 }, (_, i) => {
                 const value = `${String(i).padStart(2, "0")}:00`;
-                const disabled = i * 60 < timeToMinutes(timeRange.startTime);
+                const disabled = i * 60 < timeStringToMinutes(timeRange.startTime);
                 return (
                   <option key={i} value={value} disabled={disabled}>
                     {value}

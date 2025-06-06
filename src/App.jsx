@@ -3,6 +3,7 @@ import { Home, Map, MapPin, Plus, Trash2, HelpCircle } from "lucide-react";
 import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers.jsx";
+import { timeStringToMinutes } from "./timeUtils.js";
 import FAQ from "./FAQ"; // Import the new FAQ component
 
 const App = () => {
@@ -118,17 +119,11 @@ const App = () => {
     handleDataUpdate();
   };
   
-  // Convert HH:mm string to minutes
-  const timeToMinutes = (time) => {
-    const [h, m] = time.split(":").map(Number);
-    return h * 60 + m;
-  };
-
   // Handle time range change with basic validation
   const handleTimeRangeChange = (field, value) => {
     const updated = { ...timeRange, [field]: value };
-    const start = timeToMinutes(updated.startTime);
-    const end = timeToMinutes(updated.endTime);
+    const start = timeStringToMinutes(updated.startTime);
+    const end = timeStringToMinutes(updated.endTime);
 
     // Prevent selecting a start time after the end time or vice versa
     if (start > end) {
