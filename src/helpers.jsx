@@ -135,7 +135,7 @@ export const DatePickerModal = ({ currentDate = new Date(), onSelect, onClose })
     days.push(
       <div
         key={day}
-        className={`h-10 w-10 flex items-center justify-center rounded-full cursor-pointer
+        className={`h-12 w-12 flex items-center justify-center rounded-full cursor-pointer text-lg
           ${isSelected ? 'bg-blue-500 text-white' : ''}
           ${isToday && !isSelected ? 'border border-blue-500 text-blue-600' : ''}
           ${!isSelected && !isToday ? 'hover:bg-gray-100' : ''}
@@ -149,7 +149,7 @@ export const DatePickerModal = ({ currentDate = new Date(), onSelect, onClose })
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-5 w-full max-w-md">
+      <div className="bg-white rounded-xl p-5 w-full max-w-xl">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Select Date</h2>
           <button
