@@ -198,7 +198,7 @@ const App = () => {
             <div className="mr-2 text-3xl">🌊</div> 
             Paddleboard Weather Advisor
           </h1>
-          <nav className="flex items-center space-x-4">
+          <nav className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
             <button
               onClick={toggleFAQ}
               className="p-2 rounded-full hover:bg-blue-700 transition"
@@ -229,7 +229,7 @@ const App = () => {
       {/* Main Content */}
       <main className="flex-grow container mx-auto p-4">
         {view === "dashboard" && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {beaches.length === 0 ? (
               <div className="col-span-full bg-white rounded-lg shadow-lg p-8 text-center">
                 <div className="text-blue-600 text-5xl mb-4">🏝️</div>
@@ -369,7 +369,7 @@ const App = () => {
                         className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Latitude
@@ -431,7 +431,7 @@ const App = () => {
                 <h3 className="text-lg font-medium mb-3">
                   Popular Greek Beaches
                 </h3>
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {suggestedLocations.map((location, index) => (
                     <div
                       key={index}
