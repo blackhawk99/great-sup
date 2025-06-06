@@ -4,7 +4,7 @@ import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermomet
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection } from "./helpers.jsx";
 
-const FixedBeachView = ({ 
+const FixedBeachView = ({
   beach, 
   homeBeach, 
   onSetHomeBeach, 
@@ -20,6 +20,11 @@ const FixedBeachView = ({
   const [geoProtection, setGeoProtection] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const timeToMinutes = (time) => {
+    const [h, m] = time.split(":").map(Number);
+    return h * 60 + m;
+  };
   
   // Load data on mount and when date/time changes
   useEffect(() => {
@@ -83,8 +88,10 @@ const FixedBeachView = ({
   const calculateScores = async (weather, marine, beach) => {
     try {
       // Get data for the selected time range
-      const startHour = parseInt(timeRange.startTime.split(":")[0]);
-      const endHour = parseInt(timeRange.endTime.split(":")[0]);
+      const startMinute = timeToMinutes(timeRange.startTime);
+      const endMinute = timeToMinutes(timeRange.endTime);
+      const startHour = Math.floor(startMinute / 60);
+      const endHour = Math.floor(endMinute / 60);
       
       // Find indices for relevant hours
       const relevantIndices = [];
@@ -555,8 +562,10 @@ const FixedBeachView = ({
   const renderHourlyWind = () => {
     if (!weatherData || !weatherData.hourly) return null;
     
-    const startHour = parseInt(timeRange.startTime.split(":")[0]);
-    const endHour = parseInt(timeRange.endTime.split(":")[0]);
+    const startMinute = timeToMinutes(timeRange.startTime);
+    const endMinute = timeToMinutes(timeRange.endTime);
+    const startHour = Math.floor(startMinute / 60);
+    const endHour = Math.floor(endMinute / 60);
     
     // Initialize arrays to store hourly data for each day
     const todayHours = [];
@@ -764,11 +773,15 @@ const FixedBeachView = ({
               onChange={(e) => onTimeRangeChange?.('startTime', e.target.value)}
               className="w-full p-2 border rounded appearance-none bg-white text-lg"
             >
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
-                  {`${String(i).padStart(2, '0')}:00`}
-                </option>
-              ))}
+              {Array.from({ length: 24 }, (_, i) => {
+                const value = `${String(i).padStart(2, "0")}:00`;
+                const disabled = i * 60 > timeToMinutes(timeRange.endTime);
+                return (
+                  <option key={i} value={value} disabled={disabled}>
+                    {value}
+                  </option>
+                );
+              })}
             </select>
           </div>
           <div>
@@ -780,11 +793,15 @@ const FixedBeachView = ({
               onChange={(e) => onTimeRangeChange?.('endTime', e.target.value)}
               className="w-full p-2 border rounded appearance-none bg-white text-lg"
             >
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
-                  {`${String(i).padStart(2, '0')}:00`}
-                </option>
-              ))}
+              {Array.from({ length: 24 }, (_, i) => {
+                const value = `${String(i).padStart(2, "0")}:00`;
+                const disabled = i * 60 < timeToMinutes(timeRange.startTime);
+                return (
+                  <option key={i} value={value} disabled={disabled}>
+                    {value}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>

@@ -118,9 +118,28 @@ const App = () => {
     handleDataUpdate();
   };
   
-  // Handle time range change
+  // Convert HH:mm string to minutes
+  const timeToMinutes = (time) => {
+    const [h, m] = time.split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  // Handle time range change with basic validation
   const handleTimeRangeChange = (field, value) => {
-    setTimeRange({ ...timeRange, [field]: value });
+    const updated = { ...timeRange, [field]: value };
+    const start = timeToMinutes(updated.startTime);
+    const end = timeToMinutes(updated.endTime);
+
+    // Prevent selecting a start time after the end time or vice versa
+    if (start > end) {
+      if (field === "startTime") {
+        updated.endTime = value;
+      } else if (field === "endTime") {
+        updated.startTime = value;
+      }
+    }
+
+    setTimeRange(updated);
   };
   
   // Handle add beach
