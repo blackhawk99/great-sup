@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermometer, Droplets, Waves, Clock, Calendar, Info } from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
-import { getCardinalDirection } from "./helpers.jsx";
+import { getCardinalDirection, DatePickerModal } from "./helpers.jsx";
 
 const FixedBeachView = ({ 
   beach, 
@@ -20,6 +20,7 @@ const FixedBeachView = ({
   const [geoProtection, setGeoProtection] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   
   // Load data on mount and when date/time changes
   useEffect(() => {
@@ -672,6 +673,16 @@ const FixedBeachView = ({
 
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+      {showDatePicker && (
+        <DatePickerModal
+          currentDate={new Date(timeRange.date)}
+          onSelect={(date) => {
+            onTimeRangeChange?.('date', date);
+            setShowDatePicker(false);
+          }}
+          onClose={() => setShowDatePicker(false)}
+        />
+      )}
       {/* Header with beach info */}
       <div className="p-4 border-b flex justify-between items-center">
         <div>
@@ -722,14 +733,14 @@ const FixedBeachView = ({
         
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-          <div className="relative cursor-pointer">
+          <div className="relative cursor-pointer" onClick={() => setShowDatePicker(true)}>
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Calendar className="h-5 w-5 text-gray-400" />
             </div>
             <input
-              type="date"
+              type="text"
+              readOnly
               value={timeRange.date}
-              onChange={(e) => onTimeRangeChange?.('date', e.target.value)}
               className="w-full pl-10 p-3 bg-white border rounded-lg cursor-pointer text-lg"
             />
           </div>
