@@ -14,6 +14,15 @@ const MAX_CLOUD_SCORE = 10;
 const MAX_GEO_SCORE = 10;
 const MAX_TOTAL_SCORE = 100;
 
+const ProgressBar = ({ score, max, color }) => (
+  <div className="w-24 bg-gray-200 h-2 rounded mt-1 overflow-hidden">
+    <div
+      className={`${color} h-2 rounded`}
+      style={{ width: `${Math.min(100, (score / max) * 100)}%` }}
+    ></div>
+  </div>
+);
+
 const FixedBeachView = ({ 
   beach, 
   homeBeach, 
@@ -488,14 +497,6 @@ const FixedBeachView = ({
   const renderScoreBreakdown = () => {
     if (!scoreBreakdown) return null;
 
-    const Progress = ({ score, max, color }) => (
-      <div className="w-24 bg-gray-200 h-2 rounded mt-1 overflow-hidden">
-        <div
-          className={`${color} h-2 rounded`}
-          style={{ width: `${Math.min(100, (score / max) * 100)}%` }}
-        ></div>
-      </div>
-    );
 
     return (
       <div className="bg-white p-5 rounded-lg mt-4 shadow-sm border">
@@ -542,7 +543,7 @@ const FixedBeachView = ({
                     <span>
                       {scoreBreakdown.windSpeed.score}/{scoreBreakdown.windSpeed.maxPossible}
                     </span>
-                    <Progress
+                    <ProgressBar
                       score={scoreBreakdown.windSpeed.score}
                       max={scoreBreakdown.windSpeed.maxPossible}
                       color={
@@ -579,7 +580,7 @@ const FixedBeachView = ({
                     <span>
                       {scoreBreakdown.waveHeight.score}/{scoreBreakdown.waveHeight.maxPossible}
                     </span>
-                    <Progress
+                    <ProgressBar
                       score={scoreBreakdown.waveHeight.score}
                       max={scoreBreakdown.waveHeight.maxPossible}
                       color={
@@ -613,7 +614,7 @@ const FixedBeachView = ({
                     <span>
                       {scoreBreakdown.swellHeight.score}/{scoreBreakdown.swellHeight.maxPossible}
                     </span>
-                    <Progress
+                    <ProgressBar
                       score={scoreBreakdown.swellHeight.score}
                       max={scoreBreakdown.swellHeight.maxPossible}
                       color={
@@ -641,7 +642,7 @@ const FixedBeachView = ({
                     <span>
                       {scoreBreakdown.precipitation.score}/{scoreBreakdown.precipitation.maxPossible}
                     </span>
-                    <Progress
+                    <ProgressBar
                       score={scoreBreakdown.precipitation.score}
                       max={scoreBreakdown.precipitation.maxPossible}
                       color={scoreBreakdown.precipitation.value < 1 ? 'bg-green-500' : 'bg-red-500'}
@@ -667,7 +668,7 @@ const FixedBeachView = ({
                     <span>
                       {scoreBreakdown.temperature.score}/{scoreBreakdown.temperature.maxPossible}
                     </span>
-                    <Progress
+                    <ProgressBar
                       score={scoreBreakdown.temperature.score}
                       max={scoreBreakdown.temperature.maxPossible}
                       color={
@@ -699,7 +700,7 @@ const FixedBeachView = ({
                     <span>
                       {scoreBreakdown.cloudCover.score}/{scoreBreakdown.cloudCover.maxPossible}
                     </span>
-                    <Progress
+                    <ProgressBar
                       score={scoreBreakdown.cloudCover.score}
                       max={scoreBreakdown.cloudCover.maxPossible}
                       color={
@@ -733,7 +734,7 @@ const FixedBeachView = ({
                     <span>
                       {scoreBreakdown.geoProtection.score}/{scoreBreakdown.geoProtection.maxPossible}
                     </span>
-                    <Progress
+                    <ProgressBar
                       score={scoreBreakdown.geoProtection.score}
                       max={scoreBreakdown.geoProtection.maxPossible}
                       color={
@@ -761,7 +762,7 @@ const FixedBeachView = ({
                     <span>
                       {scoreBreakdown.total.score}/{scoreBreakdown.total.maxPossible}
                     </span>
-                    <Progress
+                    <ProgressBar
                       score={scoreBreakdown.total.score}
                       max={scoreBreakdown.total.maxPossible}
                       color={
