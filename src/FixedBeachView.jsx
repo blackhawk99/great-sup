@@ -166,8 +166,11 @@ const FixedBeachView = ({
       let totalScore = 0;
       
       // Wind speed score (0-35 points)
-      breakdown.windSpeed.score = protectedWindSpeed < 8 ? 35 :
-                                 Math.max(0, 35 - (protectedWindSpeed - 8) * (35 / 12));
+      // Use a linear scale so moderate winds still reduce the score
+      breakdown.windSpeed.score = Math.max(
+        0,
+        35 - protectedWindSpeed * (35 / 15)
+      );
       totalScore += breakdown.windSpeed.score;
       
       // Wave height score (0-20 points)
