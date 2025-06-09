@@ -10,10 +10,15 @@ const App = () => {
   const [view, setView] = useState("dashboard");
   const [selectedBeach, setSelectedBeach] = useState(null);
   const [notification, setNotification] = useState(null);
-  const [timeRange, setTimeRange] = useState({
-    date: new Date().toISOString().split("T")[0],
-    startTime: "09:00",
-    endTime: "13:00",
+  const [timeRange, setTimeRange] = useState(() => {
+    const now = new Date();
+    const startHour = now.getHours();
+    const endHour = Math.min(startHour + 6, 23);
+    return {
+      date: now.toISOString().split("T")[0],
+      startTime: `${String(startHour).padStart(2, "0")}:00`,
+      endTime: `${String(endHour).padStart(2, "0")}:00`,
+    };
   });
   const [lastUpdated, setLastUpdated] = useState(null);
   const [showFAQ, setShowFAQ] = useState(false); // New state for FAQ visibility
