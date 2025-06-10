@@ -709,9 +709,6 @@ const FixedBeachView = ({
               </tr>
             </tbody>
           </table>
-          <p className="text-xs text-gray-500 mt-2 px-4">
-            All factors sum to 100 points. Scores above 100 are capped.
-          </p>
         </div>
       </div>
     );
