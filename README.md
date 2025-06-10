@@ -10,7 +10,7 @@ A web app for planning stand-up paddleboarding sessions at Greek beaches. It com
 - **Geographic protection scoring.** Custom GIS datasets of the Greek coastline and islands are used to analyse how sheltered each beach is from wind and waves.
 - **Paddle score.** All factors are combined into a 0–100 rating so you can easily compare spots. An FAQ explains how the score is calculated.
 - **Local storage.** Your beaches and preferred "home" beach are saved in the browser so they appear on your next visit.
-- **Locate nearest popular beach.** Use your browser's location to quickly add the closest suggested spot.
+- **Locate nearest recommended location.** Use your browser's location to quickly add the closest suggested spot. Works on desktop and iPhone browsers that support HTML5 geolocation.
 
 ## Development
 

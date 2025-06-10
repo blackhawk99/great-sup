@@ -136,7 +136,7 @@ const App = () => {
     }
   };
 
-  // Find and add the nearest popular beach using browser geolocation
+  // Find and add the nearest recommended spot using browser geolocation
   const handleFindNearest = () => {
     if (!navigator.geolocation) {
       toast.error("Geolocation not supported by your browser");
@@ -167,7 +167,7 @@ const App = () => {
           }
         }
         setLocating(false);
-        if (window.confirm(`Add ${nearest.name} to your beaches?`)) {
+        if (window.confirm(`Add ${nearest.name} to your locations?`)) {
           handleAddSuggested(nearest);
         }
       },
@@ -400,7 +400,7 @@ const App = () => {
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                   disabled={locating}
                 >
-                  {locating ? 'Finding nearest beach...' : 'Find Nearest Popular Beach'}
+                  {locating ? 'Finding nearest location...' : 'Find Nearest Recommended Spot'}
                 </button>
               </div>
 
