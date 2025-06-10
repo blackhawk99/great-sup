@@ -22,6 +22,7 @@ const App = () => {
   });
   const [lastUpdated, setLastUpdated] = useState(null);
   const [showFAQ, setShowFAQ] = useState(false); // New state for FAQ visibility
+  const [locating, setLocating] = useState(false);
   
   
   // Format last updated time strings
@@ -133,6 +134,49 @@ const App = () => {
     } catch (error) {
       toast.error(error.message);
     }
+  };
+
+  // Find and add the nearest recommended spot using browser geolocation
+  const handleFindNearest = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation not supported by your browser");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const toRad = (deg) => deg * Math.PI / 180;
+        const distance = (lat1, lon1, lat2, lon2) => {
+          const R = 6371;
+          const dLat = toRad(lat2 - lat1);
+          const dLon = toRad(lon2 - lon1);
+          const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) ** 2;
+          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        };
+
+        let nearest = suggestedLocations[0];
+        let minDist = distance(latitude, longitude, nearest.latitude, nearest.longitude);
+        for (const loc of suggestedLocations.slice(1)) {
+          const d = distance(latitude, longitude, loc.latitude, loc.longitude);
+          if (d < minDist) {
+            minDist = d;
+            nearest = loc;
+          }
+        }
+        setLocating(false);
+        if (window.confirm(`Add ${nearest.name} to your locations?`)) {
+          handleAddSuggested(nearest);
+        }
+      },
+      (err) => {
+        console.error('Geolocation error', err);
+        toast.error('Unable to retrieve your location');
+        setLocating(false);
+      }
+    );
   };
   
   // Handle delete beach
@@ -349,6 +393,15 @@ const App = () => {
                     </p>
                   )}
                 </div>
+              </div>
+              <div className="mb-8">
+                <button
+                  onClick={handleFindNearest}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={locating}
+                >
+                  {locating ? 'Finding nearest location...' : 'Find Nearest Recommended Spot'}
+                </button>
               </div>
 
               <div className="mb-6">
