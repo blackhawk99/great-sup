@@ -169,7 +169,7 @@ const FixedBeachView = ({
       // Use a linear scale so moderate winds still reduce the score
       breakdown.windSpeed.score = Math.max(
         0,
-        35 - protectedWindSpeed * (35 / 15)
+        35 - protectedWindSpeed * (35 / 20)
       );
       totalScore += breakdown.windSpeed.score;
       
@@ -188,12 +188,12 @@ const FixedBeachView = ({
       totalScore += breakdown.precipitation.score;
       
       // Temperature score (0-10 points)
-      if (avgTemp >= 22 && avgTemp <= 30) {
+      if (avgTemp >= 22 && avgTemp <= 32) {
         breakdown.temperature.score = 10;
       } else if (avgTemp < 22) {
         breakdown.temperature.score = Math.max(0, 10 - (22 - avgTemp));
       } else {
-        breakdown.temperature.score = Math.max(0, 10 - (avgTemp - 30));
+        breakdown.temperature.score = Math.max(0, 10 - (avgTemp - 32));
       }
       totalScore += breakdown.temperature.score;
       
