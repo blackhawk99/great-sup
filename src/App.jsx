@@ -1,5 +1,16 @@
-import React, { useState } from "react";
-import { Home, Map, MapPin, Plus, Trash2, HelpCircle } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import {
+  Home,
+  Map,
+  MapPin,
+  Plus,
+  Trash2,
+  HelpCircle,
+  Compass,
+  LifeBuoy,
+  ListChecks,
+  Waves
+} from "lucide-react";
 import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers.jsx";
@@ -23,6 +34,8 @@ const App = () => {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [showFAQ, setShowFAQ] = useState(false); // New state for FAQ visibility
   const [locating, setLocating] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortOption, setSortOption] = useState("shelter");
   
   
   // Format last updated time strings
@@ -64,6 +77,90 @@ const App = () => {
       setTimeout(() => setNotification(null), 3000);
     },
   };
+
+  const getShelterScore = (beach) => {
+    if (typeof beach.protectionScore === "number") {
+      return beach.protectionScore;
+    }
+    if (typeof beach.bayEnclosure === "number") {
+      return Math.round(beach.bayEnclosure * 100);
+    }
+    return null;
+  };
+
+  const shelteredCount = beaches.filter((beach) => {
+    const score = getShelterScore(beach);
+    return typeof score === "number" && score >= 60;
+  }).length;
+
+  const sortedBeaches = useMemo(() => {
+    const beachesCopy = [...beaches];
+
+    switch (sortOption) {
+      case "alpha":
+        return beachesCopy.sort((a, b) => a.name.localeCompare(b.name));
+      case "recent":
+        return beachesCopy.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      case "shelter":
+      default:
+        return beachesCopy.sort((a, b) => {
+          const shelterA = getShelterScore(a);
+          const shelterB = getShelterScore(b);
+
+          if (typeof shelterA === "number" && typeof shelterB === "number") {
+            return shelterB - shelterA;
+          }
+
+          if (typeof shelterA === "number") return -1;
+          if (typeof shelterB === "number") return 1;
+          return a.name.localeCompare(b.name);
+        });
+    }
+  }, [beaches, sortOption]);
+
+  const filteredBeaches = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return sortedBeaches;
+    }
+
+    const query = searchTerm.toLowerCase();
+    return sortedBeaches.filter((beach) =>
+      beach.name.toLowerCase().includes(query) ||
+      `${beach.latitude.toFixed(2)},${beach.longitude.toFixed(2)}`.includes(query)
+    );
+  }, [sortedBeaches, searchTerm]);
+
+  const hasBeaches = beaches.length > 0;
+
+  const knowledgeCards = [
+    {
+      title: "Pre-paddle checks",
+      icon: ListChecks,
+      bullets: [
+        "Check leash, fin and paddle length before leaving the shore.",
+        "Confirm your forecast window matches your planned route.",
+        "Share launch and return times with a paddle buddy."
+      ]
+    },
+    {
+      title: "On-the-water focus",
+      icon: Waves,
+      bullets: [
+        "Face the wind on the way out so you finish with a tail breeze.",
+        "Use sheltered coves or moored boats as wind breaks when it picks up.",
+        "Keep 360° awareness for boat traffic and swimmers."
+      ]
+    },
+    {
+      title: "Safety essentials",
+      icon: LifeBuoy,
+      bullets: [
+        "Wear a PFD and leash every session—no exceptions.",
+        "Carry a waterproof phone or VHF in a dry bag.",
+        "Pack hydration, snacks and sun protection for longer paddles."
+      ]
+    }
+  ];
   
   // Function to update the last updated timestamp
   const handleDataUpdate = () => {
@@ -278,71 +375,273 @@ const App = () => {
       {/* Main Content */}
       <main className="flex-grow container mx-auto p-4">
         {view === "dashboard" && (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {beaches.length === 0 ? (
-              <div className="col-span-full bg-white rounded-lg shadow-lg p-8 text-center">
-                <div className="text-blue-600 text-5xl mb-4">🏝️</div>
-                <h2 className="text-2xl font-bold mb-4 text-gray-800">No beaches saved yet</h2>
-                <p className="text-gray-600 mb-6">Add your favorite paddleboarding spots to get started!</p>
-                <button
-                  onClick={() => setView("add")}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-md"
-                >
-                  Add Your First Beach
-                </button>
-              </div>
-            ) : (
-              beaches.map((beach) => (
-                <div
-                  key={beach.id}
-                  className={`bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow ${
-                    beach.id === homeBeach?.id ? "ring-2 ring-orange-400" : ""
-                  }`}
-                >
-                  <div className="p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <h2 className="text-xl font-semibold flex items-center">
-                        {beach.id === homeBeach?.id && (
-                          <Home className="h-4 w-4 text-orange-500 mr-1" />
-                        )}
-                        {beach.name}
-                      </h2>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteBeach(beach.id);
-                        }}
-                        className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-gray-100"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+          <div className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2 rounded-2xl bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-500 p-6 text-white shadow-xl">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="flex items-center text-sm uppercase tracking-widest text-blue-100">
+                      <Compass className="mr-2 h-4 w-4" /> Paddleboard planner
                     </div>
-                    <p className="text-gray-500 text-sm mb-3 flex items-center">
-                      <MapPin className="h-3 w-3 mr-1 text-gray-400 flex-shrink-0" />
-                      {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
+                    <h2 className="mt-2 text-3xl font-bold">Plan your next paddle</h2>
+                    <p className="mt-2 max-w-xl text-blue-100">
+                      Review real-time wind, swell and shelter analysis to pick the calmest launch window and keep a log of your favourite SUP spots.
                     </p>
-                    <div className="flex justify-between items-center">
-                      <a 
-                        href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:underline flex items-center"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Map className="h-3 w-3 mr-1" />
-                        View on Maps
-                      </a>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {homeBeach && (
                       <button
-                        onClick={() => handleBeachSelect(beach)}
-                        className="bg-blue-600 text-white text-sm px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors"
+                        onClick={() => handleBeachSelect(homeBeach)}
+                        className="rounded-lg bg-white/20 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/30"
                       >
-                        Check Conditions
+                        Check {homeBeach.name}
                       </button>
-                    </div>
+                    )}
+                    <button
+                      onClick={() => setView("add")}
+                      className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-blue-600 shadow hover:bg-blue-50"
+                    >
+                      <Plus className="mr-1 inline h-4 w-4" /> Add new spot
+                    </button>
+                    <button
+                      onClick={handleFindNearest}
+                      disabled={locating}
+                      className={`rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold transition ${
+                        locating
+                          ? 'cursor-not-allowed bg-white/10 text-blue-100'
+                          : 'text-white hover:bg-white/20'
+                      }`}
+                    >
+                      {locating ? 'Locating…' : 'Find calm bay nearby'}
+                    </button>
                   </div>
                 </div>
-              ))
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl bg-white/15 px-4 py-3 text-sm">
+                    <p className="text-blue-100">Saved spots</p>
+                    <p className="text-2xl font-semibold">{beaches.length}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/15 px-4 py-3 text-sm">
+                    <p className="text-blue-100">Sheltered bays</p>
+                    <p className="text-2xl font-semibold">{shelteredCount}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/15 px-4 py-3 text-sm">
+                    <p className="text-blue-100">Last forecast</p>
+                    <p className="text-2xl font-semibold">{lastUpdated ? formattedUpdateTime : "–"}</p>
+                    {lastUpdated && (
+                      <p className="text-xs text-blue-100">{formattedUpdateDate}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
+                <h3 className="flex items-center text-lg font-semibold text-gray-800">
+                  <LifeBuoy className="mr-2 h-5 w-5 text-blue-500" /> Session snapshot
+                </h3>
+                <dl className="mt-4 space-y-3 text-sm text-gray-600">
+                  <div className="flex items-center justify-between">
+                    <dt className="font-medium text-gray-500">Home launch</dt>
+                    <dd className="font-semibold text-gray-900">
+                      {homeBeach ? homeBeach.name : "Not set"}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <dt className="font-medium text-gray-500">Gear checklist</dt>
+                    <dd className="font-semibold text-gray-900">Tap inside a forecast</dd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <dt className="font-medium text-gray-500">Forecast window</dt>
+                    <dd className="font-semibold text-gray-900">
+                      {timeRange.startTime} – {timeRange.endTime}
+                    </dd>
+                  </div>
+                </dl>
+                {homeBeach ? (
+                  <div className="mt-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-700">
+                    <p className="font-semibold">Ready for {homeBeach.name}?</p>
+                    <p className="text-xs text-blue-600">
+                      {homeBeach.latitude.toFixed(2)}, {homeBeach.longitude.toFixed(2)}
+                    </p>
+                    <button
+                      onClick={() => handleBeachSelect(homeBeach)}
+                      className="mt-3 inline-flex items-center rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+                    >
+                      Open latest forecast
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
+                    Set any beach as "home" from its forecast page to pin it here for quick access.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1">
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder={hasBeaches ? "Search saved spots" : "Search by name or coordinates"}
+                  className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-blue-400">
+                  {hasBeaches
+                    ? `${filteredBeaches.length}/${beaches.length}`
+                    : 'No spots yet'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <label htmlFor="beach-sort" className="text-xs font-semibold uppercase tracking-wide text-blue-900">
+                  Sort by
+                </label>
+                <select
+                  id="beach-sort"
+                  value={sortOption}
+                  onChange={(event) => setSortOption(event.target.value)}
+                  className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                >
+                  <option value="shelter">Shelter strength</option>
+                  <option value="alpha">Alphabetical</option>
+                  <option value="recent">Recently added</option>
+                </select>
+              </div>
+            </div>
+
+            {hasBeaches ? (
+              filteredBeaches.length === 0 ? (
+                <div className="rounded-2xl border bg-white p-8 text-center shadow-sm">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600">🔍</div>
+                  <h3 className="mt-4 text-xl font-semibold text-gray-800">No matches found</h3>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Try a different beach name, adjust your spelling, or clear the search to see all saved launches.
+                  </p>
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="mt-4 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                  >
+                    Clear search
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {filteredBeaches.map((beach) => (
+                    <div
+                      key={beach.id}
+                      className={`flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+                        beach.id === homeBeach?.id ? "border-orange-200 ring-2 ring-orange-300" : "border-gray-100"
+                      }`}
+                    >
+                      <div className="flex flex-1 flex-col p-4">
+                        <div className="mb-3 flex items-start justify-between">
+                          <div>
+                            <h2 className="flex items-center text-lg font-semibold text-gray-800">
+                              {beach.id === homeBeach?.id && (
+                                <Home className="mr-1 h-4 w-4 text-orange-500" />
+                              )}
+                              {beach.name}
+                            </h2>
+                            {(() => {
+                              const shelter = getShelterScore(beach);
+                              if (typeof shelter !== "number") return null;
+                              const comfortLevel = shelter >= 75 ? "bg-green-50 text-green-600" : shelter >= 60 ? "bg-yellow-50 text-yellow-600" : "bg-red-50 text-red-600";
+                              return (
+                                <span className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${comfortLevel}`}>
+                                  Shelter {Math.round(shelter)}%
+                                </span>
+                              );
+                            })()}
+                          </div>
+                          <button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDeleteBeach(beach.id);
+                            }}
+                            className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-red-500"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <p className="flex items-center text-sm text-gray-500">
+                          <MapPin className="mr-1 h-3 w-3 text-gray-400" />
+                          {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
+                        </p>
+                        <div className="mt-auto flex items-center justify-between pt-4">
+                          <a
+                            href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-medium text-blue-600 hover:underline"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <Map className="mr-1 inline h-3 w-3" /> View on Maps
+                          </a>
+                          <button
+                            onClick={() => handleBeachSelect(beach)}
+                            className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-blue-700"
+                          >
+                            Check conditions
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
+              <div className="rounded-2xl border bg-white p-8 text-center shadow-sm">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600">🏝️</div>
+                <h2 className="mt-4 text-2xl font-bold text-gray-800">No beaches saved yet</h2>
+                <p className="mt-2 text-gray-600">
+                  Add your favourite paddleboarding launches to unlock personalised forecasts and checklists.
+                </p>
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                  <button
+                    onClick={() => setView("add")}
+                    className="rounded-lg bg-blue-600 px-6 py-3 text-white shadow hover:bg-blue-700"
+                  >
+                    Add manually
+                  </button>
+                  <button
+                    onClick={handleFindNearest}
+                    disabled={locating}
+                    className={`rounded-lg border px-6 py-3 ${
+                      locating
+                        ? 'border-blue-100 text-blue-300'
+                        : 'border-blue-200 text-blue-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    {locating ? 'Locating…' : 'Use my location'}
+                  </button>
+                </div>
+                <p className="mt-4 text-sm text-gray-500">
+                  Or open <span className="font-medium">Add Beach</span> to browse curated Greek bays ready to import.
+                </p>
+              </div>
             )}
+
+            <div className="grid gap-4 md:grid-cols-3">
+              {knowledgeCards.map((card) => {
+                const Icon = card.icon;
+                return (
+                  <div
+                    key={card.title}
+                    className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"
+                  >
+                    <h3 className="flex items-center text-lg font-semibold text-gray-800">
+                      <Icon className="mr-2 h-5 w-5 text-blue-500" /> {card.title}
+                    </h3>
+                    <ul className="mt-3 space-y-2 text-sm text-gray-600">
+                      {card.bullets.map((bullet) => (
+                        <li key={bullet} className="leading-relaxed">{bullet}</li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

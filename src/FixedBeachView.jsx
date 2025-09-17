@@ -1,8 +1,37 @@
 // FixedBeachView.jsx - Production-ready with all required features
 import React, { useState, useEffect } from "react";
-import { Home, ChevronLeft, RefreshCw, AlertCircle, MapPin, Map, Wind, Thermometer, Droplets, Waves, Clock, Calendar, Info } from "lucide-react";
+import {
+  Home,
+  ChevronLeft,
+  RefreshCw,
+  AlertCircle,
+  MapPin,
+  Map,
+  Wind,
+  Thermometer,
+  Droplets,
+  Waves,
+  Clock,
+  Calendar,
+  Info,
+  LifeBuoy,
+  CheckCircle2,
+  ListChecks
+} from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection, DatePickerModal } from "./helpers.jsx";
+
+const DEFAULT_CHECKLIST_ITEMS = [
+  { id: "leash", label: "Leash attached to board" },
+  { id: "pfd", label: "Personal flotation device on board" },
+  { id: "hydrate", label: "Water bottle filled" },
+  { id: "sun", label: "Sun protection applied" },
+  { id: "route", label: "Out-and-back route planned" },
+  { id: "conditions", label: "Conditions double-checked" }
+];
+
+const createDefaultChecklist = () =>
+  DEFAULT_CHECKLIST_ITEMS.map((item) => ({ ...item, done: false }));
 
 const FixedBeachView = ({ 
   beach, 
@@ -22,6 +51,58 @@ const FixedBeachView = ({
   const [error, setError] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [checklist, setChecklist] = useState(() => createDefaultChecklist());
+  const [checklistLoaded, setChecklistLoaded] = useState(false);
+
+  const toNumberOr = (value, fallback = 0) => {
+    const number = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  };
+
+  const average = (values, fallback = 0) => {
+    if (!values.length) {
+      return fallback;
+    }
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  };
+
+  const selectValues = (series, indices, fallbackValue = null) => {
+    if (!Array.isArray(series)) {
+      return [];
+    }
+    return indices
+      .map((index) => (index >= 0 && index < series.length ? series[index] : fallbackValue))
+      .map((value) => (value === null ? null : toNumberOr(value, fallbackValue)))
+      .filter((value) => value !== null);
+  };
+
+  const buildIndicesForRange = (timeStrings, targetDate, startHour, endHour) => {
+    if (!Array.isArray(timeStrings)) {
+      return [];
+    }
+
+    const indices = [];
+    const targetDateString = targetDate.toISOString().split("T")[0];
+
+    timeStrings.forEach((timeString, index) => {
+      const current = new Date(timeString);
+      if (Number.isNaN(current.getTime())) {
+        return;
+      }
+
+      const currentDate = current.toISOString().split("T")[0];
+      if (currentDate !== targetDateString) {
+        return;
+      }
+
+      const hour = current.getHours();
+      if (hour >= startHour && hour <= endHour) {
+        indices.push(index);
+      }
+    });
+
+    return indices;
+  };
   
   // Load data on mount and when date/time changes
   useEffect(() => {
@@ -29,6 +110,61 @@ const FixedBeachView = ({
       fetchWeatherData();
     }
   }, [beach?.id, timeRange.date]);
+
+  useEffect(() => {
+    if (!weatherData || !marineData || !beach) {
+      return;
+    }
+
+    const updateScores = async () => {
+      await calculateScores(weatherData, marineData, beach);
+    };
+
+    updateScores();
+  }, [timeRange.startTime, timeRange.endTime, weatherData, marineData, beach]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !beach?.id) {
+      return;
+    }
+
+    try {
+      const stored = localStorage.getItem(`sup-checklist-${beach.id}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setChecklist(
+            parsed.map((item) => ({
+              ...item,
+              done: Boolean(item.done)
+            }))
+          );
+          setChecklistLoaded(true);
+          return;
+        }
+      }
+    } catch (storageError) {
+      console.error("Failed to load checklist state", storageError);
+    }
+
+    setChecklist(createDefaultChecklist());
+    setChecklistLoaded(true);
+  }, [beach?.id]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !beach?.id || !checklistLoaded) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        `sup-checklist-${beach.id}`,
+        JSON.stringify(checklist)
+      );
+    } catch (storageError) {
+      console.error("Failed to save checklist state", storageError);
+    }
+  }, [beach?.id, checklist, checklistLoaded]);
   
   // Fetch real weather data
   const fetchWeatherData = async () => {
@@ -62,13 +198,10 @@ const FixedBeachView = ({
       
       const weatherData = await weatherRes.json();
       const marineData = await marineRes.json();
-      
+
       setWeatherData(weatherData);
       setMarineData(marineData);
-      
-      // Calculate scores
-      await calculateScores(weatherData, marineData, beach);
-      
+
       // Update last updated timestamp
       if (typeof onDataUpdate === 'function') {
         onDataUpdate();
@@ -85,71 +218,70 @@ const FixedBeachView = ({
   const calculateScores = async (weather, marine, beach) => {
     try {
       // Get data for the selected time range
-      const startHour = parseInt(timeRange.startTime.split(":")[0]);
-      const endHour = parseInt(timeRange.endTime.split(":")[0]);
-      
-      // Find indices for relevant hours
-      const relevantIndices = [];
-      for (let i = 0; i < weather.hourly.time.length; i++) {
-        const time = new Date(weather.hourly.time[i]);
-        if (time.getHours() >= startHour && time.getHours() <= endHour) {
-          relevantIndices.push(i);
-        }
+      const startHour = parseInt(timeRange.startTime.split(":")[0], 10);
+      const endHour = parseInt(timeRange.endTime.split(":")[0], 10);
+      const targetDate = new Date(timeRange.date);
+
+      let relevantIndices = buildIndicesForRange(weather?.hourly?.time, targetDate, startHour, endHour);
+      if (!relevantIndices.length) {
+        relevantIndices = buildIndicesForRange(weather?.hourly?.time, targetDate, 0, 23);
       }
-      
-      // If no hours match, use default range
-      if (relevantIndices.length === 0) {
-        for (let i = 0; i < weather.hourly.time.length; i++) {
-          const time = new Date(weather.hourly.time[i]);
-          if (time.getDate() === new Date(timeRange.date).getDate()) {
-            relevantIndices.push(i);
-          }
-        }
+      if (!relevantIndices.length && Array.isArray(weather?.hourly?.time)) {
+        relevantIndices = weather.hourly.time.map((_, index) => index);
       }
-      
-      // Calculate averages
-      const avgTemp = relevantIndices.map(i => weather.hourly.temperature_2m[i])
-        .reduce((sum, val) => sum + val, 0) / relevantIndices.length;
-      
-      const avgWind = relevantIndices.map(i => weather.hourly.windspeed_10m[i])
-        .reduce((sum, val) => sum + val, 0) / relevantIndices.length;
-      
-      const avgCloud = relevantIndices.map(i => weather.hourly.cloudcover[i])
-        .reduce((sum, val) => sum + val, 0) / relevantIndices.length;
-      
-      const maxPrecip = Math.max(...relevantIndices.map(i => weather.hourly.precipitation[i]));
-      
-      // Average wind direction using vector mean to handle circular data
-      let sinSum = 0;
-      let cosSum = 0;
-      relevantIndices.forEach(i => {
-        const rad = weather.hourly.winddirection_10m[i] * Math.PI / 180;
-        sinSum += Math.sin(rad);
-        cosSum += Math.cos(rad);
-      });
-      const avgWindDir = (Math.atan2(sinSum / relevantIndices.length, cosSum / relevantIndices.length) * 180 / Math.PI + 360) % 360;
-      
-      // Get wave data from daily or calculate from hourly
-      const waveHeight = marine.daily.wave_height_max[0];
-      
-      const avgSwellHeight = relevantIndices.map(i => marine.hourly.swell_wave_height[i])
-        .reduce((sum, val) => sum + val, 0) / relevantIndices.length;
-      
-      // Calculate geographic protection
-      const waveDirection = marine.daily.wave_direction_dominant[0];
+
+      if (!relevantIndices.length) {
+        throw new Error("No hourly data available for the selected beach");
+      }
+
+      const tempValues = selectValues(weather?.hourly?.temperature_2m, relevantIndices);
+      const windValues = selectValues(weather?.hourly?.windspeed_10m, relevantIndices);
+      const cloudValues = selectValues(weather?.hourly?.cloudcover, relevantIndices);
+      const precipValues = selectValues(weather?.hourly?.precipitation, relevantIndices);
+      const windDirValues = selectValues(weather?.hourly?.winddirection_10m, relevantIndices);
+
+      const avgTemp = average(tempValues, toNumberOr(weather?.hourly?.temperature_2m?.[0], 0));
+      const avgWind = average(windValues, 0);
+      const avgCloud = average(cloudValues, 0);
+      const maxPrecip = precipValues.length ? Math.max(...precipValues) : 0;
+
+      let avgWindDir = 0;
+      if (windDirValues.length) {
+        let sinSum = 0;
+        let cosSum = 0;
+        windDirValues.forEach((direction) => {
+          const radians = (direction * Math.PI) / 180;
+          sinSum += Math.sin(radians);
+          cosSum += Math.cos(radians);
+        });
+        avgWindDir = (Math.atan2(sinSum / windDirValues.length, cosSum / windDirValues.length) * 180) / Math.PI;
+        avgWindDir = (avgWindDir + 360) % 360;
+      }
+
+      const hourlyWaveValues = selectValues(marine?.hourly?.wave_height, relevantIndices);
+      const waveHeight = average(hourlyWaveValues, toNumberOr(marine?.daily?.wave_height_max?.[0], 0));
+
+      const swellValues = selectValues(marine?.hourly?.swell_wave_height, relevantIndices);
+      const avgSwellHeight = average(swellValues, toNumberOr(marine?.daily?.wave_height_max?.[0], 0));
+
+      const waveDirection = toNumberOr(marine?.daily?.wave_direction_dominant?.[0], avgWindDir);
       const protection = await calculateGeographicProtection(
         beach,
         avgWindDir,
         waveDirection,
-        new Date(timeRange.date)
+        targetDate
       );
       setGeoProtection(protection);
-      
+
+      const windProtectionFactor = toNumberOr(protection?.windProtection, 0);
+      const waveProtectionFactor = toNumberOr(protection?.waveProtection, 0);
+      const protectionScore = toNumberOr(protection?.protectionScore, 0);
+
       // Apply protection factors
-      const protectedWindSpeed = avgWind * (1 - (protection.windProtection * 0.9));
-      const protectedWaveHeight = waveHeight * (1 - (protection.waveProtection * 0.9));
-      const protectedSwellHeight = avgSwellHeight * (1 - (protection.waveProtection * 0.85));
-      
+      const protectedWindSpeed = avgWind * (1 - windProtectionFactor * 0.9);
+      const protectedWaveHeight = waveHeight * (1 - waveProtectionFactor * 0.9);
+      const protectedSwellHeight = avgSwellHeight * (1 - waveProtectionFactor * 0.85);
+
       // Initialize score breakdown
       const breakdown = {
         windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 35 },
@@ -158,7 +290,7 @@ const FixedBeachView = ({
         precipitation: { value: maxPrecip, score: 0, maxPossible: 10 },
         temperature: { value: avgTemp, score: 0, maxPossible: 10 },
         cloudCover: { value: avgCloud, score: 0, maxPossible: 5 },
-        geoProtection: { value: protection.protectionScore, score: 0, maxPossible: 10 },
+        geoProtection: { value: protectionScore, score: 0, maxPossible: 10 },
         total: { score: 0, rawScore: 0, bonus: 0, maxPossible: 100 }
       };
       
@@ -226,26 +358,176 @@ const FixedBeachView = ({
       
       setPaddleScore(breakdown.total.score);
       setScoreBreakdown(breakdown);
-      
+
     } catch (err) {
       console.error("Error calculating scores:", err);
       setPaddleScore(null);
       setScoreBreakdown(null);
     }
   };
+
+  const toggleChecklistItem = (itemId) => {
+    setChecklist((items) =>
+      items.map((item) =>
+        item.id === itemId ? { ...item, done: !item.done } : item
+      )
+    );
+  };
+
+  const resetChecklist = () => {
+    setChecklist(createDefaultChecklist());
+  };
+
+  const getPaddleReadiness = () => {
+    if (!scoreBreakdown || !weatherData || !marineData) {
+      return null;
+    }
+
+    const protectedWind = scoreBreakdown.windSpeed?.protected ?? null;
+    const protectedWave = scoreBreakdown.waveHeight?.protected ?? null;
+    const protectedSwell = scoreBreakdown.swellHeight?.protected ?? null;
+    const precipitation = scoreBreakdown.precipitation?.value ?? 0;
+    const avgTemp = scoreBreakdown.temperature?.value ?? null;
+
+    if (
+      protectedWind === null ||
+      protectedWave === null ||
+      protectedSwell === null ||
+      avgTemp === null
+    ) {
+      return null;
+    }
+
+    let skillLevel = "Beginner friendly";
+    let badgeClass = "bg-white/20 text-white border border-white/30";
+    let headline = "Glassy session ahead";
+    let message = "Expect calm water – ideal for easy cruises.";
+    let emoji = "🛶";
+
+    if (protectedWind > 12 || protectedWave > 0.5) {
+      skillLevel = "Advanced paddlers only";
+      badgeClass = "bg-red-500/30 text-white border border-white/40";
+      headline = "Challenging conditions";
+      message = "Plan a backup route and stay close to shore.";
+      emoji = "⚠️";
+    } else if (protectedWind > 8 || protectedWave > 0.35) {
+      skillLevel = "Intermediate focus";
+      badgeClass = "bg-yellow-400/30 text-white border border-white/40";
+      headline = "Manageable but watch the bumps";
+      message = "Expect some texture on the water – warm up with crosswind drills.";
+      emoji = "🌊";
+    }
+
+    if (paddleScore >= 90) {
+      headline = "Mirror-flat window";
+      message = "Perfect for distance paddles or SUP yoga sessions.";
+      emoji = "✨";
+    } else if (paddleScore >= 75 && protectedWind <= 10) {
+      headline = "Solid session";
+      message = "Plenty of glide with just a hint of breeze.";
+      emoji = "👍";
+    }
+
+    const startHour = parseInt(timeRange.startTime.split(":")[0], 10);
+    const endHour = parseInt(timeRange.endTime.split(":")[0], 10);
+    const targetDate = new Date(timeRange.date);
+
+    const selectedHours = [];
+
+    weatherData.hourly.time.forEach((timeString, index) => {
+      const current = new Date(timeString);
+      if (
+        current.getFullYear() === targetDate.getFullYear() &&
+        current.getMonth() === targetDate.getMonth() &&
+        current.getDate() === targetDate.getDate() &&
+        current.getHours() >= startHour &&
+        current.getHours() <= endHour
+      ) {
+        selectedHours.push({
+          index,
+          time: current,
+          wind: weatherData.hourly.windspeed_10m?.[index] ?? 0,
+          wave: marineData.hourly?.wave_height?.[index] ?? protectedWave,
+          precipitation: weatherData.hourly.precipitation?.[index] ?? 0
+        });
+      }
+    });
+
+    let bestHour = null;
+    let bestComposite = Number.POSITIVE_INFINITY;
+
+    selectedHours.forEach((hour) => {
+      const composite = hour.wind + hour.wave * 12 + hour.precipitation * 6;
+      if (composite < bestComposite) {
+        bestComposite = composite;
+        bestHour = hour;
+      }
+    });
+
+    const suggestions = [];
+
+    if (bestHour) {
+      const bestLabel = bestHour.time.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      const waveText = Number.isFinite(bestHour.wave)
+        ? bestHour.wave.toFixed(1)
+        : '0.0';
+      suggestions.push(
+        `Sweet spot around ${bestLabel} — wind near ${Math.round(bestHour.wind)} km/h and waves about ${waveText} m.`
+      );
+    }
+
+    if (protectedWave < 0.25 && protectedWind < 9) {
+      suggestions.push("Great chance to work on technique drills or SUP yoga poses.");
+    }
+
+    if (protectedWind >= 10) {
+      suggestions.push("Plan your route with an easy downwind finish or hug the coastline on the way back.");
+    }
+
+    if (avgTemp <= 20) {
+      suggestions.push("Layer with a light wetsuit top or thermal rash vest.");
+    } else if (avgTemp >= 28) {
+      suggestions.push("Pack extra hydration and reapply sunscreen every hour.");
+    }
+
+    if (precipitation >= 1) {
+      suggestions.push("Expect showers — stash dry gear and keep electronics in a dry bag.");
+    }
+
+    if (!suggestions.length) {
+      suggestions.push("Quick safety recap, leash on, and enjoy the glide!");
+    }
+
+    return {
+      icon: emoji,
+      skillLevel,
+      badgeClass,
+      headline,
+      message,
+      suggestions,
+      windowLabel: `${timeRange.startTime} – ${timeRange.endTime}`,
+      bestHour,
+      wind: protectedWind,
+      wave: protectedWave,
+      temperature: avgTemp,
+      swell: protectedSwell
+    };
+  };
   
   // Get condition text based on score and actual conditions
   const getCondition = (score) => {
-    if (!scoreBreakdown || !weatherData) return { label: "Loading", emoji: "⏳", message: "Calculating conditions...", color: "text-gray-500" };
-    
-    // Extract key metrics
-    const temp = weatherData.hourly.temperature_2m[12]; // Midday temperature
-    const windSpeed = scoreBreakdown.windSpeed.protected;
-    const precipitation = weatherData.hourly.precipitation[12]; // Midday precipitation
-    
-    // Base conditions on score
+    if (!scoreBreakdown) {
+      return { label: "Loading", emoji: "⏳", message: "Calculating conditions...", color: "text-gray-500" };
+    }
+
+    const temp = toNumberOr(scoreBreakdown.temperature?.value, 0);
+    const windSpeed = toNumberOr(scoreBreakdown.windSpeed?.protected, 0);
+    const precipitation = toNumberOr(scoreBreakdown.precipitation?.value, 0);
+
     if (score >= 85) {
-      // Perfect score, but check for non-perfect conditions
       if (temp < 18) {
         return {
           label: "Chilly but Calm",
@@ -253,60 +535,65 @@ const FixedBeachView = ({
           message: "Great conditions, but bring a wetsuit.",
           color: "text-blue-500"
         };
-      } else if (precipitation >= 0.5) {
+      }
+      if (precipitation >= 0.5) {
         return {
           label: "Calm but Wet",
           emoji: "🌧️",
           message: "Light rain, but excellent water conditions.",
           color: "text-blue-500"
         };
-      } else if (windSpeed > 15) {
+      }
+      if (windSpeed > 15) {
         return {
           label: "Excellent",
           emoji: "✅",
           message: "Some wind, but well-protected location.",
           color: "text-green-500"
         };
-      } else {
-        return {
-          label: "Perfect",
-          emoji: "✅",
-          message: "Flat like oil. Paddle on.",
-          color: "text-green-500"
-        };
       }
-    } else if (score >= 70) {
+      return {
+        label: "Perfect",
+        emoji: "✅",
+        message: "Flat like oil. Paddle on.",
+        color: "text-green-500"
+      };
+    }
+
+    if (score >= 70) {
       return {
         label: "Okay-ish",
         emoji: "⚠️",
         message: "Minor chop. Go early.",
         color: "text-yellow-500"
       };
-    } else if (score >= 50) {
+    }
+
+    if (score >= 50) {
       return {
         label: "Not Great",
         emoji: "❌",
         message: "Wind or waves make it tricky.",
-        color: "text-orange-500" 
-      };
-    } else {
-      return { 
-        label: "Nope", 
-        emoji: "🚫", 
-        message: "Not recommended.",
-        color: "text-red-500"
+        color: "text-orange-500"
       };
     }
+
+    return {
+      label: "Nope",
+      emoji: "🚫",
+      message: "Not recommended.",
+      color: "text-red-500"
+    };
   };
-  
+
   // Generate condition details tooltip content
   const getConditionDetails = () => {
-    if (!scoreBreakdown || !weatherData) return "";
-    
-    const temp = weatherData.hourly.temperature_2m[12]; // Midday temperature
-    const windSpeed = scoreBreakdown.windSpeed.protected;
-    const precipitation = weatherData.hourly.precipitation[12]; // Midday precipitation
-    const cloudCover = weatherData.hourly.cloudcover[12]; // Midday cloud cover
+    if (!scoreBreakdown) return "";
+
+    const temp = toNumberOr(scoreBreakdown.temperature?.value, 0);
+    const windSpeed = toNumberOr(scoreBreakdown.windSpeed?.protected, 0);
+    const precipitation = toNumberOr(scoreBreakdown.precipitation?.value, 0);
+    const cloudCover = toNumberOr(scoreBreakdown.cloudCover?.value, 0);
     
     // Create array of condition notes
     const notes = [];
@@ -344,7 +631,13 @@ const FixedBeachView = ({
     
     // Calculate the bonus points added to score from geographic protection
     const geoBonus = Math.round((geoProtection.protectionScore / 100) * 10);
-    const avgWindDirection = weatherData?.hourly?.winddirection_10m?.[12] || 0;
+    const avgWindDirection = toNumberOr(
+      geoProtection?.debugInfo?.windDirection ??
+      geoProtection?.dominantWindDirection ??
+      geoProtection?.windDirection ??
+      0,
+      0
+    );
     
     return (
       <div className="bg-blue-50 p-5 rounded-lg mt-4 border border-blue-200 shadow-inner">
@@ -842,6 +1135,24 @@ const FixedBeachView = ({
 
   // Get condition details for tooltip
   const conditionDetails = getConditionDetails();
+  const readiness = getPaddleReadiness();
+  const completedChecklist = checklist.filter((item) => item.done).length;
+  const checklistProgress = checklist.length
+    ? Math.round((completedChecklist / checklist.length) * 100)
+    : 0;
+
+  const breakdownMetrics = scoreBreakdown
+    ? {
+        windRaw: toNumberOr(scoreBreakdown.windSpeed?.raw, 0),
+        windProtected: toNumberOr(scoreBreakdown.windSpeed?.protected, 0),
+        waveRaw: toNumberOr(scoreBreakdown.waveHeight?.raw, 0),
+        waveProtected: toNumberOr(scoreBreakdown.waveHeight?.protected, 0),
+        swellProtected: toNumberOr(scoreBreakdown.swellHeight?.protected, 0),
+        temperature: toNumberOr(scoreBreakdown.temperature?.value, 0),
+        precipitation: toNumberOr(scoreBreakdown.precipitation?.value, 0),
+        cloudCover: toNumberOr(scoreBreakdown.cloudCover?.value, 0)
+      }
+    : null;
 
   return (
     <>
@@ -1073,91 +1384,210 @@ const FixedBeachView = ({
               {/* Weather Factors - RIGHT SIDE */}
               <div className="md:w-2/3">
                 <div className="grid grid-cols-2 gap-3">
-                  {weatherData.hourly && (
-                    <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                      <Wind className="h-6 w-6 mr-3 text-blue-600" />
-                      <div className="flex-grow">
-                        <div className="text-sm text-gray-500">Wind</div>
-                        <div className={`text-lg font-medium ${
-                          weatherData.hourly.windspeed_10m[12] < 8
-                            ? "text-green-600"
-                            : weatherData.hourly.windspeed_10m[12] < 15
-                            ? "text-yellow-600"
-                            : "text-red-600"
-                        }`}>
-                          {Math.round(weatherData.hourly.windspeed_10m[12])} km/h
-                          {scoreBreakdown && scoreBreakdown.windSpeed && (
+                  {breakdownMetrics ? (
+                    <>
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                        <Wind className="h-6 w-6 mr-3 text-blue-600" />
+                        <div className="flex-grow">
+                          <div className="text-sm text-gray-500">Wind</div>
+                          <div className={`text-lg font-medium ${
+                            breakdownMetrics.windProtected < 8
+                              ? 'text-green-600'
+                              : breakdownMetrics.windProtected < 15
+                                ? 'text-yellow-600'
+                                : 'text-red-600'
+                          }`}>
+                            {Math.round(breakdownMetrics.windRaw)} km/h
                             <span className="text-xs ml-2 text-gray-500">
-                              (Protected: {Math.round(scoreBreakdown.windSpeed.protected)} km/h)
+                              (Protected: {Math.round(breakdownMetrics.windProtected)} km/h)
                             </span>
-                          )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  
-                  {marineData.daily && (
-                    <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                      <Waves className="h-6 w-6 mr-3 text-blue-600" />
-                      <div className="flex-grow">
-                        <div className="text-sm text-gray-500">Wave Height</div>
-                        <div className={`text-lg font-medium ${
-                          marineData.daily.wave_height_max[0] < 0.2
-                            ? "text-green-600"
-                            : marineData.daily.wave_height_max[0] < 0.4
-                            ? "text-yellow-600"
-                            : "text-red-600"
-                        }`}>
-                          {marineData.daily.wave_height_max[0].toFixed(1)} m
-                          {scoreBreakdown && scoreBreakdown.waveHeight && (
+
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                        <Waves className="h-6 w-6 mr-3 text-blue-600" />
+                        <div className="flex-grow">
+                          <div className="text-sm text-gray-500">Wave Height</div>
+                          <div className={`text-lg font-medium ${
+                            breakdownMetrics.waveProtected < 0.2
+                              ? 'text-green-600'
+                              : breakdownMetrics.waveProtected < 0.4
+                                ? 'text-yellow-600'
+                                : 'text-red-600'
+                          }`}>
+                            {breakdownMetrics.waveRaw.toFixed(2)} m
                             <span className="text-xs ml-2 text-gray-500">
-                              (Protected: {scoreBreakdown.waveHeight.protected.toFixed(2)} m)
+                              (Protected: {breakdownMetrics.waveProtected.toFixed(2)} m)
                             </span>
-                          )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  
-                  {weatherData.hourly && (
-                    <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                      <Thermometer className="h-6 w-6 mr-3 text-blue-600" />
-                      <div className="flex-grow">
-                        <div className="text-sm text-gray-500">Temperature</div>
-                        <div className={`text-lg font-medium ${
-                          weatherData.hourly.temperature_2m[12] >= 22 &&
-                          weatherData.hourly.temperature_2m[12] <= 30
-                            ? "text-green-600"
-                            : weatherData.hourly.temperature_2m[12] >= 18
-                            ? "text-yellow-600"
-                            : "text-blue-600"
-                        }`}>
-                          {Math.round(weatherData.hourly.temperature_2m[12])}°C
+
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                        <Thermometer className="h-6 w-6 mr-3 text-blue-600" />
+                        <div className="flex-grow">
+                          <div className="text-sm text-gray-500">Temperature</div>
+                          <div className={`text-lg font-medium ${
+                            breakdownMetrics.temperature >= 22 && breakdownMetrics.temperature <= 30
+                              ? 'text-green-600'
+                              : breakdownMetrics.temperature >= 18
+                                ? 'text-yellow-600'
+                                : 'text-blue-600'
+                          }`}>
+                            {Math.round(breakdownMetrics.temperature)}°C
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  
-                  {weatherData.hourly && (
-                    <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                      <Droplets className="h-6 w-6 mr-3 text-blue-600" />
-                      <div className="flex-grow">
-                        <div className="text-sm text-gray-500">Precipitation</div>
-                        <div className={`text-lg font-medium ${
-                          weatherData.hourly.precipitation[12] < 1
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}>
-                          {weatherData.hourly.precipitation[12].toFixed(1)} mm
+
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                        <Droplets className="h-6 w-6 mr-3 text-blue-600" />
+                        <div className="flex-grow">
+                          <div className="text-sm text-gray-500">Precipitation</div>
+                          <div className={`text-lg font-medium ${
+                            breakdownMetrics.precipitation < 1 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {breakdownMetrics.precipitation.toFixed(1)} mm
+                          </div>
+                          <div className="mt-1 text-xs text-gray-500">
+                            Cloud cover {Math.round(breakdownMetrics.cloudCover)}%
+                          </div>
                         </div>
                       </div>
+                    </>
+                  ) : (
+                    <div className="col-span-2 rounded-lg border border-dashed border-blue-200 p-4 text-sm text-gray-500">
+                      Forecast metrics will appear once weather data loads.
                     </div>
                   )}
                 </div>
               </div>
             </div>
           )}
-          
+
+          {readiness && (
+            <div className="mt-6 space-y-4">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-sky-500 to-cyan-500 p-6 text-white shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="text-4xl">{readiness.icon}</div>
+                      <div>
+                        <p className="text-xs uppercase tracking-widest text-blue-100">Paddle readiness</p>
+                        <h4 className="text-2xl font-semibold">{readiness.headline}</h4>
+                      </div>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${readiness.badgeClass}`}>
+                      {readiness.skillLevel}
+                    </span>
+                  </div>
+
+                  <p className="mt-4 text-sm leading-relaxed text-blue-50">{readiness.message}</p>
+
+                  <div className="mt-6 grid grid-cols-3 gap-3 text-sm">
+                    <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
+                      <div className="text-xs uppercase text-blue-100">Wind (protected)</div>
+                      <div className="text-lg font-semibold">{Math.round(readiness.wind)} km/h</div>
+                    </div>
+                    <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
+                      <div className="text-xs uppercase text-blue-100">Wave height</div>
+                      <div className="text-lg font-semibold">{readiness.wave.toFixed(2)} m</div>
+                    </div>
+                    <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
+                      <div className="text-xs uppercase text-blue-100">Air temp</div>
+                      <div className="text-lg font-semibold">{Math.round(readiness.temperature)}°C</div>
+                    </div>
+                  </div>
+
+                  {readiness.bestHour && (
+                    <div className="mt-6 flex items-center rounded-xl bg-white/15 px-4 py-3 text-sm backdrop-blur">
+                      <Clock className="mr-3 h-5 w-5 text-white" />
+                      <div>
+                        <p className="font-semibold">Sweet spot timing</p>
+                        <p className="text-blue-100">
+                          {readiness.bestHour.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — wind {Math.round(readiness.bestHour.wind)} km/h
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                  <h4 className="flex items-center text-lg font-semibold text-gray-800">
+                    <LifeBuoy className="mr-2 h-5 w-5 text-blue-500" /> Session game plan
+                  </h4>
+                  <p className="mt-2 text-sm text-gray-500">Forecast window: {readiness.windowLabel}</p>
+                  <ul className="mt-4 space-y-3">
+                    {readiness.suggestions.map((tip, index) => (
+                      <li key={index} className="flex items-start text-sm text-gray-600">
+                        <CheckCircle2 className="mr-2 h-5 w-5 flex-shrink-0 text-blue-500" />
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h4 className="flex items-center text-lg font-semibold text-gray-800">
+                      <ListChecks className="mr-2 h-5 w-5 text-blue-500" /> Launch checklist
+                    </h4>
+                    <p className="text-sm text-gray-500">Track your prep for {beach?.name || 'this beach'}. Saved per spot.</p>
+                  </div>
+                  <button
+                    onClick={resetChecklist}
+                    className="self-start rounded-lg border border-blue-200 px-3 py-1 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                <div className="mt-4">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full bg-blue-500 transition-all"
+                      style={{ width: `${checklistProgress}%` }}
+                    ></div>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    {completedChecklist}/{checklist.length} ready
+                  </p>
+                </div>
+
+                <ul className="mt-4 space-y-2">
+                  {checklist.map((item) => (
+                    <li key={item.id}>
+                      <label className={`flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition ${
+                        item.done ? 'border-blue-200 bg-blue-50' : 'border-gray-200 hover:border-blue-200'
+                      }`}>
+                        <input
+                          type="checkbox"
+                          checked={item.done}
+                          onChange={() => toggleChecklistItem(item.id)}
+                          className="sr-only"
+                        />
+                        <span
+                          className={`flex h-5 w-5 items-center justify-center rounded-full border ${
+                            item.done
+                              ? 'border-blue-500 bg-blue-500 text-white'
+                              : 'border-gray-300 text-transparent'
+                          }`}
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                        </span>
+                        <span className={`text-sm ${item.done ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                          {item.label}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
           {/* Safety alert */}
           {scoreBreakdown && scoreBreakdown.windSpeed.raw > 30 && (
             <div className="bg-red-50 p-4 rounded-lg border border-red-200 mb-6">

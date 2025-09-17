@@ -23,7 +23,12 @@ export const useBeachManager = () => {
       const savedBeaches = localStorage.getItem("beaches");
       if (savedBeaches) {
         const parsedBeaches = JSON.parse(savedBeaches);
-        setBeaches(parsedBeaches);
+        const timestamp = Date.now();
+        const normalisedBeaches = parsedBeaches.map((beach, index) => ({
+          ...beach,
+          createdAt: beach?.createdAt ?? timestamp - index,
+        }));
+        setBeaches(normalisedBeaches);
       }
 
       const savedHomeBeach = localStorage.getItem("homeBeach");
@@ -194,6 +199,7 @@ export const useBeachManager = () => {
         latitude: lat,
         longitude: lng,
         googleMapsUrl: newBeach.googleMapsUrl || mapUrl,
+        createdAt: Date.now(),
       };
       
       // If we have pre-analyzed protection data, add it
@@ -236,6 +242,7 @@ export const useBeachManager = () => {
         latitude: location.latitude,
         longitude: location.longitude,
         googleMapsUrl: location.googleMapsUrl,
+        createdAt: Date.now(),
       };
 
       setBeaches([...beaches, beachToAdd]);
