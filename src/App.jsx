@@ -3,13 +3,18 @@ import {
   Home,
   Map,
   MapPin,
+  Smartphone,
   Plus,
   Trash2,
   HelpCircle,
+  Image as ImageIcon,
+  Navigation,
   Compass,
   LifeBuoy,
   ListChecks,
-  Waves
+  Waves,
+  Sparkles,
+  Sunrise
 } from "lucide-react";
 import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
@@ -36,6 +41,12 @@ const App = () => {
   const [locating, setLocating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("shelter");
+  const greekBounds = {
+    latMin: 34.6,
+    latMax: 41.9,
+    lonMin: 19.0,
+    lonMax: 29.8
+  };
   
   
   // Format last updated time strings
@@ -233,6 +244,49 @@ const App = () => {
     }
   };
 
+  const describeGreekRegion = (latitude, longitude) => {
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return "";
+
+    if (longitude < 21) return "Ionian Sea";
+    if (latitude > 40.5) return "North Aegean";
+    if (latitude < 37 && longitude > 25) return "Cyclades / Dodecanese";
+    if (latitude < 36.6 && longitude < 25) return "Crete & Libyan Sea";
+    return "Central Aegean";
+  };
+
+  const greekReadiness = useMemo(() => {
+    const lat = parseFloat(newBeach.latitude);
+    const lon = parseFloat(newBeach.longitude);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return {
+        state: "idle",
+        message: "Paste a Google Maps link or drop coordinates to check the spot.",
+        region: null,
+        previewUrl: null
+      };
+    }
+
+    const inGreece =
+      lat >= greekBounds.latMin &&
+      lat <= greekBounds.latMax &&
+      lon >= greekBounds.lonMin &&
+      lon <= greekBounds.lonMax;
+
+    const region = describeGreekRegion(lat, lon);
+    const bboxPadding = 0.08;
+    const previewUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${lon - bboxPadding}%2C${lat - bboxPadding}%2C${lon + bboxPadding}%2C${lat + bboxPadding}&layer=mapnik&marker=${lat}%2C${lon}`;
+
+    return {
+      state: inGreece ? "ready" : "warn",
+      message: inGreece
+        ? "Looks like a Greek shoreline—forecast + coastline analysis will run correctly."
+        : "Coordinates sit outside the usual Greek bounds. Double‑check before saving.",
+      region,
+      previewUrl
+    };
+  }, [newBeach.latitude, newBeach.longitude, greekBounds.latMax, greekBounds.latMin, greekBounds.lonMax, greekBounds.lonMin]);
+
   // Find and add the nearest recommended spot using browser geolocation
   const handleFindNearest = () => {
     if (!navigator.geolocation) {
@@ -377,8 +431,17 @@ const App = () => {
         {view === "dashboard" && (
           <div className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2 rounded-2xl bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-500 p-6 text-white shadow-xl">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="relative overflow-hidden lg:col-span-2 rounded-2xl bg-gradient-to-r from-blue-700 via-sky-600 to-cyan-500 p-6 text-white shadow-xl">
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-30"
+                  style={{
+                    backgroundImage:
+                      "url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1600&q=80')",
+                    backgroundSize: "cover",
+                    backgroundPosition: "center"
+                  }}
+                />
+                <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="flex items-center text-sm uppercase tracking-widest text-blue-100">
                       <Compass className="mr-2 h-4 w-4" /> Paddleboard planner
@@ -399,7 +462,7 @@ const App = () => {
                     )}
                     <button
                       onClick={() => setView("add")}
-                      className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-blue-600 shadow hover:bg-blue-50"
+                      className="rounded-lg bg-white/90 px-4 py-2 text-sm font-semibold text-blue-700 shadow hover:bg-white"
                     >
                       <Plus className="mr-1 inline h-4 w-4" /> Add new spot
                     </button>
@@ -416,7 +479,7 @@ const App = () => {
                     </button>
                   </div>
                 </div>
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="relative mt-6 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-xl bg-white/15 px-4 py-3 text-sm">
                     <p className="text-blue-100">Saved spots</p>
                     <p className="text-2xl font-semibold">{beaches.length}</p>
@@ -431,6 +494,22 @@ const App = () => {
                     {lastUpdated && (
                       <p className="text-xs text-blue-100">{formattedUpdateDate}</p>
                     )}
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="flex items-center gap-3 rounded-xl bg-white/15 p-3 text-sm text-blue-50 backdrop-blur">
+                    <Smartphone className="h-5 w-5" />
+                    <div>
+                      <p className="font-semibold">Built for iPhone</p>
+                      <p className="text-blue-100">Sticky actions and thumb-friendly controls on small screens.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl bg-white/15 p-3 text-sm text-blue-50 backdrop-blur">
+                    <Navigation className="h-5 w-5" />
+                    <div>
+                      <p className="font-semibold">Any Greek beach works</p>
+                      <p className="text-blue-100">Paste coordinates or a Maps link—Aegean, Ionian, Crete and more.</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -646,71 +725,86 @@ const App = () => {
         )}
 
         {view === "add" && (
-          <div className="bg-white rounded-lg shadow-lg">
-            <div className="p-4 border-b">
-              <h2 className="text-xl font-semibold flex items-center">
-                <Plus className="h-5 w-5 mr-2 text-blue-500" />
-                Add New Beach
-              </h2>
+          <div className="bg-white rounded-2xl shadow-lg border border-blue-50">
+            <div className="p-4 border-b flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold flex items-center">
+                  <Plus className="h-5 w-5 mr-2 text-blue-500" />
+                  Add New Beach
+                </h2>
+                <p className="text-sm text-gray-600">Optimised for Greek coastlines. Works with any bay—from Epirus to Rhodes.</p>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <Smartphone className="h-4 w-4" /> Mobile-friendly form
+              </div>
             </div>
 
-            <div className="p-4">
-              <div className="mb-8">
-                <h3 className="text-lg font-medium mb-3">
-                  Add via Google Maps Link
-                </h3>
-                <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                  <div className="flex items-start mb-3">
-                    <Map className="h-5 w-5 mr-2 text-blue-600 mt-1 flex-shrink-0" />
-                    <p className="text-sm text-gray-700">
-                      Paste a Google Maps link to a beach and we'll automatically extract the coordinates!
-                      <br/>
-                      <span className="text-xs text-gray-500 mt-1 block">
-                        Example: https://maps.app.goo.gl/yEXLZW5kwBArCHvb7
-                      </span>
-                    </p>
+            <div className="p-4 space-y-6">
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="rounded-2xl bg-white shadow-sm border border-blue-100 p-6">
+                  <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-800">Add a Greek beach</h3>
+                      <p className="text-sm text-gray-600">Paste a Google Maps link or enter coordinates. Works for every shoreline in Greece—ionian coves, windy Cyclades and calm mainland bays.</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-blue-700">
+                      <MapPin className="h-4 w-4" />
+                      <span>Aegean & Ionian ready</span>
+                    </div>
                   </div>
-                  <div className="flex">
-                    <input
-                      type="text"
-                      value={mapUrl}
-                      onChange={(e) => setMapUrl(e.target.value)}
-                      placeholder="Paste Google Maps URL here..."
-                      className="flex-grow p-2 border rounded-l"
-                    />
+
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-2 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-sm text-blue-800">
+                      <div className="flex items-center gap-2 font-semibold text-blue-900">
+                        <Sparkles className="h-4 w-4" /> Fast lane
+                      </div>
+                      <p>Drop a Maps link and we auto-fill the name and coordinates. Anything inside Greece works—the checker below flags out-of-bounds spots.</p>
+                    </div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="url"
+                        value={mapUrl}
+                        onChange={(e) => setMapUrl(e.target.value)}
+                        placeholder="Paste Google Maps URL here..."
+                        className="flex-grow rounded-lg border px-3 py-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      />
+                      <button
+                        onClick={handleExtractCoordinates}
+                        className="rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                        disabled={beachLoading}
+                      >
+                        {beachLoading ? 'Analyzing...' : 'Extract'}
+                      </button>
+                    </div>
+                    {beachLoading && (
+                      <p className="text-xs text-blue-600 mt-2">
+                        Analyzing coastline and geographic protection...
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center rounded-2xl border border-dashed border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 text-center">
+                  <div className="space-y-3 max-w-md">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm text-blue-600">
+                      <Map className="h-5 w-5" />
+                    </div>
+                    <p className="text-base font-semibold text-blue-900">Tap to add from your phone</p>
+                    <p className="text-sm text-gray-600">Works on iPhone: paste a Maps link, confirm the preview, and save. The layout stays thumb-friendly.</p>
                     <button
-                      onClick={handleExtractCoordinates}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700 transition-colors"
-                      disabled={beachLoading}
+                      onClick={handleFindNearest}
+                      className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                      disabled={locating}
                     >
-                      {beachLoading ? 'Analyzing...' : 'Extract'}
+                      {locating ? 'Finding nearest location...' : 'Use my current location'}
                     </button>
                   </div>
-                  {beachLoading && (
-                    <p className="text-xs text-blue-600 mt-2">
-                      Analyzing coastline and geographic protection...
-                    </p>
-                  )}
                 </div>
               </div>
-              <div className="mb-8">
-                <button
-                  onClick={handleFindNearest}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  disabled={locating}
-                >
-                  {locating ? 'Finding nearest location...' : 'Find Nearest Recommended Spot'}
-                </button>
-              </div>
 
-              <div className="mb-6">
-                <h3 className="text-lg font-medium mb-3">
-                  <span className="flex items-center">
-                    <Plus className="h-5 w-5 mr-2 text-blue-500" />
-                    Beach Details
-                  </span>
-                </h3>
-                <div className="bg-white p-4 rounded-lg border shadow-sm">
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="lg:col-span-2 bg-white p-4 rounded-lg border shadow-sm">
                   <div className="grid gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -782,6 +876,40 @@ const App = () => {
                     </button>
                   </div>
                 </div>
+
+                <div className="space-y-3 rounded-lg border border-blue-100 bg-gradient-to-b from-blue-50 to-white p-4 shadow-sm">
+                  <div className="flex items-center gap-2 text-blue-900">
+                    <Sunrise className="h-5 w-5" />
+                    <p className="font-semibold">Greek beach checker</p>
+                  </div>
+                  <p className="text-sm text-gray-700">We sanity-check your coordinates. Anything within {greekBounds.latMin}°–{greekBounds.latMax}° N and {greekBounds.lonMin}°–{greekBounds.lonMax}° E is Greek territory.</p>
+                  <div
+                    className={`rounded-lg border p-3 text-sm ${
+                      greekReadiness.state === "ready"
+                        ? "border-green-200 bg-green-50 text-green-800"
+                        : greekReadiness.state === "warn"
+                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          : "border-blue-100 bg-white text-blue-800"
+                    }`}
+                  >
+                    <p className="font-semibold">{greekReadiness.region || "Waiting for coordinates"}</p>
+                    <p className="text-xs leading-5">{greekReadiness.message}</p>
+                    {greekReadiness.previewUrl && (
+                      <div className="mt-3 overflow-hidden rounded-lg border">
+                        <iframe
+                          title="Greek beach preview"
+                          src={greekReadiness.previewUrl}
+                          className="h-48 w-full"
+                          loading="lazy"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-start gap-2 text-xs text-gray-600">
+                    <ImageIcon className="mt-0.5 h-4 w-4 text-blue-500" />
+                    <p>Preview uses OpenStreetMap tiles so you can visually verify coves before saving.</p>
+                  </div>
+                </div>
               </div>
 
               <div className="border-t pt-6">
@@ -831,6 +959,45 @@ const App = () => {
           </ErrorBoundary>
         )}
       </main>
+
+      {/* Mobile quick actions */}
+      <div className="fixed inset-x-4 bottom-4 z-40 md:hidden">
+        <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-white p-3 shadow-xl backdrop-blur">
+          <button
+            onClick={() => setView("dashboard")}
+            className={`flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold ${
+              view === "dashboard" ? "bg-blue-50 text-blue-700" : "text-blue-800 hover:bg-blue-50"
+            }`}
+          >
+            <Home className="h-4 w-4" />
+            Home
+          </button>
+          <button
+            onClick={() => setView("add")}
+            className={`flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold ${
+              view === "add" ? "bg-blue-50 text-blue-700" : "text-blue-800 hover:bg-blue-50"
+            }`}
+          >
+            <Plus className="h-4 w-4" />
+            Add
+          </button>
+          <button
+            onClick={handleFindNearest}
+            className="flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
+            disabled={locating}
+          >
+            <MapPin className="h-4 w-4" />
+            {locating ? "Locating" : "Nearby"}
+          </button>
+          <button
+            onClick={toggleFAQ}
+            className="flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Help
+          </button>
+        </div>
+      </div>
 
       {/* Footer with Last Updated Time */}
       <footer className="bg-blue-800 text-white p-4 mt-auto shadow-inner">
