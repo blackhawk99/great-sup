@@ -14,3 +14,14 @@
 
 .refresh-surface { touch-action: pan-down; }
 
+:root {
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  @apply transition-colors duration-200;
+}

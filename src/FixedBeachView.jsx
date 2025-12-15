@@ -1166,9 +1166,9 @@ const FixedBeachView = ({
           onClose={() => setShowDatePicker(false)}
         />
       )}
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden dark:bg-slate-900 dark:border dark:border-slate-800">
       {/* Header with beach info */}
-      <div className="p-4 border-b flex justify-between items-center">
+      <div className="p-4 border-b flex justify-between items-center dark:border-slate-800">
         <div>
           <h2 className="text-2xl font-semibold flex items-center">
             {beach?.id === homeBeach?.id && (
@@ -1176,16 +1176,16 @@ const FixedBeachView = ({
             )}
             {beach?.name || "Beach"}
           </h2>
-          <div className="flex items-center mt-1">
-            <p className="text-gray-600 mr-3">
+          <div className="flex items-center mt-1 text-gray-600 dark:text-slate-200">
+            <p className="text-gray-600 mr-3 dark:text-slate-300">
               {beach ? `${beach.latitude.toFixed(4)}, ${beach.longitude.toFixed(4)}` : ""}
             </p>
             {beach && (
-              <a 
+              <a
                 href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:underline flex items-center"
+                className="text-xs text-blue-600 hover:underline flex items-center dark:text-blue-300"
               >
                 <Map className="h-3 w-3 mr-1" />
                 View on Maps
@@ -1198,16 +1198,63 @@ const FixedBeachView = ({
             <button
               onClick={() => onSetHomeBeach?.(beach)}
               className="bg-orange-500 text-white px-3 py-1 rounded-lg hover:bg-orange-600 transition-colors flex items-center"
+              aria-label="Set this beach as home"
             >
               <Home className="h-4 w-4 mr-1" /> Set as Home
             </button>
           )}
           <button
             onClick={() => setView?.("dashboard")}
-            className="bg-gray-200 text-gray-800 px-3 py-1 rounded-lg hover:bg-gray-300 transition-colors flex items-center"
+            className="bg-gray-200 text-gray-800 px-3 py-1 rounded-lg hover:bg-gray-300 transition-colors flex items-center dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+            aria-label="Back to dashboard"
           >
             <ChevronLeft className="h-4 w-4 mr-1" /> Back
           </button>
+        </div>
+      </div>
+      <div className="border-b bg-gray-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700 dark:text-slate-200" aria-label="Quick actions for this beach">
+          <button
+            type="button"
+            onClick={() => fetchWeatherData()}
+            className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 dark:bg-slate-900 dark:text-blue-200 dark:hover:bg-slate-700"
+            aria-label="Refresh forecast data"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDatePicker(true)}
+            className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 dark:bg-slate-900 dark:text-blue-200 dark:hover:bg-slate-700"
+            aria-label="Change forecast date"
+          >
+            <Calendar className="h-4 w-4" />
+            Date
+          </button>
+          {beach && (
+            <a
+              href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 dark:bg-slate-900 dark:text-blue-200 dark:hover:bg-slate-700"
+              aria-label={`Open ${beach.name} on Google Maps`}
+            >
+              <MapPin className="h-4 w-4" />
+              Maps
+            </a>
+          )}
+          {beach && beach.id !== homeBeach?.id && (
+            <button
+              type="button"
+              onClick={() => onSetHomeBeach?.(beach)}
+              className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-3 py-1 font-semibold text-orange-700 shadow-sm transition hover:bg-orange-200 dark:bg-orange-900/40 dark:text-orange-100 dark:hover:bg-orange-800/60"
+              aria-label="Pin this beach as home"
+            >
+              <Home className="h-4 w-4" />
+              Pin home
+            </button>
+          )}
         </div>
       </div>
 
