@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Home,
   Map,
@@ -14,18 +14,27 @@ import {
   ListChecks,
   Waves,
   Sparkles,
-  Sunrise
+  Sunrise,
+  Sun,
+  Moon,
+  Link as LinkIcon,
+  Eye
 } from "lucide-react";
 import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers.jsx";
 import FAQ from "./FAQ"; // Import the new FAQ component
+import { useTheme } from "./utils/themeContext.jsx";
+
+const RECENT_SEARCH_KEY = "sup-recent-searches";
 
 const App = () => {
   // State
   const [view, setView] = useState("dashboard");
   const [selectedBeach, setSelectedBeach] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [recentSearches, setRecentSearches] = useState([]);
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [timeRange, setTimeRange] = useState(() => {
     const now = new Date();
     const startHour = now.getHours();
@@ -41,6 +50,7 @@ const App = () => {
   const [locating, setLocating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("shelter");
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const greekBounds = {
     latMin: 34.6,
     latMax: 41.9,
@@ -104,6 +114,20 @@ const App = () => {
     return typeof score === "number" && score >= 60;
   }).length;
 
+  const rememberSearchTerm = (term) => {
+    const value = term.trim();
+    if (!value) return;
+    setRecentSearches((prev) => {
+      const updated = [value, ...prev.filter((item) => item.toLowerCase() !== value.toLowerCase())];
+      return updated.slice(0, 6);
+    });
+  };
+
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
+    setShowSearchSuggestions(true);
+  };
+
   const sortedBeaches = useMemo(() => {
     const beachesCopy = [...beaches];
 
@@ -128,6 +152,37 @@ const App = () => {
         });
     }
   }, [beaches, sortOption]);
+
+  const searchSuggestions = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    const nameSuggestions = beaches
+      .filter((beach) => beach.name.toLowerCase().includes(query))
+      .map((beach) => beach.name);
+    const recents = recentSearches.filter((item) => item.toLowerCase().includes(query));
+
+    return Array.from(new Set([...recents, ...nameSuggestions])).slice(0, 7);
+  }, [beaches, recentSearches, searchTerm]);
+
+  const handleSearchSubmit = () => rememberSearchTerm(searchTerm);
+
+  const handleSearchSuggestionClick = (value) => {
+    handleSearchChange(value);
+    rememberSearchTerm(value);
+    setShowSearchSuggestions(false);
+  };
+
+  const clearRecentSearches = () => setRecentSearches([]);
+
+  const handleSearchKeyDown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleSearchSubmit();
+      setShowSearchSuggestions(false);
+    }
+    if (event.key === "Escape") {
+      setShowSearchSuggestions(false);
+    }
+  };
 
   const filteredBeaches = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -172,6 +227,32 @@ const App = () => {
       ]
     }
   ];
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(RECENT_SEARCH_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setRecentSearches(parsed);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load recent searches", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (recentSearches.length) {
+        localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(recentSearches));
+      } else {
+        localStorage.removeItem(RECENT_SEARCH_KEY);
+      }
+    } catch (error) {
+      console.error("Failed to persist recent searches", error);
+    }
+  }, [recentSearches]);
   
   // Function to update the last updated timestamp
   const handleDataUpdate = () => {
@@ -365,7 +446,13 @@ const App = () => {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-blue-50">
+    <div
+      className={`flex flex-col min-h-screen transition-colors ${
+        resolvedTheme === "dark"
+          ? "bg-slate-950 text-slate-100"
+          : "bg-blue-50 text-gray-900"
+      }`}
+    >
       {/* Toast notification */}
       {notification && (
         <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
@@ -389,13 +476,13 @@ const App = () => {
       <FAQ isOpen={showFAQ} onClose={() => setShowFAQ(false)} />
       
       {/* Header */}
-      <header className="bg-blue-600 text-white p-4 shadow-md">
+      <header className="bg-blue-600 text-white p-4 shadow-md dark:bg-slate-900">
         <div className="container mx-auto flex justify-between items-center">
-          <h1 
+          <h1
             className="text-2xl font-bold flex items-center cursor-pointer hover:text-blue-100 transition-colors"
             onClick={() => setView("dashboard")}
           >
-            <div className="mr-2 text-3xl">🌊</div> 
+            <div className="mr-2 text-3xl">🌊</div>
             Paddleboard Weather Advisor
           </h1>
           <nav className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
@@ -406,6 +493,51 @@ const App = () => {
             >
               <HelpCircle className="h-5 w-5" />
             </button>
+            <div className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-xs font-semibold uppercase tracking-wide">
+              <span className="sr-only">Theme selection</span>
+              <button
+                type="button"
+                aria-label="Use light theme"
+                aria-pressed={theme === "light"}
+                onClick={() => setTheme("light")}
+                className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
+                  theme === "light"
+                    ? "bg-white/80 text-blue-700"
+                    : "text-white hover:bg-white/20"
+                }`}
+              >
+                <Sun className="h-4 w-4" />
+                <span className="hidden sm:inline">Light</span>
+              </button>
+              <button
+                type="button"
+                aria-label="Use system theme"
+                aria-pressed={theme === "system"}
+                onClick={() => setTheme("system")}
+                className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
+                  theme === "system"
+                    ? "bg-white/80 text-blue-700"
+                    : "text-white hover:bg-white/20"
+                }`}
+              >
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden sm:inline">Auto</span>
+              </button>
+              <button
+                type="button"
+                aria-label="Use dark theme"
+                aria-pressed={theme === "dark"}
+                onClick={() => setTheme("dark")}
+                className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
+                  theme === "dark"
+                    ? "bg-white/80 text-blue-700"
+                    : "text-white hover:bg-white/20"
+                }`}
+              >
+                <Moon className="h-4 w-4" />
+                <span className="hidden sm:inline">Dark</span>
+              </button>
+            </div>
             <button
               onClick={() => setView("dashboard")}
               className={`px-3 py-1 rounded-lg ${
@@ -559,18 +691,61 @@ const App = () => {
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative flex-1">
+                <label htmlFor="beach-search" className="sr-only">Search beaches</label>
                 <input
+                  id="beach-search"
                   type="search"
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onChange={(event) => handleSearchChange(event.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  onFocus={() => setShowSearchSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 120)}
                   placeholder={hasBeaches ? "Search saved spots" : "Search by name or coordinates"}
-                  className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  aria-autocomplete="list"
+                  aria-expanded={showSearchSuggestions && searchSuggestions.length > 0}
+                  aria-owns="beach-search-suggestions"
+                  className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-blue-500"
                 />
-                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-blue-400">
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-blue-400 dark:text-blue-200">
                   {hasBeaches
                     ? `${filteredBeaches.length}/${beaches.length}`
                     : 'No spots yet'}
                 </span>
+                {showSearchSuggestions && searchSuggestions.length > 0 && (
+                  <div
+                    id="beach-search-suggestions"
+                    className="absolute left-0 right-0 z-20 mt-2 rounded-lg border border-blue-100 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <div className="flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wide text-blue-800 dark:text-slate-200">
+                      <span>Recent & suggestions</span>
+                      {recentSearches.length > 0 && (
+                        <button
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={clearRecentSearches}
+                          className="text-blue-600 hover:underline dark:text-blue-200"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <ul className="divide-y divide-blue-50 dark:divide-slate-700">
+                      {searchSuggestions.map((suggestion) => (
+                        <li key={suggestion}>
+                          <button
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleSearchSuggestionClick(suggestion)}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-blue-50 dark:text-slate-100 dark:hover:bg-slate-700"
+                          >
+                            <MapPin className="h-4 w-4 text-blue-500" aria-hidden="true" />
+                            <span>{suggestion}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <label htmlFor="beach-sort" className="text-xs font-semibold uppercase tracking-wide text-blue-900">
@@ -580,7 +755,7 @@ const App = () => {
                   id="beach-sort"
                   value={sortOption}
                   onChange={(event) => setSortOption(event.target.value)}
-                  className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-500"
                 >
                   <option value="shelter">Shelter strength</option>
                   <option value="alpha">Alphabetical</option>
@@ -609,8 +784,8 @@ const App = () => {
                   {filteredBeaches.map((beach) => (
                     <div
                       key={beach.id}
-                      className={`flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
-                        beach.id === homeBeach?.id ? "border-orange-200 ring-2 ring-orange-300" : "border-gray-100"
+                      className={`flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900 ${
+                        beach.id === homeBeach?.id ? "border-orange-200 ring-2 ring-orange-300" : "border-gray-100 dark:border-slate-700"
                       }`}
                     >
                       <div className="flex flex-1 flex-col p-4">
@@ -638,7 +813,8 @@ const App = () => {
                               event.stopPropagation();
                               handleDeleteBeach(beach.id);
                             }}
-                            className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-red-500"
+                            className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-red-500 dark:hover:bg-slate-800"
+                            aria-label={`Delete ${beach.name}`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -647,19 +823,62 @@ const App = () => {
                           <MapPin className="mr-1 h-3 w-3 text-gray-400" />
                           {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
                         </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => handleBeachSelect(beach)}
+                            className="inline-flex items-center gap-1 rounded-full border border-blue-100 px-2 py-1 font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-slate-700 dark:text-blue-200 dark:hover:bg-slate-800"
+                            aria-label={`Open details for ${beach.name}`}
+                          >
+                            <Eye className="h-3 w-3" />
+                            <span className="sr-only">Open details</span>
+                            <span aria-hidden>View</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetHomeBeach(beach)}
+                            disabled={beach.id === homeBeach?.id}
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold transition ${
+                              beach.id === homeBeach?.id
+                                ? "bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-200"
+                                : "border border-blue-100 text-blue-700 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-200 dark:hover:bg-slate-800"
+                            }`}
+                            aria-label={
+                              beach.id === homeBeach?.id
+                                ? `${beach.name} is set as home`
+                                : `Set ${beach.name} as home beach`
+                            }
+                          >
+                            <Home className="h-3 w-3" />
+                            <span className="sr-only">Set as home beach</span>
+                            <span aria-hidden>{beach.id === homeBeach?.id ? "Home" : "Pin"}</span>
+                          </button>
+                          <a
+                            href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-full border border-blue-100 px-2 py-1 font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-slate-700 dark:text-blue-200 dark:hover:bg-slate-800"
+                            aria-label={`Open ${beach.name} in Google Maps`}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <LinkIcon className="h-3 w-3" />
+                            <span className="sr-only">Open in Maps</span>
+                            <span aria-hidden>Maps</span>
+                          </a>
+                        </div>
                         <div className="mt-auto flex items-center justify-between pt-4">
                           <a
                             href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs font-medium text-blue-600 hover:underline"
+                            className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-200"
                             onClick={(event) => event.stopPropagation()}
                           >
                             <Map className="mr-1 inline h-3 w-3" /> View on Maps
                           </a>
                           <button
                             onClick={() => handleBeachSelect(beach)}
-                            className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-blue-700"
+                            className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                           >
                             Check conditions
                           </button>
