@@ -415,7 +415,7 @@ const App = () => {
             views={navigableViews}
             activeView={view}
             onChange={setView}
-            className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4"
+            className="swipe-surface flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4"
           >
             <nav className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <button
@@ -580,7 +580,7 @@ const App = () => {
             <PullToRefreshList
               onRefresh={handleRefreshList}
               loaderLabel="Refreshing spots"
-              className="mt-2 rounded-2xl border border-blue-50 bg-white/60 p-4 shadow-inner max-h-[70vh] space-y-4"
+              className="refresh-surface mt-2 rounded-2xl border border-blue-50 bg-white/60 p-4 shadow-inner max-h-[70vh] space-y-4"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="relative flex-1">
@@ -992,7 +992,7 @@ const App = () => {
           views={navigableViews}
           activeView={view}
           onChange={setView}
-          className="flex items-center justify-between rounded-2xl border border-blue-100 bg-white p-3 shadow-xl backdrop-blur"
+          className="swipe-surface flex items-center justify-between rounded-2xl border border-blue-100 bg-white p-3 shadow-xl backdrop-blur"
         >
           <button
             onClick={() => setView("dashboard")}

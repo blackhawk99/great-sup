@@ -2,12 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-.btn-micro
-{ @apply transition-transform duration-150 ease-out active:scale-95; }
+.btn-micro { @apply transition-transform duration-150 ease-out active:scale-95; }
 
-.card-micro
-{ @apply transition duration-200 ease-out hover:-translate-y-1 hover:shadow-lg hover:opacity-100; }
+.card-micro { @apply transition duration-200 ease-out hover:-translate-y-1 hover:shadow-lg hover:opacity-100; }
 
-.tap-fade
-{ @apply transition-opacity duration-150 ease-out hover:opacity-90; }
+.tap-fade { @apply transition-opacity duration-150 ease-out hover:opacity-90; }
+
+.swipe-surface { touch-action: pan-y; }
+
+.refresh-surface { touch-action: pan-down; }
 
