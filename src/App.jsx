@@ -20,6 +20,8 @@ import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers.jsx";
 import FAQ from "./FAQ"; // Import the new FAQ component
+import SwipeNavigator from "./components/SwipeNavigator";
+import PullToRefreshList from "./components/PullToRefreshList";
 
 const App = () => {
   // State
@@ -143,6 +145,12 @@ const App = () => {
 
   const hasBeaches = beaches.length > 0;
 
+  const navigableViews = useMemo(() => {
+    const baseViews = ["dashboard", "add"];
+    if (selectedBeach) baseViews.push("detail");
+    return baseViews;
+  }, [selectedBeach]);
+
   const knowledgeCards = [
     {
       title: "Pre-paddle checks",
@@ -176,6 +184,11 @@ const App = () => {
   // Function to update the last updated timestamp
   const handleDataUpdate = () => {
     setLastUpdated(new Date());
+  };
+
+  const handleRefreshList = async () => {
+    handleDataUpdate();
+    toast.success("Feed refreshed");
   };
   
   
@@ -391,38 +404,45 @@ const App = () => {
       {/* Header */}
       <header className="bg-blue-600 text-white p-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
-          <h1 
+          <h1
             className="text-2xl font-bold flex items-center cursor-pointer hover:text-blue-100 transition-colors"
             onClick={() => setView("dashboard")}
           >
-            <div className="mr-2 text-3xl">🌊</div> 
+            <div className="mr-2 text-3xl">🌊</div>
             Paddleboard Weather Advisor
           </h1>
-          <nav className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
-            <button
-              onClick={toggleFAQ}
-              className="p-2 rounded-full hover:bg-blue-700 transition"
-              title="Help & FAQ"
-            >
-              <HelpCircle className="h-5 w-5" />
-            </button>
-            <button
-              onClick={() => setView("dashboard")}
-              className={`px-3 py-1 rounded-lg ${
-                view === "dashboard" ? "bg-blue-800" : "hover:bg-blue-700"
-              } transition-colors duration-200`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setView("add")}
-              className={`px-3 py-1 rounded-lg ${
-                view === "add" ? "bg-blue-800" : "hover:bg-blue-700"
-              } transition-colors duration-200`}
-            >
-              Add Beach
-            </button>
-          </nav>
+          <SwipeNavigator
+            views={navigableViews}
+            activeView={view}
+            onChange={setView}
+            className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4"
+          >
+            <nav className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
+              <button
+                onClick={toggleFAQ}
+                className="btn-micro tap-fade p-2 rounded-full hover:bg-blue-700"
+                title="Help & FAQ"
+              >
+                <HelpCircle className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => setView("dashboard")}
+                className={`btn-micro px-3 py-1 rounded-lg ${
+                  view === "dashboard" ? "bg-blue-800" : "hover:bg-blue-700"
+                } transition-colors duration-200`}
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => setView("add")}
+                className={`btn-micro px-3 py-1 rounded-lg ${
+                  view === "add" ? "bg-blue-800" : "hover:bg-blue-700"
+                } transition-colors duration-200`}
+              >
+                Add Beach
+              </button>
+            </nav>
+          </SwipeNavigator>
         </div>
       </header>
 
@@ -455,21 +475,21 @@ const App = () => {
                     {homeBeach && (
                       <button
                         onClick={() => handleBeachSelect(homeBeach)}
-                        className="rounded-lg bg-white/20 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/30"
+                        className="btn-micro rounded-lg bg-white/20 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/30"
                       >
                         Check {homeBeach.name}
                       </button>
                     )}
                     <button
                       onClick={() => setView("add")}
-                      className="rounded-lg bg-white/90 px-4 py-2 text-sm font-semibold text-blue-700 shadow hover:bg-white"
+                      className="btn-micro rounded-lg bg-white/90 px-4 py-2 text-sm font-semibold text-blue-700 shadow hover:bg-white"
                     >
                       <Plus className="mr-1 inline h-4 w-4" /> Add new spot
                     </button>
                     <button
                       onClick={handleFindNearest}
                       disabled={locating}
-                      className={`rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold transition ${
+                      className={`btn-micro rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold transition ${
                         locating
                           ? 'cursor-not-allowed bg-white/10 text-blue-100'
                           : 'text-white hover:bg-white/20'
@@ -557,149 +577,155 @@ const App = () => {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="relative flex-1">
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder={hasBeaches ? "Search saved spots" : "Search by name or coordinates"}
-                  className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                />
-                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-blue-400">
-                  {hasBeaches
-                    ? `${filteredBeaches.length}/${beaches.length}`
-                    : 'No spots yet'}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <label htmlFor="beach-sort" className="text-xs font-semibold uppercase tracking-wide text-blue-900">
-                  Sort by
-                </label>
-                <select
-                  id="beach-sort"
-                  value={sortOption}
-                  onChange={(event) => setSortOption(event.target.value)}
-                  className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="shelter">Shelter strength</option>
-                  <option value="alpha">Alphabetical</option>
-                  <option value="recent">Recently added</option>
-                </select>
-              </div>
-            </div>
-
-            {hasBeaches ? (
-              filteredBeaches.length === 0 ? (
-                <div className="rounded-2xl border bg-white p-8 text-center shadow-sm">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600">🔍</div>
-                  <h3 className="mt-4 text-xl font-semibold text-gray-800">No matches found</h3>
-                  <p className="mt-2 text-sm text-gray-600">
-                    Try a different beach name, adjust your spelling, or clear the search to see all saved launches.
-                  </p>
-                  <button
-                    onClick={() => setSearchTerm("")}
-                    className="mt-4 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-                  >
-                    Clear search
-                  </button>
+            <PullToRefreshList
+              onRefresh={handleRefreshList}
+              loaderLabel="Refreshing spots"
+              className="mt-2 rounded-2xl border border-blue-50 bg-white/60 p-4 shadow-inner max-h-[70vh] space-y-4"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="relative flex-1">
+                  <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder={hasBeaches ? "Search saved spots" : "Search by name or coordinates"}
+                    className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-blue-400">
+                    {hasBeaches
+                      ? `${filteredBeaches.length}/${beaches.length}`
+                      : 'No spots yet'}
+                  </span>
                 </div>
-              ) : (
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredBeaches.map((beach) => (
-                    <div
-                      key={beach.id}
-                      className={`flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
-                        beach.id === homeBeach?.id ? "border-orange-200 ring-2 ring-orange-300" : "border-gray-100"
-                      }`}
+                <div className="flex items-center gap-2">
+                  <label htmlFor="beach-sort" className="text-xs font-semibold uppercase tracking-wide text-blue-900">
+                    Sort by
+                  </label>
+                  <select
+                    id="beach-sort"
+                    value={sortOption}
+                    onChange={(event) => setSortOption(event.target.value)}
+                    className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option value="shelter">Shelter strength</option>
+                    <option value="alpha">Alphabetical</option>
+                    <option value="recent">Recently added</option>
+                  </select>
+                </div>
+              </div>
+
+              {hasBeaches ? (
+                filteredBeaches.length === 0 ? (
+                  <div className="rounded-2xl border bg-white p-8 text-center shadow-sm">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600">🔍</div>
+                    <h3 className="mt-4 text-xl font-semibold text-gray-800">No matches found</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Try a different beach name, adjust your spelling, or clear the search to see all saved launches.
+                    </p>
+                    <button
+                      onClick={() => setSearchTerm("")}
+                      className="btn-micro mt-4 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
                     >
-                      <div className="flex flex-1 flex-col p-4">
-                        <div className="mb-3 flex items-start justify-between">
-                          <div>
-                            <h2 className="flex items-center text-lg font-semibold text-gray-800">
-                              {beach.id === homeBeach?.id && (
-                                <Home className="mr-1 h-4 w-4 text-orange-500" />
-                              )}
-                              {beach.name}
-                            </h2>
-                            {(() => {
-                              const shelter = getShelterScore(beach);
-                              if (typeof shelter !== "number") return null;
-                              const comfortLevel = shelter >= 75 ? "bg-green-50 text-green-600" : shelter >= 60 ? "bg-yellow-50 text-yellow-600" : "bg-red-50 text-red-600";
-                              return (
-                                <span className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${comfortLevel}`}>
-                                  Shelter {Math.round(shelter)}%
-                                </span>
-                              );
-                            })()}
+                      Clear search
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {filteredBeaches.map((beach) => (
+                      <div
+                        key={beach.id}
+                        className={`card-micro flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition ${
+                          beach.id === homeBeach?.id ? "border-orange-200 ring-2 ring-orange-300" : "border-gray-100"
+                        }`}
+                      >
+                        <div className="flex flex-1 flex-col p-4">
+                          <div className="mb-3 flex items-start justify-between">
+                            <div>
+                              <h2 className="flex items-center text-lg font-semibold text-gray-800">
+                                {beach.id === homeBeach?.id && (
+                                  <Home className="mr-1 h-4 w-4 text-orange-500" />
+                                )}
+                                {beach.name}
+                              </h2>
+                              {(() => {
+                                const shelter = getShelterScore(beach);
+                                if (typeof shelter !== "number") return null;
+                                const comfortLevel = shelter >= 75 ? "bg-green-50 text-green-600" : shelter >= 60 ? "bg-yellow-50 text-yellow-600" : "bg-red-50 text-red-600";
+                                return (
+                                  <span className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${comfortLevel}`}>
+                                    Shelter {Math.round(shelter)}%
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                            <button
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteBeach(beach.id);
+                              }}
+                              className="btn-micro rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-red-500"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           </div>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleDeleteBeach(beach.id);
-                            }}
-                            className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-red-500"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <p className="flex items-center text-sm text-gray-500">
-                          <MapPin className="mr-1 h-3 w-3 text-gray-400" />
-                          {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
-                        </p>
-                        <div className="mt-auto flex items-center justify-between pt-4">
-                          <a
-                            href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs font-medium text-blue-600 hover:underline"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <Map className="mr-1 inline h-3 w-3" /> View on Maps
-                          </a>
-                          <button
-                            onClick={() => handleBeachSelect(beach)}
-                            className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-blue-700"
-                          >
-                            Check conditions
-                          </button>
+                          <p className="flex items-center text-sm text-gray-500">
+                            <MapPin className="mr-1 h-3 w-3 text-gray-400" />
+                            {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
+                          </p>
+                          <div className="mt-auto flex items-center justify-between pt-4">
+                            <a
+                              href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-medium text-blue-600 hover:underline"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <Map className="mr-1 inline h-3 w-3" /> View on Maps
+                            </a>
+                            <button
+                              onClick={() => handleBeachSelect(beach)}
+                              className="btn-micro rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-blue-700"
+                            >
+                              Check conditions
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div className="rounded-2xl border bg-white p-8 text-center shadow-sm">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600">🏝️</div>
+                  <h2 className="mt-4 text-2xl font-bold text-gray-800">No beaches saved yet</h2>
+                  <p className="mt-2 text-gray-600">
+                    Add your favourite paddleboarding launches to unlock personalised forecasts and checklists.
+                  </p>
+                  <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                    <button
+                      onClick={() => setView("add")}
+                      className="btn-micro rounded-lg bg-blue-600 px-6 py-3 text-white shadow hover:bg-blue-700"
+                    >
+                      Add manually
+                    </button>
+                    <button
+                      onClick={handleFindNearest}
+                      disabled={locating}
+                      className={`btn-micro rounded-lg border px-6 py-3 ${
+                        locating
+                          ? 'border-blue-100 text-blue-300'
+                          : 'border-blue-200 text-blue-600 hover:bg-blue-50'
+                      }`}
+                    >
+                      {locating ? 'Locating…' : 'Use my location'}
+                    </button>
+                  </div>
+                  <p className="mt-4 text-sm text-gray-500">
+                    Or open <span className="font-medium">Add Beach</span> to browse curated Greek bays ready to import.
+                  </p>
                 </div>
-              )
-            ) : (
-              <div className="rounded-2xl border bg-white p-8 text-center shadow-sm">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600">🏝️</div>
-                <h2 className="mt-4 text-2xl font-bold text-gray-800">No beaches saved yet</h2>
-                <p className="mt-2 text-gray-600">
-                  Add your favourite paddleboarding launches to unlock personalised forecasts and checklists.
-                </p>
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                  <button
-                    onClick={() => setView("add")}
-                    className="rounded-lg bg-blue-600 px-6 py-3 text-white shadow hover:bg-blue-700"
-                  >
-                    Add manually
-                  </button>
-                  <button
-                    onClick={handleFindNearest}
-                    disabled={locating}
-                    className={`rounded-lg border px-6 py-3 ${
-                      locating
-                        ? 'border-blue-100 text-blue-300'
-                        : 'border-blue-200 text-blue-600 hover:bg-blue-50'
-                    }`}
-                  >
-                    {locating ? 'Locating…' : 'Use my location'}
-                  </button>
-                </div>
-                <p className="mt-4 text-sm text-gray-500">
-                  Or open <span className="font-medium">Add Beach</span> to browse curated Greek bays ready to import.
-                </p>
-              </div>
-            )}
+              )}
+            </PullToRefreshList>
 
             <div className="grid gap-4 md:grid-cols-3">
               {knowledgeCards.map((card) => {
@@ -962,10 +988,15 @@ const App = () => {
 
       {/* Mobile quick actions */}
       <div className="fixed inset-x-4 bottom-4 z-40 md:hidden">
-        <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-white p-3 shadow-xl backdrop-blur">
+        <SwipeNavigator
+          views={navigableViews}
+          activeView={view}
+          onChange={setView}
+          className="flex items-center justify-between rounded-2xl border border-blue-100 bg-white p-3 shadow-xl backdrop-blur"
+        >
           <button
             onClick={() => setView("dashboard")}
-            className={`flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold ${
+            className={`btn-micro flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold ${
               view === "dashboard" ? "bg-blue-50 text-blue-700" : "text-blue-800 hover:bg-blue-50"
             }`}
           >
@@ -974,7 +1005,7 @@ const App = () => {
           </button>
           <button
             onClick={() => setView("add")}
-            className={`flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold ${
+            className={`btn-micro flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold ${
               view === "add" ? "bg-blue-50 text-blue-700" : "text-blue-800 hover:bg-blue-50"
             }`}
           >
@@ -983,7 +1014,7 @@ const App = () => {
           </button>
           <button
             onClick={handleFindNearest}
-            className="flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
+            className="btn-micro flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
             disabled={locating}
           >
             <MapPin className="h-4 w-4" />
@@ -991,12 +1022,12 @@ const App = () => {
           </button>
           <button
             onClick={toggleFAQ}
-            className="flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
+            className="btn-micro flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
           >
             <HelpCircle className="h-4 w-4" />
             Help
           </button>
-        </div>
+        </SwipeNavigator>
       </div>
 
       {/* Footer with Last Updated Time */}
