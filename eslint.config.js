@@ -16,6 +16,7 @@ const nodeGlobals = Object.fromEntries(
 export default [
   js.configs.recommended,
   {
+    ignores: ['dist', 'node_modules'],
     files: ['**/*.{js,jsx,ts,tsx}'],
     languageOptions: {
       parser: tsParser,
