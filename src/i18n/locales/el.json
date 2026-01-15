@@ -12,11 +12,17 @@
   "dashboard": {
     "title": "Οι Παραλίες σας",
     "noBeaches": "Δεν έχετε αποθηκευμένες παραλίες",
-    "addBeachHint": "Προσθέστε παραλία με Google Maps URL ή συντεταγμένες",
+    "addBeachHint": "Προσθήκη Παραλίας",
     "totalBeaches": "Συνολικές Παραλίες",
     "homeBeach": "Αρχική Παραλία",
     "setAsHome": "Ορισμός ως Αρχική",
-    "viewConditions": "Δείτε Συνθήκες"
+    "viewConditions": "Δείτε Συνθήκες",
+    "planNextPaddle": "Σχεδιάστε την επόμενη κωπηλασία",
+    "savedSpots": "Αποθηκευμένα σημεία",
+    "shelteredBays": "Προστατευμένοι κόλποι",
+    "lastForecast": "Τελευταία πρόγνωση",
+    "checkConditions": "Ελέγξτε συνθήκες",
+    "addNewSpot": "Νέο σημείο"
   },
   "search": {
     "placeholder": "Αναζήτηση ή προσθήκη παραλίας (Google Maps URL ή συντεταγμένες)",
@@ -140,7 +146,10 @@
     "back": "Πίσω",
     "select": "Επιλογή",
     "close": "Κλείσιμο",
-    "tryAgain": "Προσπαθήστε Ξανά"
+    "tryAgain": "Προσπαθήστε Ξανά",
+    "locating": "Εντοπισμός…",
+    "view": "Προβολή",
+    "nearby": "Κοντά"
   },
   "charts": {
     "overview": "Επισκόπηση Συνθηκών",

@@ -1,14 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Home,
   Map,
   MapPin,
-  Smartphone,
   Plus,
   Trash2,
   HelpCircle,
   Image as ImageIcon,
-  Navigation,
   Compass,
   LifeBuoy,
   ListChecks,
@@ -31,6 +30,8 @@ import FAQ from "./FAQ"; // Import the new FAQ component
 const RECENT_SEARCH_KEY = "sup-recent-searches";
 
 const App = () => {
+  const { t } = useTranslation();
+
   // State
   const [view, setView] = useState("dashboard");
   const [selectedBeach, setSelectedBeach] = useState(null);
@@ -518,7 +519,7 @@ const App = () => {
                   }`}
                 >
                   <Compass className="h-4 w-4 inline mr-1.5" />
-                  Dashboard
+                  {t('nav.home')}
                 </button>
                 <button
                   onClick={() => setView("add")}
@@ -529,7 +530,7 @@ const App = () => {
                   }`}
                 >
                   <Plus className="h-4 w-4 inline mr-1.5" />
-                  Add Beach
+                  {t('dashboard.addBeachHint', 'Add Beach')}
                 </button>
               </div>
 
@@ -567,7 +568,7 @@ const App = () => {
                 }`}
               >
                 <Compass className="h-5 w-5" />
-                <span className="font-medium">Dashboard</span>
+                <span className="font-medium">{t('nav.home')}</span>
               </button>
               <button
                 onClick={() => { setView("add"); setMobileMenuOpen(false); }}
@@ -578,14 +579,14 @@ const App = () => {
                 }`}
               >
                 <Plus className="h-5 w-5" />
-                <span className="font-medium">Add Beach</span>
+                <span className="font-medium">{t('nav.beaches')}</span>
               </button>
               <button
                 onClick={() => { toggleFAQ(); setMobileMenuOpen(false); }}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-white/70 hover:bg-white/10 transition-all"
               >
                 <HelpCircle className="h-5 w-5" />
-                <span className="font-medium">Help & FAQ</span>
+                <span className="font-medium">{t('nav.help')}</span>
               </button>
               <div className="px-4 py-3">
                 <LanguageSwitcher showLabel className="w-full justify-center" />
@@ -612,13 +613,7 @@ const App = () => {
                 />
                 <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <div className="flex items-center text-sm uppercase tracking-widest text-blue-100">
-                      <Compass className="mr-2 h-4 w-4" /> Paddleboard planner
-                    </div>
-                    <h2 className="mt-2 text-3xl font-bold">Plan your next paddle</h2>
-                    <p className="mt-2 max-w-xl text-blue-100">
-                      Review real-time wind, swell and shelter analysis to pick the calmest launch window and keep a log of your favourite SUP spots.
-                    </p>
+                    <h2 className="text-3xl font-bold">{t('dashboard.planNextPaddle')}</h2>
                   </div>
                   <div className="flex flex-wrap gap-3">
                     {homeBeach && (
@@ -626,14 +621,14 @@ const App = () => {
                         onClick={() => handleBeachSelect(homeBeach)}
                         className="rounded-lg bg-white/20 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/30"
                       >
-                        Check {homeBeach.name}
+                        {homeBeach.name}
                       </button>
                     )}
                     <button
                       onClick={() => setView("add")}
                       className="rounded-lg bg-white/90 px-4 py-2 text-sm font-semibold text-blue-700 shadow hover:bg-white"
                     >
-                      <Plus className="mr-1 inline h-4 w-4" /> Add new spot
+                      <Plus className="mr-1 inline h-4 w-4" /> {t('dashboard.addNewSpot')}
                     </button>
                     <button
                       onClick={handleFindNearest}
@@ -644,41 +639,25 @@ const App = () => {
                           : 'text-white hover:bg-white/20'
                       }`}
                     >
-                      {locating ? 'Locating…' : 'Find calm bay nearby'}
+                      {locating ? t('common.locating') : t('search.findNearby')}
                     </button>
                   </div>
                 </div>
                 <div className="relative mt-6 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-xl bg-white/15 px-4 py-3 text-sm">
-                    <p className="text-blue-100">Saved spots</p>
+                    <p className="text-blue-100">{t('dashboard.savedSpots')}</p>
                     <p className="text-2xl font-semibold">{beaches.length}</p>
                   </div>
                   <div className="rounded-xl bg-white/15 px-4 py-3 text-sm">
-                    <p className="text-blue-100">Sheltered bays</p>
+                    <p className="text-blue-100">{t('dashboard.shelteredBays')}</p>
                     <p className="text-2xl font-semibold">{shelteredCount}</p>
                   </div>
                   <div className="rounded-xl bg-white/15 px-4 py-3 text-sm">
-                    <p className="text-blue-100">Last forecast</p>
+                    <p className="text-blue-100">{t('dashboard.lastForecast')}</p>
                     <p className="text-2xl font-semibold">{lastUpdated ? formattedUpdateTime : "–"}</p>
                     {lastUpdated && (
                       <p className="text-xs text-blue-100">{formattedUpdateDate}</p>
                     )}
-                  </div>
-                </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="flex items-center gap-3 rounded-xl bg-white/15 p-3 text-sm text-blue-50 backdrop-blur">
-                    <Smartphone className="h-5 w-5" />
-                    <div>
-                      <p className="font-semibold">Built for iPhone</p>
-                      <p className="text-blue-100">Sticky actions and thumb-friendly controls on small screens.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 rounded-xl bg-white/15 p-3 text-sm text-blue-50 backdrop-blur">
-                    <Navigation className="h-5 w-5" />
-                    <div>
-                      <p className="font-semibold">Any Greek beach works</p>
-                      <p className="text-blue-100">Paste coordinates or a Maps link—Aegean, Ionian, Crete and more.</p>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -917,7 +896,7 @@ const App = () => {
                             onClick={() => handleBeachSelect(beach)}
                             className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-blue-700"
                           >
-                            Check conditions
+                            {t('dashboard.checkConditions')}
                           </button>
                         </div>
                       </div>
@@ -1284,7 +1263,7 @@ const App = () => {
             }`}
           >
             <Home className="h-4 w-4" />
-            Home
+            {t('nav.home')}
           </button>
           <button
             onClick={() => setView("add")}
@@ -1293,7 +1272,7 @@ const App = () => {
             }`}
           >
             <Plus className="h-4 w-4" />
-            Add
+            +
           </button>
           <button
             onClick={handleFindNearest}
@@ -1301,14 +1280,14 @@ const App = () => {
             disabled={locating}
           >
             <MapPin className="h-4 w-4" />
-            {locating ? "Locating" : "Nearby"}
+            {locating ? t('common.locating') : t('common.nearby')}
           </button>
           <button
             onClick={toggleFAQ}
             className="flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
           >
             <HelpCircle className="h-4 w-4" />
-            Help
+            {t('nav.help')}
           </button>
         </div>
       </div>
