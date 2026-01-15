@@ -786,7 +786,7 @@ const FixedBeachView = ({
     const InfoTip = ({ tip }) => (
       <span className="relative group ml-1 cursor-help">
         <Info className="h-3.5 w-3.5 text-gray-400 inline hover:text-blue-500" />
-        <span className="absolute left-0 bottom-full mb-2 w-48 p-2 text-xs text-white bg-gray-800 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+        <span className="absolute left-0 bottom-full mb-2 w-64 p-2 text-xs text-white bg-gray-800 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none whitespace-normal">
           {tip}
         </span>
       </span>
