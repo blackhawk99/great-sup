@@ -1271,45 +1271,6 @@ const App = () => {
         )}
       </main>
 
-      {/* Mobile quick actions */}
-      <div className="fixed inset-x-4 bottom-4 z-40 md:hidden">
-        <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-white p-3 shadow-xl backdrop-blur">
-          <button
-            onClick={() => setView("dashboard")}
-            className={`flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold ${
-              view === "dashboard" ? "bg-blue-50 text-blue-700" : "text-blue-800 hover:bg-blue-50"
-            }`}
-          >
-            <Home className="h-4 w-4" />
-            {t('nav.home')}
-          </button>
-          <button
-            onClick={() => setView("add")}
-            className={`flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold ${
-              view === "add" ? "bg-blue-50 text-blue-700" : "text-blue-800 hover:bg-blue-50"
-            }`}
-          >
-            <Plus className="h-4 w-4" />
-            +
-          </button>
-          <button
-            onClick={handleFindNearest}
-            className="flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
-            disabled={locating}
-          >
-            <MapPin className="h-4 w-4" />
-            {locating ? t('common.locating') : t('common.nearby')}
-          </button>
-          <button
-            onClick={toggleFAQ}
-            className="flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
-          >
-            <HelpCircle className="h-4 w-4" />
-            {t('nav.help')}
-          </button>
-        </div>
-      </div>
-
       {/* Footer with Last Updated Time */}
       <footer className="bg-blue-800 text-white p-4 mt-auto shadow-inner">
         <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center">
