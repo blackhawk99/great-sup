@@ -1,0 +1,153 @@
+{
+  "app": {
+    "title": "SUP Weather Advisor",
+    "subtitle": "Find the perfect conditions for paddleboarding in Greece"
+  },
+  "nav": {
+    "home": "Home",
+    "beaches": "Beaches",
+    "help": "Help",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Your Beaches",
+    "noBeaches": "No beaches saved yet",
+    "addBeachHint": "Add a beach using Google Maps URL or coordinates",
+    "totalBeaches": "Total Beaches",
+    "homeBeach": "Home Beach",
+    "setAsHome": "Set as Home",
+    "viewConditions": "View Conditions"
+  },
+  "search": {
+    "placeholder": "Search or add beach (Google Maps URL or coordinates)",
+    "recentSearches": "Recent Searches",
+    "suggestions": "Suggested Beaches",
+    "findNearby": "Find Calm Bay Nearby"
+  },
+  "beach": {
+    "name": "Beach Name",
+    "coordinates": "Coordinates",
+    "shelter": "Shelter",
+    "delete": "Delete",
+    "confirmDelete": "Confirm Deletion",
+    "confirmDeleteMessage": "Are you sure you want to remove {{name}}?"
+  },
+  "weather": {
+    "title": "Weather Conditions",
+    "loading": "Loading weather data...",
+    "error": "Failed to load weather data",
+    "retry": "Retry",
+    "wind": "Wind",
+    "windSpeed": "Wind Speed",
+    "windGusts": "Gusts",
+    "windDirection": "Direction",
+    "waves": "Waves",
+    "waveHeight": "Wave Height",
+    "swellHeight": "Swell Height",
+    "swellPeriod": "Swell Period",
+    "temperature": "Temperature",
+    "airTemp": "Air Temperature",
+    "waterTemp": "Water Temperature",
+    "precipitation": "Precipitation",
+    "cloudCover": "Cloud Cover",
+    "tides": "Tides",
+    "tideHeight": "Tide Height",
+    "currents": "Currents",
+    "currentSpeed": "Current Speed"
+  },
+  "score": {
+    "title": "Paddle Score",
+    "excellent": "Excellent",
+    "good": "Good",
+    "fair": "Fair",
+    "poor": "Poor",
+    "dangerous": "Dangerous",
+    "dataQuality": "Data Quality",
+    "breakdown": "Score Breakdown"
+  },
+  "safety": {
+    "title": "Safety Information",
+    "warnings": "Warnings",
+    "thunderstorm": "THUNDERSTORM WARNING",
+    "thunderstormMessage": "Lightning is extremely dangerous on water - DO NOT paddle!",
+    "coldWater": "Cold Water Warning",
+    "coldWaterMessage": "Water temperature below 15°C - wear a wetsuit!",
+    "strongCurrents": "Strong Currents",
+    "strongGusts": "Strong Gusts",
+    "recommendation": "Skill Level Recommendation",
+    "beginner": "Beginner",
+    "intermediate": "Intermediate",
+    "advanced": "Advanced",
+    "expert": "Expert Only",
+    "sweetSpot": "Best Time",
+    "gamePlan": "Session Game Plan"
+  },
+  "time": {
+    "selectDate": "Select Date",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "startTime": "Start Time",
+    "endTime": "End Time",
+    "hours": "hours"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "howToUse": "How do I use this app?",
+    "howToUseAnswer": "Add beaches using Google Maps URLs or coordinates, then check conditions for the best paddling times.",
+    "whatIsScore": "What does the Paddle Score mean?",
+    "whatIsScoreAnswer": "The Paddle Score (0-100) combines wind, waves, weather, and geographic protection to rate paddling conditions.",
+    "howProtectionWorks": "How does geographic protection work?",
+    "howProtectionWorksAnswer": "We analyze the coastline and nearby islands to determine how much natural shelter a beach has from wind and waves."
+  },
+  "units": {
+    "kmh": "km/h",
+    "ms": "m/s",
+    "meters": "m",
+    "celsius": "°C",
+    "percent": "%",
+    "mm": "mm"
+  },
+  "directions": {
+    "N": "N",
+    "NNE": "NNE",
+    "NE": "NE",
+    "ENE": "ENE",
+    "E": "E",
+    "ESE": "ESE",
+    "SE": "SE",
+    "SSE": "SSE",
+    "S": "S",
+    "SSW": "SSW",
+    "SW": "SW",
+    "WSW": "WSW",
+    "W": "W",
+    "WNW": "WNW",
+    "NW": "NW",
+    "NNW": "NNW"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "back": "Back",
+    "select": "Select",
+    "close": "Close",
+    "tryAgain": "Try Again"
+  },
+  "charts": {
+    "overview": "Conditions Overview",
+    "windForecast": "Wind Forecast",
+    "waveForecast": "Wave Forecast",
+    "tempForecast": "Temperature Forecast",
+    "caution": "Caution",
+    "coldWater": "Cold Water"
+  }
+}

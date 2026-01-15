@@ -497,8 +497,8 @@ return {
 }
 
 // Main geographic protection analysis function
-import { getCachedProtection, setCachedProtection } from './protectionCache';
-import { adjustDirectionForSeason } from './seasonal';
+import { getCachedProtection, setCachedProtection } from './protectionCache.js';
+import { adjustDirectionForSeason } from './seasonal.js';
 
 export const calculateGeographicProtection = async (beach, windDirection, waveDirection, date = new Date()) => {
   if (!beach || !beach.latitude || !beach.longitude) {
