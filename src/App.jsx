@@ -19,8 +19,11 @@ import {
   Moon,
   Link as LinkIcon,
   Eye,
-  Search
+  Search,
+  Menu,
+  X
 } from "lucide-react";
+import { Logo, LogoCompact } from "./components/Logo";
 import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers.jsx";
@@ -51,6 +54,7 @@ const App = () => {
   const [locating, setLocating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("shelter");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, resolvedTheme, setTheme } = useTheme();
   const greekBounds = {
     latMin: 34.6,
@@ -487,85 +491,172 @@ const App = () => {
       <FAQ isOpen={showFAQ} onClose={() => setShowFAQ(false)} />
       
       {/* Header */}
-      <header className="bg-blue-600 text-white p-4 shadow-md dark:bg-slate-900">
-        <div className="container mx-auto flex justify-between items-center">
-          <h1
-            className="text-2xl font-bold flex items-center cursor-pointer hover:text-blue-100 transition-colors"
-            onClick={() => setView("dashboard")}
-          >
-            <div className="mr-2 text-3xl">🌊</div>
-            Paddleboard Weather Advisor
-          </h1>
-          <nav className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
+      <header className="relative bg-gradient-to-r from-slate-900 via-blue-900 to-cyan-900 text-white shadow-xl">
+        {/* Decorative wave pattern */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10">
+          <svg className="absolute bottom-0 w-full h-12" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,60 C200,120 400,0 600,60 C800,120 1000,0 1200,60 L1200,120 L0,120 Z" fill="currentColor" />
+          </svg>
+        </div>
+
+        <div className="container mx-auto px-4 py-3 relative">
+          <div className="flex items-center justify-between">
+            {/* Logo */}
             <button
-              onClick={toggleFAQ}
-              className="p-2 rounded-full hover:bg-blue-700 transition"
-              title="Help & FAQ"
+              onClick={() => { setView("dashboard"); setMobileMenuOpen(false); }}
+              className="hover:opacity-90 transition-opacity"
             >
-              <HelpCircle className="h-5 w-5" />
+              <div className="hidden sm:block">
+                <Logo />
+              </div>
+              <div className="sm:hidden">
+                <LogoCompact />
+              </div>
             </button>
-            <div className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-xs font-semibold uppercase tracking-wide">
-              <span className="sr-only">Theme selection</span>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center gap-3">
+              {/* Nav buttons */}
+              <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1">
+                <button
+                  onClick={() => setView("dashboard")}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    view === "dashboard"
+                      ? "bg-white/20 text-white shadow-lg"
+                      : "text-white/70 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <Compass className="h-4 w-4 inline mr-1.5" />
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => setView("add")}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    view === "add"
+                      ? "bg-white/20 text-white shadow-lg"
+                      : "text-white/70 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <Plus className="h-4 w-4 inline mr-1.5" />
+                  Add Beach
+                </button>
+              </div>
+
+              {/* Theme switcher */}
+              <div className="flex items-center gap-0.5 bg-white/5 rounded-full p-1">
+                <button
+                  onClick={() => setTheme("light")}
+                  className={`p-2 rounded-full transition-all ${
+                    theme === "light" ? "bg-amber-400 text-slate-900" : "text-white/60 hover:text-white"
+                  }`}
+                  title="Light mode"
+                >
+                  <Sun className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setTheme("system")}
+                  className={`p-2 rounded-full transition-all ${
+                    theme === "system" ? "bg-purple-400 text-slate-900" : "text-white/60 hover:text-white"
+                  }`}
+                  title="System theme"
+                >
+                  <Sparkles className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setTheme("dark")}
+                  className={`p-2 rounded-full transition-all ${
+                    theme === "dark" ? "bg-indigo-400 text-slate-900" : "text-white/60 hover:text-white"
+                  }`}
+                  title="Dark mode"
+                >
+                  <Moon className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Help button */}
               <button
-                type="button"
-                aria-label="Use light theme"
-                aria-pressed={theme === "light"}
-                onClick={() => setTheme("light")}
-                className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
-                  theme === "light"
-                    ? "bg-white/80 text-blue-700"
-                    : "text-white hover:bg-white/20"
+                onClick={toggleFAQ}
+                className="p-2 rounded-full bg-white/5 hover:bg-white/15 transition-colors"
+                title="Help & FAQ"
+              >
+                <HelpCircle className="h-5 w-5 text-white/70" />
+              </button>
+            </nav>
+
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
+
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && (
+            <nav className="md:hidden mt-4 pb-2 border-t border-white/10 pt-4 space-y-2">
+              <button
+                onClick={() => { setView("dashboard"); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
+                  view === "dashboard"
+                    ? "bg-white/20 text-white"
+                    : "text-white/70 hover:bg-white/10"
                 }`}
               >
-                <Sun className="h-4 w-4" />
-                <span className="hidden sm:inline">Light</span>
+                <Compass className="h-5 w-5" />
+                <span className="font-medium">Dashboard</span>
               </button>
               <button
-                type="button"
-                aria-label="Use system theme"
-                aria-pressed={theme === "system"}
-                onClick={() => setTheme("system")}
-                className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
-                  theme === "system"
-                    ? "bg-white/80 text-blue-700"
-                    : "text-white hover:bg-white/20"
+                onClick={() => { setView("add"); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
+                  view === "add"
+                    ? "bg-white/20 text-white"
+                    : "text-white/70 hover:bg-white/10"
                 }`}
               >
-                <Sparkles className="h-4 w-4" />
-                <span className="hidden sm:inline">Auto</span>
+                <Plus className="h-5 w-5" />
+                <span className="font-medium">Add Beach</span>
               </button>
               <button
-                type="button"
-                aria-label="Use dark theme"
-                aria-pressed={theme === "dark"}
-                onClick={() => setTheme("dark")}
-                className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
-                  theme === "dark"
-                    ? "bg-white/80 text-blue-700"
-                    : "text-white hover:bg-white/20"
-                }`}
+                onClick={() => { toggleFAQ(); setMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-white/70 hover:bg-white/10 transition-all"
               >
-                <Moon className="h-4 w-4" />
-                <span className="hidden sm:inline">Dark</span>
+                <HelpCircle className="h-5 w-5" />
+                <span className="font-medium">Help & FAQ</span>
               </button>
-            </div>
-            <button
-              onClick={() => setView("dashboard")}
-              className={`px-3 py-1 rounded-lg ${
-                view === "dashboard" ? "bg-blue-800" : "hover:bg-blue-700"
-              } transition-colors duration-200`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setView("add")}
-              className={`px-3 py-1 rounded-lg ${
-                view === "add" ? "bg-blue-800" : "hover:bg-blue-700"
-              } transition-colors duration-200`}
-            >
-              Add Beach
-            </button>
-          </nav>
+
+              {/* Mobile theme switcher */}
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <span className="text-xs text-white/50 uppercase tracking-wide">Theme:</span>
+                <div className="flex items-center gap-1 bg-white/5 rounded-full p-1">
+                  <button
+                    onClick={() => setTheme("light")}
+                    className={`p-2 rounded-full transition-all ${
+                      theme === "light" ? "bg-amber-400 text-slate-900" : "text-white/60"
+                    }`}
+                  >
+                    <Sun className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setTheme("system")}
+                    className={`p-2 rounded-full transition-all ${
+                      theme === "system" ? "bg-purple-400 text-slate-900" : "text-white/60"
+                    }`}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setTheme("dark")}
+                    className={`p-2 rounded-full transition-all ${
+                      theme === "dark" ? "bg-indigo-400 text-slate-900" : "text-white/60"
+                    }`}
+                  >
+                    <Moon className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </nav>
+          )}
         </div>
       </header>
 
