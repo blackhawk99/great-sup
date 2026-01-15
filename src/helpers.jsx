@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight, AlertCircle } from "lucide-react";
-import { parseGoogleMapsUrl } from "./googleMapsUtils.js";
+import { parseGoogleMapsUrl } from "./googleMapsUtils";
 
 export { parseGoogleMapsUrl };
 
