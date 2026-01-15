@@ -356,13 +356,7 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     // Advanced bay geometry analysis
     const bayGeometry = analyzeBayGeometry(beachPoint);
     
-    // Apply special checks for Vathy Bay specifically
-    let isVathySifnos = false;
-    // Check if this is Vathy Bay on Sifnos (known highly protected bay)
-    if (Math.abs(latitude - 36.9386) < 0.01 && Math.abs(longitude - 24.6750) < 0.01) {
-      console.log("Identified as Vathy Bay (Sifnos) by coordinates");
-      isVathySifnos = true;
-    }
+    // Bay detection is now handled algorithmically - no hardcoded overrides
     
     // Find the nearest coastline segment
     const nearestSegment = findNearestCoastlineSegment(beachPoint, greeceCoastlines);
@@ -395,8 +389,8 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     
     // Calculate weighted enclosure score based on bay type
     let enclosureScore;
-    
-    if (isVathySifnos || bayGeometry.isDeepBay) {
+
+    if (bayGeometry.isDeepBay) {
       // Deep bay - high protection
       enclosureScore = Math.min(0.95, (shortEnclosure * 0.3) + (mediumEnclosure * 0.3) + (longEnclosure * 0.4) + 0.2);
       console.log("Using deep bay enclosure calculation:", enclosureScore);
@@ -445,8 +439,8 @@ const totalWaveProtection = Math.min(1.0, bestWaveProtection * (0.5 + 0.5 * encl
       0.4 * enclosureScore
     ) * 100;
     
-    // Special case for Vathy - ensure highest protection
-    const finalScore = isVathySifnos ? 95 : protectionScore;
+    // Use calculated protection score (no hardcoded overrides)
+    const finalScore = protectionScore;
     
 return {
   protectionScore: finalScore,
@@ -472,16 +466,17 @@ return {
     };
   } catch (error) {
     console.error("Error in coastline analysis:", error);
-    // Return default values as fallback
+    // Return WORST-CASE values as fallback (assume fully exposed for safety)
     return {
-      protectionScore: 50,
+      protectionScore: 0,
       coastlineAngle: 0,
-      enclosureScore: 0.5,
-      windProtection: 0.5,
-      waveProtection: 0.5,
-      bayEnclosure: 0.5,
-      isProtected: true,
-      description: "Could not analyze coastline protection. Using default values."
+      enclosureScore: 0,
+      windProtection: 0,
+      waveProtection: 0,
+      bayEnclosure: 0,
+      isProtected: false,
+      analysisError: true,
+      description: "Could not analyze coastline protection. Assuming fully exposed conditions for safety."
     };
   }
 }
@@ -514,14 +509,15 @@ export const calculateGeographicProtection = async (beach, windDirection, waveDi
     return dynamicAnalysis;
   } catch (error) {
     console.error("Dynamic protection analysis failed:", error);
-    
-    // Fallback to simple estimation
+
+    // Fallback to WORST-CASE (assume fully exposed for safety)
     return {
-      protectionScore: 50,
-      windProtection: 0.5,
-      waveProtection: 0.5,
-      bayEnclosure: 0.5,
-      isProtected: true
+      protectionScore: 0,
+      windProtection: 0,
+      waveProtection: 0,
+      bayEnclosure: 0,
+      isProtected: false,
+      analysisError: true
     };
   }
 };
