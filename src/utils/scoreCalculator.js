@@ -17,7 +17,6 @@ const WORST_CASE_DEFAULTS = {
   temperature: 10,      // Cold air (hypothermia risk) - °C
   waterTemperature: 12, // Cold water (hypothermia risk) - °C
   cloudcover: 100,      // Overcast - %
-  tideHeight: 0,        // Extreme low tide - meters
   currentSpeed: 2.0,    // Strong current - m/s
 };
 
@@ -28,7 +27,7 @@ const WORST_CASE_DEFAULTS = {
  * @param hours  Array of hourly-condition objects from fetchPaddleConditions
  * @param range  { startIndex, endIndex } slice into hours
  * @returns { totalScore, breakdown: { wind, waves, swell, precipitation,
- *   temperature, cloudcover, geographic, tide, currents }, dataQuality }
+ *   temperature, cloudcover, geographic, currents }, dataQuality }
  */
 export async function calculatePaddleScore(beach, hours, range) {
   const slice = hours.slice(range.startIndex, range.endIndex + 1);
@@ -63,7 +62,6 @@ export async function calculatePaddleScore(beach, hours, range) {
   const temp        = avg('temperature');
   const waterTemp   = avg('waterTemperature');
   const cloud       = avg('cloudcover');
-  const tide        = avg('tideHeight');
   const currentSpd  = avg('currentSpeed');
 
   // Check for thunderstorms (WMO codes 95-99)
@@ -98,23 +96,23 @@ export async function calculatePaddleScore(beach, hours, range) {
   const effectiveSwellSeverity = swellHeight / swellPeriodFactor; // Adjusted for period
 
   // Scoring weights (normalized to sum to 100)
-  // For SUP: Wind & Waves equally critical, Water temp important for safety, Air temp less so (can wear layers)
-  // Wind: 20, Waves: 20, Swell: 8, Gusts: 5, Precip: 4, AirTemp: 4, WaterTemp: 12, Cloud: 3, Geo: 8, Tide: 8, Currents: 8
-  const ptsWind      = linearScore(protectedWindSpeed, 0, 20) * 20;
-  const ptsWaves     = linearScore(protectedWaveHeight, 0, 1.0) * 20;
+  // For SUP: Wind & Waves equally critical, Water temp important for safety
+  // Wind: 23, Waves: 23, Swell: 8, Gusts: 5, Precip: 4, AirTemp: 4, WaterTemp: 14, Cloud: 3, Geo: 8, Currents: 8
+  // Note: Tides removed (Mediterranean tides are <30cm, not relevant for SUP)
+  const ptsWind      = linearScore(protectedWindSpeed, 0, 20) * 23;
+  const ptsWaves     = linearScore(protectedWaveHeight, 0, 1.0) * 23;
   const ptsSwell     = linearScore(effectiveSwellSeverity, 0, 0.5) * 8;
   const ptsGusts     = clamp(1 - gustPenalty, 0, 1) * 5;
   const ptsPrecip    = linearScore(precip, 0, 5) * 4;
   const ptsTemp      = bellScore(temp, 15, 30) * 4;       // Air temperature - wider range, can wear layers
-  const ptsWaterTemp = bellScore(waterTemp, 18, 26) * 12; // Water temperature (crucial for safety)
+  const ptsWaterTemp = bellScore(waterTemp, 18, 26) * 14; // Water temperature (crucial for safety)
   const ptsCloud     = linearScore(cloud, 0, 100) * 3;
   const ptsGeo       = clamp((20 - protectedWindSpeed) / 20, 0, 1) * 8;
-  const ptsTide      = inRangeScore(tide, 0.5, 2.0) * 8;
   const ptsCurrents  = clamp(1 - clamp(currentSpd / 1.5, 0, 1), 0, 1) * 8;
 
   let total = Math.round(
     ptsWind + ptsWaves + ptsSwell + ptsGusts + ptsPrecip +
-    ptsTemp + ptsWaterTemp + ptsCloud + ptsGeo + ptsTide + ptsCurrents
+    ptsTemp + ptsWaterTemp + ptsCloud + ptsGeo + ptsCurrents
   );
 
   // CRITICAL: Thunderstorms make conditions extremely dangerous
@@ -162,7 +160,6 @@ export async function calculatePaddleScore(beach, hours, range) {
       waterTemperature:{ value: waterTemp,            score: Math.round(ptsWaterTemp) },
       cloudcover:      { value: cloud,                score: Math.round(ptsCloud) },
       geographic:      { value: null,                 score: Math.round(ptsGeo) },
-      tide:            { value: tide,                 score: Math.round(ptsTide) },
       currents:        { value: currentSpd,           score: Math.round(ptsCurrents) },
     }
   };
@@ -197,16 +194,6 @@ function bellScore(val, idealLow, idealHigh) {
   // e.g., for 28°C ideal, score hits 0 at 40°C (heat exhaustion)
   const distanceFromIdeal = val - idealHigh;
   return clamp(1 - distanceFromIdeal / 12, 0, 1);
-}
-
-function inRangeScore(val, low, high) {
-  if (val >= low && val <= high) return 1;
-  // Guard against division by zero
-  if (low === 0 && val < low) return 0;
-  if (val < low)  return clamp(val / low, 0, 1);
-  // above high: taper off linearly
-  if (high === 0) return 0;
-  return clamp((high * 2 - val) / high, 0, 1);
 }
 
 /**

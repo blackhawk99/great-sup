@@ -285,7 +285,7 @@ describe('scoreCalculator', () => {
       expect(result.breakdown).toHaveProperty('waterTemperature')
       expect(result.breakdown).toHaveProperty('cloudcover')
       expect(result.breakdown).toHaveProperty('geographic')
-      expect(result.breakdown).toHaveProperty('tide')
+      // Note: tide removed - Mediterranean tides are <30cm, not relevant for SUP
       expect(result.breakdown).toHaveProperty('currents')
 
       // Each breakdown should have value and score

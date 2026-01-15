@@ -29,8 +29,7 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
     <button
       onClick={toggleLanguage}
       className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors
-        bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600
-        text-gray-700 dark:text-gray-200 ${className}`}
+        bg-white/10 hover:bg-white/20 text-white ${className}`}
       aria-label={`Switch language to ${i18n.language === 'en' ? 'Greek' : 'English'}`}
     >
       <Globe className="h-4 w-4" />
@@ -60,8 +59,7 @@ export const LanguageDropdown: React.FC<{ className?: string }> = ({ className =
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-4 py-2 w-full rounded-lg border
-          border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700
-          text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+          border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
       >
         <Globe className="h-4 w-4" />
         <span className="text-lg">{languages.find(l => l.code === i18n.language)?.flag}</span>
@@ -74,18 +72,18 @@ export const LanguageDropdown: React.FC<{ className?: string }> = ({ className =
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-700
-          border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-50">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white
+          border border-gray-300 rounded-lg shadow-lg z-50">
           {languages.map(lang => (
             <button
               key={lang.code}
               onClick={() => handleSelect(lang.code)}
               className={`flex items-center gap-2 px-4 py-2 w-full text-left
-                hover:bg-gray-100 dark:hover:bg-gray-600 first:rounded-t-lg last:rounded-b-lg
-                ${lang.code === i18n.language ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
+                hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg
+                ${lang.code === i18n.language ? 'bg-blue-50' : ''}`}
             >
               <span className="text-lg">{lang.flag}</span>
-              <span className="text-gray-700 dark:text-gray-200">{lang.name}</span>
+              <span className="text-gray-700">{lang.name}</span>
               {lang.code === i18n.language && (
                 <svg className="h-4 w-4 ml-auto text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

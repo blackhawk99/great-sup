@@ -15,8 +15,6 @@ import {
   Waves,
   Sparkles,
   Sunrise,
-  Sun,
-  Moon,
   Link as LinkIcon,
   Eye,
   Search,
@@ -24,11 +22,11 @@ import {
   X
 } from "lucide-react";
 import { Logo, LogoCompact } from "./components/Logo";
+import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers.jsx";
 import FAQ from "./FAQ"; // Import the new FAQ component
-import { useTheme } from "./utils/themeContext.jsx";
 
 const RECENT_SEARCH_KEY = "sup-recent-searches";
 
@@ -55,7 +53,6 @@ const App = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("shelter");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { theme, resolvedTheme, setTheme } = useTheme();
   const greekBounds = {
     latMin: 34.6,
     latMax: 41.9,
@@ -461,13 +458,7 @@ const App = () => {
   ];
 
   return (
-    <div
-      className={`flex flex-col min-h-screen transition-colors ${
-        resolvedTheme === "dark"
-          ? "bg-slate-950 text-slate-100"
-          : "bg-blue-50 text-gray-900"
-      }`}
-    >
+    <div className="flex flex-col min-h-screen bg-blue-50 text-gray-900">
       {/* Toast notification */}
       {notification && (
         <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
@@ -542,36 +533,8 @@ const App = () => {
                 </button>
               </div>
 
-              {/* Theme switcher */}
-              <div className="flex items-center gap-0.5 bg-white/5 rounded-full p-1">
-                <button
-                  onClick={() => setTheme("light")}
-                  className={`p-2 rounded-full transition-all ${
-                    theme === "light" ? "bg-amber-400 text-slate-900" : "text-white/60 hover:text-white"
-                  }`}
-                  title="Light mode"
-                >
-                  <Sun className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setTheme("system")}
-                  className={`p-2 rounded-full transition-all ${
-                    theme === "system" ? "bg-purple-400 text-slate-900" : "text-white/60 hover:text-white"
-                  }`}
-                  title="System theme"
-                >
-                  <Sparkles className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setTheme("dark")}
-                  className={`p-2 rounded-full transition-all ${
-                    theme === "dark" ? "bg-indigo-400 text-slate-900" : "text-white/60 hover:text-white"
-                  }`}
-                  title="Dark mode"
-                >
-                  <Moon className="h-4 w-4" />
-                </button>
-              </div>
+              {/* Language switcher */}
+              <LanguageSwitcher />
 
               {/* Help button */}
               <button
@@ -624,36 +587,8 @@ const App = () => {
                 <HelpCircle className="h-5 w-5" />
                 <span className="font-medium">Help & FAQ</span>
               </button>
-
-              {/* Mobile theme switcher */}
-              <div className="flex items-center justify-center gap-2 pt-2">
-                <span className="text-xs text-white/50 uppercase tracking-wide">Theme:</span>
-                <div className="flex items-center gap-1 bg-white/5 rounded-full p-1">
-                  <button
-                    onClick={() => setTheme("light")}
-                    className={`p-2 rounded-full transition-all ${
-                      theme === "light" ? "bg-amber-400 text-slate-900" : "text-white/60"
-                    }`}
-                  >
-                    <Sun className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setTheme("system")}
-                    className={`p-2 rounded-full transition-all ${
-                      theme === "system" ? "bg-purple-400 text-slate-900" : "text-white/60"
-                    }`}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setTheme("dark")}
-                    className={`p-2 rounded-full transition-all ${
-                      theme === "dark" ? "bg-indigo-400 text-slate-900" : "text-white/60"
-                    }`}
-                  >
-                    <Moon className="h-4 w-4" />
-                  </button>
-                </div>
+              <div className="px-4 py-3">
+                <LanguageSwitcher showLabel className="w-full justify-center" />
               </div>
             </nav>
           )}
@@ -806,9 +741,9 @@ const App = () => {
                   aria-autocomplete="list"
                   aria-expanded={showSearchSuggestions && searchSuggestions.length > 0}
                   aria-owns="beach-search-suggestions"
-                  className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-blue-500"
+                  className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 />
-                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-blue-400 dark:text-blue-200">
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-blue-400">
                   {hasBeaches
                     ? `${filteredBeaches.length}/${beaches.length}`
                     : 'No spots yet'}
@@ -816,29 +751,29 @@ const App = () => {
                 {showSearchSuggestions && searchSuggestions.length > 0 && (
                   <div
                     id="beach-search-suggestions"
-                    className="absolute left-0 right-0 z-20 mt-2 rounded-lg border border-blue-100 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
+                    className="absolute left-0 right-0 z-20 mt-2 rounded-lg border border-blue-100 bg-white shadow-lg"
                   >
-                    <div className="flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wide text-blue-800 dark:text-slate-200">
+                    <div className="flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wide text-blue-800">
                       <span>Recent & suggestions</span>
                       {recentSearches.length > 0 && (
                         <button
                           type="button"
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={clearRecentSearches}
-                          className="text-blue-600 hover:underline dark:text-blue-200"
+                          className="text-blue-600 hover:underline"
                         >
                           Clear
                         </button>
                       )}
                     </div>
-                    <ul className="divide-y divide-blue-50 dark:divide-slate-700">
+                    <ul className="divide-y divide-blue-50">
                       {searchSuggestions.map((suggestion) => (
                         <li key={suggestion}>
                           <button
                             type="button"
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => handleSearchSuggestionClick(suggestion)}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-blue-50 dark:text-slate-100 dark:hover:bg-slate-700"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-blue-50"
                           >
                             <MapPin className="h-4 w-4 text-blue-500" aria-hidden="true" />
                             <span>{suggestion}</span>
@@ -857,7 +792,7 @@ const App = () => {
                   id="beach-sort"
                   value={sortOption}
                   onChange={(event) => setSortOption(event.target.value)}
-                  className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-500"
+                  className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 >
                   <option value="shelter">Shelter strength</option>
                   <option value="alpha">Alphabetical</option>
@@ -886,8 +821,8 @@ const App = () => {
                   {filteredBeaches.map((beach) => (
                     <div
                       key={beach.id}
-                      className={`flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900 ${
-                        beach.id === homeBeach?.id ? "border-orange-200 ring-2 ring-orange-300" : "border-gray-100 dark:border-slate-700"
+                      className={`flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+                        beach.id === homeBeach?.id ? "border-orange-200 ring-2 ring-orange-300" : "border-gray-100"
                       }`}
                     >
                       <div className="flex flex-1 flex-col p-4">
@@ -915,7 +850,7 @@ const App = () => {
                               event.stopPropagation();
                               handleDeleteBeach(beach.id);
                             }}
-                            className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-red-500 dark:hover:bg-slate-800"
+                            className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-red-500"
                             aria-label={`Delete ${beach.name}`}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -929,7 +864,7 @@ const App = () => {
                           <button
                             type="button"
                             onClick={() => handleBeachSelect(beach)}
-                            className="inline-flex items-center gap-1 rounded-full border border-blue-100 px-2 py-1 font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-slate-700 dark:text-blue-200 dark:hover:bg-slate-800"
+                            className="inline-flex items-center gap-1 rounded-full border border-blue-100 px-2 py-1 font-semibold text-blue-700 transition hover:bg-blue-50"
                             aria-label={`Open details for ${beach.name}`}
                           >
                             <Eye className="h-3 w-3" />
@@ -942,8 +877,8 @@ const App = () => {
                             disabled={beach.id === homeBeach?.id}
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold transition ${
                               beach.id === homeBeach?.id
-                                ? "bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-200"
-                                : "border border-blue-100 text-blue-700 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-200 dark:hover:bg-slate-800"
+                                ? "bg-orange-100 text-orange-600"
+                                : "border border-blue-100 text-blue-700 hover:bg-blue-50"
                             }`}
                             aria-label={
                               beach.id === homeBeach?.id
@@ -959,7 +894,7 @@ const App = () => {
                             href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-full border border-blue-100 px-2 py-1 font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-slate-700 dark:text-blue-200 dark:hover:bg-slate-800"
+                            className="inline-flex items-center gap-1 rounded-full border border-blue-100 px-2 py-1 font-semibold text-blue-700 transition hover:bg-blue-50"
                             aria-label={`Open ${beach.name} in Google Maps`}
                             onClick={(event) => event.stopPropagation()}
                           >
@@ -973,14 +908,14 @@ const App = () => {
                             href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-200"
+                            className="text-xs font-medium text-blue-600 hover:underline"
                             onClick={(event) => event.stopPropagation()}
                           >
                             <Map className="mr-1 inline h-3 w-3" /> View on Maps
                           </a>
                           <button
                             onClick={() => handleBeachSelect(beach)}
-                            className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                            className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-blue-700"
                           >
                             Check conditions
                           </button>

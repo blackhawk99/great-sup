@@ -1303,65 +1303,6 @@ const FixedBeachView = ({
     );
   };
 
-  // Render tide information (Mediterranean has minimal tides)
-  const renderTideInfo = () => {
-    // Calculate approximate tide state based on moon phase
-    const now = new Date(timeRange.date);
-    const lunarCycle = 29.53059; // days
-    const knownNewMoon = new Date('2024-01-11'); // Reference new moon
-    const daysSinceNew = (now - knownNewMoon) / (1000 * 60 * 60 * 24);
-    const moonAge = daysSinceNew % lunarCycle;
-
-    // Spring tides occur at new moon (0) and full moon (~14.76 days)
-    // Neap tides occur at first quarter (~7.38) and third quarter (~22.14)
-    const isSpringTide = (moonAge < 2 || Math.abs(moonAge - 14.76) < 2);
-    const isNeapTide = (Math.abs(moonAge - 7.38) < 2 || Math.abs(moonAge - 22.14) < 2);
-
-    // Mediterranean tidal range is very small: 20-60cm typically
-    const tidalRange = isSpringTide ? '40-60cm' : isNeapTide ? '15-25cm' : '25-40cm';
-    const tideType = isSpringTide ? 'Spring Tide' : isNeapTide ? 'Neap Tide' : 'Normal Tide';
-
-    // Approximate high/low tide times (simplified - 2 high/low per day, ~6hrs apart)
-    const hour = parseInt(timeRange.startTime.split(':')[0]);
-    // Simple approximation: tides shift ~50 min later each day
-    const tideShift = (daysSinceNew * 50) % (12 * 60); // minutes into 12-hour cycle
-    const nextHighHour = Math.floor(tideShift / 60) % 12;
-    const nextLowHour = (nextHighHour + 6) % 12;
-
-    return (
-      <div className="bg-cyan-50 rounded-xl p-4 border border-cyan-200">
-        <h4 className="font-medium text-cyan-800 mb-3 flex items-center">
-          <span className="mr-2">🌊</span> Tide Information
-        </h4>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white rounded-lg p-3 text-center">
-            <div className="text-xs text-gray-500">Type</div>
-            <div className="font-semibold text-cyan-700">{tideType}</div>
-          </div>
-          <div className="bg-white rounded-lg p-3 text-center">
-            <div className="text-xs text-gray-500">Range</div>
-            <div className="font-semibold text-cyan-700">{tidalRange}</div>
-          </div>
-          <div className="bg-white rounded-lg p-3 text-center">
-            <div className="text-xs text-gray-500">High ~</div>
-            <div className="font-semibold text-cyan-700">
-              {nextHighHour.toString().padStart(2, '0')}:00 / {(nextHighHour + 12).toString().padStart(2, '0')}:00
-            </div>
-          </div>
-          <div className="bg-white rounded-lg p-3 text-center">
-            <div className="text-xs text-gray-500">Low ~</div>
-            <div className="font-semibold text-cyan-700">
-              {nextLowHour.toString().padStart(2, '0')}:00 / {(nextLowHour + 12).toString().padStart(2, '0')}:00
-            </div>
-          </div>
-        </div>
-        <p className="text-xs text-cyan-600 mt-3">
-          ℹ️ Mediterranean tides are minimal ({tidalRange} range). Times are approximate.
-        </p>
-      </div>
-    );
-  };
-
   // Share functionality
   const handleShare = async () => {
     const text = `🏄 SUP Conditions at ${beach?.name}\n` +
@@ -1554,9 +1495,9 @@ const FixedBeachView = ({
           onClose={() => setShowDatePicker(false)}
         />
       )}
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden dark:bg-slate-900 dark:border dark:border-slate-800">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
       {/* Header with beach info */}
-      <div className="p-4 border-b flex justify-between items-center dark:border-slate-800">
+      <div className="p-4 border-b flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-semibold flex items-center">
             {beach?.id === homeBeach?.id && (
@@ -1564,8 +1505,8 @@ const FixedBeachView = ({
             )}
             {beach?.name || "Beach"}
           </h2>
-          <div className="flex items-center mt-1 text-gray-600 dark:text-slate-200">
-            <p className="text-gray-600 mr-3 dark:text-slate-300">
+          <div className="flex items-center mt-1 text-gray-600">
+            <p className="text-gray-600 mr-3">
               {beach ? `${beach.latitude.toFixed(4)}, ${beach.longitude.toFixed(4)}` : ""}
             </p>
             {beach && (
@@ -1573,7 +1514,7 @@ const FixedBeachView = ({
                 href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:underline flex items-center dark:text-blue-300"
+                className="text-xs text-blue-600 hover:underline flex items-center"
               >
                 <Map className="h-3 w-3 mr-1" />
                 View on Maps
@@ -1593,19 +1534,19 @@ const FixedBeachView = ({
           )}
           <button
             onClick={() => setView?.("dashboard")}
-            className="bg-gray-200 text-gray-800 px-3 py-1 rounded-lg hover:bg-gray-300 transition-colors flex items-center dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+            className="bg-gray-200 text-gray-800 px-3 py-1 rounded-lg hover:bg-gray-300 transition-colors flex items-center"
             aria-label="Back to dashboard"
           >
             <ChevronLeft className="h-4 w-4 mr-1" /> Back
           </button>
         </div>
       </div>
-      <div className="border-b bg-gray-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700 dark:text-slate-200" aria-label="Quick actions for this beach">
+      <div className="border-b bg-gray-50 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700" aria-label="Quick actions for this beach">
           <button
             type="button"
             onClick={() => fetchWeatherData()}
-            className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 dark:bg-slate-900 dark:text-blue-200 dark:hover:bg-slate-700"
+            className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50"
             aria-label="Refresh forecast data"
           >
             <RefreshCw className="h-4 w-4" />
@@ -1614,7 +1555,7 @@ const FixedBeachView = ({
           <button
             type="button"
             onClick={() => setShowDatePicker(true)}
-            className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 dark:bg-slate-900 dark:text-blue-200 dark:hover:bg-slate-700"
+            className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50"
             aria-label="Change forecast date"
           >
             <Calendar className="h-4 w-4" />
@@ -1625,7 +1566,7 @@ const FixedBeachView = ({
               href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 dark:bg-slate-900 dark:text-blue-200 dark:hover:bg-slate-700"
+              className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50"
               aria-label={`Open ${beach.name} on Google Maps`}
             >
               <MapPin className="h-4 w-4" />
@@ -1636,7 +1577,7 @@ const FixedBeachView = ({
             <button
               type="button"
               onClick={() => onSetHomeBeach?.(beach)}
-              className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-3 py-1 font-semibold text-orange-700 shadow-sm transition hover:bg-orange-200 dark:bg-orange-900/40 dark:text-orange-100 dark:hover:bg-orange-800/60"
+              className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-3 py-1 font-semibold text-orange-700 shadow-sm transition hover:bg-orange-200"
               aria-label="Pin this beach as home"
             >
               <Home className="h-4 w-4" />
@@ -2176,9 +2117,6 @@ const FixedBeachView = ({
           
           {/* Equipment Recommendations */}
           {renderEquipment()}
-
-          {/* Tide Information */}
-          {renderTideInfo()}
 
           {/* 7-Day Forecast */}
           {renderWeeklyForecast()}
