@@ -278,6 +278,32 @@ export const useBeachManager = () => {
     }
   };
 
+  // Re-snap all existing beaches to coastline
+  const resnapAllBeaches = () => {
+    const updatedBeaches = beaches.map(beach => {
+      const snapped = snapToCoastline(beach.latitude, beach.longitude, 2);
+      if (snapped.snapped) {
+        console.log(`Re-snapped ${beach.name}: (${beach.latitude.toFixed(4)}, ${beach.longitude.toFixed(4)}) → (${snapped.latitude.toFixed(4)}, ${snapped.longitude.toFixed(4)}) - ${(snapped.distance * 1000).toFixed(0)}m`);
+        return {
+          ...beach,
+          latitude: snapped.latitude,
+          longitude: snapped.longitude,
+          snappedToCoastline: true,
+          originalLatitude: beach.latitude,
+          originalLongitude: beach.longitude,
+        };
+      }
+      return beach;
+    });
+
+    const snappedCount = updatedBeaches.filter((b, i) =>
+      b.latitude !== beaches[i].latitude || b.longitude !== beaches[i].longitude
+    ).length;
+
+    setBeaches(updatedBeaches);
+    return { total: beaches.length, snapped: snappedCount };
+  };
+
   // Search for places using Nominatim API (OpenStreetMap)
   const searchPlaces = async (query) => {
     if (!query || query.length < 3) {
@@ -389,6 +415,8 @@ export const useBeachManager = () => {
     searchingPlaces,
     searchPlaces,
     selectPlace,
-    clearPlaceSearch
+    clearPlaceSearch,
+    // Coastline snapping
+    resnapAllBeaches
   };
 };
