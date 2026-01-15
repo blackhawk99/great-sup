@@ -969,27 +969,22 @@ const App = () => {
                 </h2>
                 <p className="text-sm text-gray-600">Optimised for Greek coastlines. Works with any bay—from Epirus to Rhodes.</p>
               </div>
-              <div className="flex items-center gap-3">
-                {beaches.length > 0 && (
-                  <button
-                    onClick={() => {
-                      const result = resnapAllBeaches();
-                      if (result.snapped > 0) {
-                        toast.success(`Moved ${result.snapped} of ${result.total} beaches to coastline`);
-                      } else {
-                        toast.success(`All ${result.total} beaches already on coastline`);
-                      }
-                    }}
-                    className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
-                  >
-                    <MapPin className="h-3.5 w-3.5" />
-                    Snap to coastline
-                  </button>
-                )}
-                <div className="flex items-center gap-2 text-xs text-blue-700">
-                  <Smartphone className="h-4 w-4" /> Mobile-friendly form
-                </div>
-              </div>
+              {beaches.length > 0 && (
+                <button
+                  onClick={() => {
+                    const result = resnapAllBeaches();
+                    if (result.snapped > 0) {
+                      toast.success(`Moved ${result.snapped} of ${result.total} beaches to coastline`);
+                    } else {
+                      toast.success(`All ${result.total} beaches already on coastline`);
+                    }
+                  }}
+                  className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+                  Snap to coastline
+                </button>
+              )}
             </div>
 
             <div className="p-4 space-y-6">
