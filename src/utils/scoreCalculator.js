@@ -64,6 +64,17 @@ export async function calculatePaddleScore(beach, hours, range) {
   const tide        = avg('tideHeight');
   const currentSpd  = avg('currentSpeed');
 
+  // Check for thunderstorms (WMO codes 95-99)
+  // Unlike other metrics, we check if ANY hour has a thunderstorm
+  const hasThunderstorm = slice.some(h => {
+    const code = h.weatherCode;
+    return code !== null && code !== undefined && code >= 95 && code <= 99;
+  });
+  const thunderstormHours = slice.filter(h => {
+    const code = h.weatherCode;
+    return code !== null && code !== undefined && code >= 95 && code <= 99;
+  }).length;
+
   // Geographic protection analysis
   const geoProtection = await calculateGeographicProtection(beach, windDir, waveDir);
 
@@ -97,16 +108,28 @@ export async function calculatePaddleScore(beach, hours, range) {
   const ptsTide   = inRangeScore(tide, 0.5, 2.0) * 8;
   const ptsCurrents = clamp(1 - clamp(currentSpd / 1.5, 0, 1), 0, 1) * 4;
 
-  const total = Math.round(
+  let total = Math.round(
     ptsWind + ptsWaves + ptsSwell + ptsGusts + ptsPrecip +
     ptsTemp + ptsCloud + ptsGeo + ptsTide + ptsCurrents
   );
+
+  // CRITICAL: Thunderstorms make conditions extremely dangerous
+  // Lightning is the #1 weather killer on water - cap score at 20
+  if (hasThunderstorm) {
+    total = Math.min(total, 20);
+  }
 
   // Calculate data quality (0-100%)
   const dataQuality = Math.round(100 * (1 - missingDataCount / totalFields));
 
   // Generate warnings for dangerous conditions
   const warnings = [];
+
+  // CRITICAL: Thunderstorm warning - lightning is deadly on water
+  if (hasThunderstorm) {
+    warnings.unshift(`⚡ THUNDERSTORM WARNING: ${thunderstormHours} hour(s) with storm activity - DO NOT paddle!`);
+  }
+
   if (gustFactor > 1.8) {
     warnings.push(`Strong gusts: ${Math.round(windGusts)} km/h (${Math.round(gustFactor * 100 - 100)}% above average)`);
   }
@@ -121,6 +144,7 @@ export async function calculatePaddleScore(beach, hours, range) {
     totalScore: total,
     dataQuality,
     warnings,
+    hasThunderstorm,
     breakdown: {
       wind:         { value: protectedWindSpeed, score: Math.round(ptsWind) },
       waves:        { value: protectedWaveHeight, score: Math.round(ptsWaves) },

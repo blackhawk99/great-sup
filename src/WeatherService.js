@@ -7,6 +7,7 @@
  *   time,
  *   temperature, precipitation, cloudcover,
  *   windSpeed, windGusts, windDirection,
+ *   weatherCode,  // WMO weather code (95-99 = thunderstorm)
  *   waveHeight, swellHeight, swellPeriod, waveDirection,
  *   tideHeight,
  *   currentSpeed, currentDirection
@@ -15,9 +16,9 @@
 export async function fetchPaddleConditions({ latitude, longitude, startDate, endDate, timezone = 'auto' }) {
   const base = 'https://api.open-meteo.com/v1';
 
-  // 1) Meteorological data (added wind gusts)
+  // 1) Meteorological data (added wind gusts and weather code for storm detection)
   const weatherUrl = `${base}/forecast?latitude=${latitude}&longitude=${longitude}` +
-    `&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,windgusts_10m,winddirection_10m` +
+    `&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,windgusts_10m,winddirection_10m,weather_code` +
     `&start_date=${startDate}&end_date=${endDate}&timezone=${timezone}`;
 
   // 2) Marine data: waves + tides (added swell period)
@@ -82,6 +83,7 @@ export async function fetchPaddleConditions({ latitude, longitude, startDate, en
     windSpeed:        safeGet(weatherData.hourly.windspeed_10m, i),
     windGusts:        safeGet(weatherData.hourly.windgusts_10m, i),
     windDirection:    safeGet(weatherData.hourly.winddirection_10m, i),
+    weatherCode:      safeGet(weatherData.hourly.weather_code, i), // WMO code for storm detection
     waveHeight:       safeGet(marineData?.hourly?.wave_height, i),
     swellHeight:      safeGet(marineData?.hourly?.swell_wave_height, i),
     swellPeriod:      safeGet(marineData?.hourly?.swell_wave_period, i),
@@ -90,4 +92,29 @@ export async function fetchPaddleConditions({ latitude, longitude, startDate, en
     currentSpeed:     safeGet(currentsData?.hourly?.current_speed, i),
     currentDirection: safeGet(currentsData?.hourly?.current_direction, i),
   }));
+}
+
+/**
+ * Check if a WMO weather code indicates a thunderstorm.
+ * WMO codes 95-99 are thunderstorm conditions.
+ */
+export function isThunderstormCode(code) {
+  return code >= 95 && code <= 99;
+}
+
+/**
+ * Get a human-readable description of WMO weather codes.
+ */
+export function getWeatherDescription(code) {
+  const descriptions = {
+    0: 'Clear sky',
+    1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+    45: 'Fog', 48: 'Depositing rime fog',
+    51: 'Light drizzle', 53: 'Moderate drizzle', 55: 'Dense drizzle',
+    61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain',
+    71: 'Slight snow', 73: 'Moderate snow', 75: 'Heavy snow',
+    80: 'Slight rain showers', 81: 'Moderate rain showers', 82: 'Violent rain showers',
+    95: 'Thunderstorm', 96: 'Thunderstorm with slight hail', 99: 'Thunderstorm with heavy hail'
+  };
+  return descriptions[code] || `Weather code ${code}`;
 }
