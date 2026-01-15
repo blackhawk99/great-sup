@@ -856,369 +856,164 @@ const FixedBeachView = ({
       </span>
     );
 
+    // Score item component for mobile-friendly display
+    const ScoreItem = ({ label, tip, maxPts, value, score, max, extraInfo }) => {
+      const percentage = (score / max) * 100;
+      const color = percentage >= 75 ? 'bg-emerald-500' : percentage >= 50 ? 'bg-amber-500' : 'bg-red-500';
+      const textColor = percentage >= 75 ? 'text-emerald-600' : percentage >= 50 ? 'text-amber-600' : 'text-red-600';
+
+      return (
+        <div className="bg-white rounded-xl border border-gray-100 p-3 hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-gray-800 text-sm">{label}</span>
+              <InfoTip tip={tip} />
+            </div>
+            <span className={`font-bold text-sm ${textColor}`}>{score}/{max}</span>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+            <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${percentage}%` }} />
+          </div>
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>{value}</span>
+            {extraInfo && <span className="text-gray-400">{extraInfo}</span>}
+          </div>
+        </div>
+      );
+    };
+
     return (
-      <div className="bg-white rounded-lg mt-4 shadow-sm border">
+      <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl mt-4 shadow-sm border border-blue-100">
         <button
           onClick={() => toggleSection('scoreBreakdown')}
-          className="w-full p-5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors rounded-lg"
+          className="w-full p-4 flex items-center justify-between text-left hover:bg-white/50 transition-colors rounded-2xl"
         >
-          <h4 className="font-medium flex items-center text-gray-800">
-            <Info className="h-5 w-5 mr-2 text-blue-600" />
+          <h4 className="font-semibold flex items-center text-gray-800">
+            <div className="p-2 bg-blue-100 rounded-lg mr-3">
+              <Info className="h-4 w-4 text-blue-600" />
+            </div>
             Score Breakdown
-            <span className="ml-2 text-sm font-normal text-gray-500">
-              ({scoreBreakdown.total.score}/100)
-            </span>
           </h4>
-          {expandedSections.scoreBreakdown ? (
-            <ChevronUp className="h-5 w-5 text-gray-400" />
-          ) : (
-            <ChevronDown className="h-5 w-5 text-gray-400" />
-          )}
+          <div className="flex items-center gap-3">
+            <span className={`text-lg font-bold ${
+              scoreBreakdown.total.score >= 85 ? 'text-emerald-600' :
+              scoreBreakdown.total.score >= 70 ? 'text-amber-600' :
+              scoreBreakdown.total.score >= 50 ? 'text-orange-600' : 'text-red-600'
+            }`}>
+              {scoreBreakdown.total.score}/100
+            </span>
+            {expandedSections.scoreBreakdown ? (
+              <ChevronUp className="h-5 w-5 text-gray-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-gray-400" />
+            )}
+          </div>
         </button>
 
         {expandedSections.scoreBreakdown && (
-          <div className="px-5 pb-5">
-            <p className="text-sm text-gray-600 mb-3">
-              Each factor contributes a set number of points to the final score – shown in parentheses below.
-              The progress bar indicates how many of those points were earned. See the FAQ for details.
-            </p>
+          <div className="px-4 pb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <ScoreItem
+                label="Wind"
+                tip="Lower wind = better stability. Under 10 km/h is ideal for SUP."
+                value={`${scoreBreakdown.windSpeed.protected.toFixed(1)} km/h`}
+                score={scoreBreakdown.windSpeed.score}
+                max={scoreBreakdown.windSpeed.maxPossible}
+                extraInfo={`Raw: ${scoreBreakdown.windSpeed.raw.toFixed(0)}`}
+              />
+              <ScoreItem
+                label="Waves"
+                tip="Flat water (<0.2m) is ideal. Larger waves make balancing harder."
+                value={`${scoreBreakdown.waveHeight.protected.toFixed(2)} m`}
+                score={scoreBreakdown.waveHeight.score}
+                max={scoreBreakdown.waveHeight.maxPossible}
+                extraInfo={`Raw: ${scoreBreakdown.waveHeight.raw.toFixed(2)}`}
+              />
+              <ScoreItem
+                label="Water Temp"
+                tip="18-26°C is ideal. Below 15°C risks hypothermia — wetsuit required!"
+                value={scoreBreakdown.waterTemperature?.value != null ? `${scoreBreakdown.waterTemperature.value.toFixed(1)}°C` : 'N/A'}
+                score={scoreBreakdown.waterTemperature?.score ?? 0}
+                max={scoreBreakdown.waterTemperature?.maxPossible ?? 12}
+              />
+              <ScoreItem
+                label="Protection"
+                tip="How much the coastline shelters this beach from wind and waves."
+                value={`${scoreBreakdown.geoProtection.value.toFixed(0)}/100`}
+                score={scoreBreakdown.geoProtection.score}
+                max={scoreBreakdown.geoProtection.maxPossible}
+              />
+              <ScoreItem
+                label="Currents"
+                tip="Strong currents (>3 km/h) can push you off course or make returning difficult."
+                value={`${scoreBreakdown.currents?.value?.toFixed(1) ?? 'N/A'} km/h`}
+                score={scoreBreakdown.currents?.score ?? 0}
+                max={scoreBreakdown.currents?.maxPossible ?? 10}
+              />
+              <ScoreItem
+                label="Swell"
+                tip="Ocean swells from distant storms. Long period (>10s) = gentle rollers."
+                value={`${scoreBreakdown.swellHeight.raw.toFixed(2)} m`}
+                score={scoreBreakdown.swellHeight.score}
+                max={scoreBreakdown.swellHeight.maxPossible}
+                extraInfo={`${scoreBreakdown.swellHeight.period?.toFixed(0) ?? '?'}s period`}
+              />
+              <ScoreItem
+                label="Gusts"
+                tip="Sudden wind bursts that can knock you off balance."
+                value={`${scoreBreakdown.gusts?.value?.toFixed(1) ?? 'N/A'} km/h`}
+                score={scoreBreakdown.gusts?.score ?? 0}
+                max={scoreBreakdown.gusts?.maxPossible ?? 5}
+              />
+              <ScoreItem
+                label="Rain"
+                tip="No rain is best. Heavy rain reduces visibility and makes the board slippery."
+                value={`${scoreBreakdown.precipitation.value.toFixed(1)} mm`}
+                score={scoreBreakdown.precipitation.score}
+                max={scoreBreakdown.precipitation.maxPossible}
+              />
+              <ScoreItem
+                label="Air Temp"
+                tip="Comfortable range is 15-30°C. Less critical than water temp."
+                value={`${scoreBreakdown.temperature.value.toFixed(1)}°C`}
+                score={scoreBreakdown.temperature.score}
+                max={scoreBreakdown.temperature.maxPossible}
+              />
+              <ScoreItem
+                label="Clouds"
+                tip="Clear skies preferred but clouds don't affect paddling much."
+                value={`${scoreBreakdown.cloudCover.value.toFixed(0)}%`}
+                score={scoreBreakdown.cloudCover.score}
+                max={scoreBreakdown.cloudCover.maxPossible}
+              />
+            </div>
 
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factor</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Points</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  <span className="font-medium">Wind Speed</span>
-                  <InfoTip tip="Lower wind = better stability. Under 10 km/h is ideal for SUP. 'Protected' value accounts for shoreline shelter." />
-                  <span className="ml-1 text-xs text-gray-400">(20 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.windSpeed.raw.toFixed(1)} km/h
-                  <span className="text-xs text-gray-400 ml-1">
-                    (Protected: {scoreBreakdown.windSpeed.protected.toFixed(1)})
-                  </span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.windSpeed.score > 15 ? 'text-green-600' :
-                    scoreBreakdown.windSpeed.score > 10 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.windSpeed.score}/{scoreBreakdown.windSpeed.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.windSpeed.score}
-                      max={scoreBreakdown.windSpeed.maxPossible}
-                      color={
-                        scoreBreakdown.windSpeed.score > 15 ? 'bg-green-500' :
-                        scoreBreakdown.windSpeed.score > 10 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  <span className="font-medium">Gusts</span>
-                  <InfoTip tip="Sudden wind bursts that can knock you off balance. Gusts >50% above average wind indicate unpredictable conditions." />
-                  <span className="ml-1 text-xs text-gray-400">(5 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.gusts?.value?.toFixed(1) ?? 'N/A'} km/h
-                  {scoreBreakdown.gusts?.factor > 1.5 && (
-                    <span className="text-xs text-orange-500 ml-1">
-                      (Gusty: {((scoreBreakdown.gusts.factor - 1) * 100).toFixed(0)}% above avg)
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    (scoreBreakdown.gusts?.score ?? 0) > 4 ? 'text-green-600' :
-                    (scoreBreakdown.gusts?.score ?? 0) > 2 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.gusts?.score ?? 0}/{scoreBreakdown.gusts?.maxPossible ?? 5}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.gusts?.score ?? 0}
-                      max={scoreBreakdown.gusts?.maxPossible ?? 5}
-                      color={
-                        (scoreBreakdown.gusts?.score ?? 0) > 4 ? 'bg-green-500' :
-                        (scoreBreakdown.gusts?.score ?? 0) > 2 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  <span className="font-medium">Wave Height</span>
-                  <InfoTip tip="Flat water (<0.2m) is ideal for SUP. Larger waves make balancing harder and can cause falls." />
-                  <span className="ml-1 text-xs text-gray-400">(20 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.waveHeight.raw.toFixed(2)} m
-                  <span className="text-xs text-gray-400 ml-1">
-                    (Protected: {scoreBreakdown.waveHeight.protected.toFixed(2)})
-                  </span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.waveHeight.score > 15 ? 'text-green-600' :
-                    scoreBreakdown.waveHeight.score > 10 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.waveHeight.score}/{scoreBreakdown.waveHeight.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.waveHeight.score}
-                      max={scoreBreakdown.waveHeight.maxPossible}
-                      color={
-                        scoreBreakdown.waveHeight.score > 15 ? 'bg-green-500' :
-                        scoreBreakdown.waveHeight.score > 10 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  <span className="font-medium">Swell</span>
-                  <InfoTip tip="Ocean swells from distant storms. Long period (>10s) = gentle rollers. Short period (<6s) = choppy, uncomfortable." />
-                  <span className="ml-1 text-xs text-gray-400">(8 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.swellHeight.raw.toFixed(2)} m
-                  <span className="text-xs text-gray-400 ml-1">
-                    @ {scoreBreakdown.swellHeight.period?.toFixed(0) ?? '?'}s
-                    {scoreBreakdown.swellHeight.period >= 10 && ' (gentle)'}
-                    {scoreBreakdown.swellHeight.period < 6 && ' (choppy)'}
-                  </span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.swellHeight.score > 6 ? 'text-green-600' :
-                    scoreBreakdown.swellHeight.score > 4 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.swellHeight.score}/{scoreBreakdown.swellHeight.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.swellHeight.score}
-                      max={scoreBreakdown.swellHeight.maxPossible}
-                      color={
-                        scoreBreakdown.swellHeight.score > 6 ? 'bg-green-500' :
-                        scoreBreakdown.swellHeight.score > 4 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  <span className="font-medium">Currents</span>
-                  <InfoTip tip="Ocean currents can push you off course or make returning difficult. Strong currents (>3 km/h) are dangerous." />
-                  <span className="ml-1 text-xs text-gray-400">(10 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.currents?.value?.toFixed(1) ?? 'N/A'} km/h
-                  {(scoreBreakdown.currents?.value ?? 0) > 3 && (
-                    <span className="text-xs text-red-500 ml-1">(Strong!)</span>
-                  )}
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    (scoreBreakdown.currents?.score ?? 0) > 8 ? 'text-green-600' :
-                    (scoreBreakdown.currents?.score ?? 0) > 5 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.currents?.score ?? 0}/{scoreBreakdown.currents?.maxPossible ?? 10}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.currents?.score ?? 0}
-                      max={scoreBreakdown.currents?.maxPossible ?? 10}
-                      color={
-                        (scoreBreakdown.currents?.score ?? 0) > 8 ? 'bg-green-500' :
-                        (scoreBreakdown.currents?.score ?? 0) > 5 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  <span className="font-medium">Precipitation</span>
-                  <InfoTip tip="No rain is best. Heavy rain (>1.5mm/hr) reduces visibility and makes the board slippery." />
-                  <span className="ml-1 text-xs text-gray-400">(5 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.precipitation.value.toFixed(1)} mm
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.precipitation.value < 1 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.precipitation.score}/{scoreBreakdown.precipitation.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.precipitation.score}
-                      max={scoreBreakdown.precipitation.maxPossible}
-                      color={scoreBreakdown.precipitation.value < 1 ? 'bg-green-500' : 'bg-red-500'}
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  <span className="font-medium">Air Temperature</span>
-                  <InfoTip tip="Comfortable range is 15-30°C. Less critical than water temp — you can always wear layers on top." />
-                  <span className="ml-1 text-xs text-gray-400">(4 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.temperature.value.toFixed(1)} °C
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.temperature.score > 4 ? 'text-green-600' : 'text-yellow-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.temperature.score}/{scoreBreakdown.temperature.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.temperature.score}
-                      max={scoreBreakdown.temperature.maxPossible}
-                      color={scoreBreakdown.temperature.score > 4 ? 'bg-green-500' : 'bg-yellow-500'}
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  <span className="font-medium">Water Temperature</span>
-                  <InfoTip tip="18-26°C is ideal. Below 15°C risks hypothermia if you fall in — wetsuit required!" />
-                  <span className="ml-1 text-xs text-gray-400">(12 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.waterTemperature?.value != null
-                    ? `${scoreBreakdown.waterTemperature.value.toFixed(1)} °C`
-                    : 'N/A'}
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    (scoreBreakdown.waterTemperature?.score ?? 0) > 6 ? 'text-green-600' :
-                    (scoreBreakdown.waterTemperature?.score ?? 0) > 3 ? 'text-yellow-600' : 'text-blue-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.waterTemperature?.score ?? 0}/{scoreBreakdown.waterTemperature?.maxPossible ?? 8}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.waterTemperature?.score ?? 0}
-                      max={scoreBreakdown.waterTemperature?.maxPossible ?? 8}
-                      color={
-                        (scoreBreakdown.waterTemperature?.score ?? 0) > 6 ? 'bg-green-500' :
-                        (scoreBreakdown.waterTemperature?.score ?? 0) > 3 ? 'bg-yellow-500' : 'bg-blue-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  <span className="font-medium">Cloud Cover</span>
-                  <InfoTip tip="Clear skies are preferred but clouds don't affect paddling much. Heavy overcast may indicate incoming weather." />
-                  <span className="ml-1 text-xs text-gray-400">(4 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.cloudCover.value.toFixed(0)}%
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.cloudCover.score > 3 ? 'text-green-600' :
-                    scoreBreakdown.cloudCover.score > 2 ? 'text-yellow-600' : 'text-gray-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.cloudCover.score}/{scoreBreakdown.cloudCover.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.cloudCover.score}
-                      max={scoreBreakdown.cloudCover.maxPossible}
-                      color={
-                        scoreBreakdown.cloudCover.score > 3 ? 'bg-green-500' :
-                        scoreBreakdown.cloudCover.score > 2 ? 'bg-yellow-500' : 'bg-gray-400'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  <span className="font-medium">Geographic Protection</span>
-                  <InfoTip tip="How much the coastline shelters this beach from wind and waves. Higher score = more protected bay or cove." />
-                  <span className="ml-1 text-xs text-gray-400">(12 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
-                  {scoreBreakdown.geoProtection.value.toFixed(0)}/100
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.geoProtection.score > 7 ? 'text-green-600' :
-                    scoreBreakdown.geoProtection.score > 4 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.geoProtection.score}/{scoreBreakdown.geoProtection.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.geoProtection.score}
-                      max={scoreBreakdown.geoProtection.maxPossible}
-                      color={
-                        scoreBreakdown.geoProtection.score > 7 ? 'bg-green-500' :
-                        scoreBreakdown.geoProtection.score > 4 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr className="bg-blue-50">
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
-                  TOTAL SCORE
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap"></td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.total.score >= 85 ? 'text-green-600' :
-                    scoreBreakdown.total.score >= 70 ? 'text-yellow-600' :
-                    scoreBreakdown.total.score >= 50 ? 'text-orange-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.total.score}/{scoreBreakdown.total.maxPossible}
-                      {scoreBreakdown.total.rawScore > scoreBreakdown.total.maxPossible && (
-                        <span className="text-xs text-gray-500 ml-1">
-                          (raw {scoreBreakdown.total.rawScore})
-                        </span>
-                      )}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.total.score}
-                      max={scoreBreakdown.total.maxPossible}
-                      color={
-                        scoreBreakdown.total.score >= 85 ? 'bg-green-500' :
-                        scoreBreakdown.total.score >= 70 ? 'bg-yellow-500' :
-                        scoreBreakdown.total.score >= 50 ? 'bg-orange-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+            {/* Total Score */}
+            <div className={`mt-4 p-4 rounded-xl border-2 ${
+              scoreBreakdown.total.score >= 85 ? 'bg-emerald-50 border-emerald-200' :
+              scoreBreakdown.total.score >= 70 ? 'bg-amber-50 border-amber-200' :
+              scoreBreakdown.total.score >= 50 ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-gray-700">Total Score</span>
+                <span className={`text-2xl font-bold ${
+                  scoreBreakdown.total.score >= 85 ? 'text-emerald-600' :
+                  scoreBreakdown.total.score >= 70 ? 'text-amber-600' :
+                  scoreBreakdown.total.score >= 50 ? 'text-orange-600' : 'text-red-600'
+                }`}>
+                  {scoreBreakdown.total.score}<span className="text-base font-normal text-gray-400">/100</span>
+                </span>
+              </div>
+              <div className="h-3 bg-white/50 rounded-full overflow-hidden mt-2">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    scoreBreakdown.total.score >= 85 ? 'bg-emerald-500' :
+                    scoreBreakdown.total.score >= 70 ? 'bg-amber-500' :
+                    scoreBreakdown.total.score >= 50 ? 'bg-orange-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${scoreBreakdown.total.score}%` }}
+                />
+              </div>
             </div>
           </div>
         )}
