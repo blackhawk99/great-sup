@@ -602,13 +602,13 @@ const FixedBeachView = ({
     );
     
     return (
-      <div className="bg-blue-50 p-5 rounded-lg mt-4 border border-blue-200 shadow-inner">
-        <h4 className="font-medium mb-4 text-lg flex items-center text-blue-800">
-          <MapPin className="h-5 w-5 mr-2 text-blue-600" />
+      <div className="bg-blue-50 dark:bg-slate-800 p-5 rounded-lg mt-4 border border-blue-200 dark:border-slate-700 shadow-inner">
+        <h4 className="font-medium mb-4 text-lg flex items-center text-blue-800 dark:text-blue-300">
+          <MapPin className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
           Geographic Protection Analysis
           <button
             onClick={() => setShowDebug(!showDebug)}
-            className="ml-auto text-xs text-blue-600 underline"
+            className="ml-auto text-xs text-blue-600 dark:text-blue-400 underline"
           >
             {showDebug ? 'Hide debug' : 'Show debug'}
           </button>
@@ -616,8 +616,8 @@ const FixedBeachView = ({
         
         <div className="grid md:grid-cols-2 gap-6">
           <ul className="space-y-3">
-            <li className="flex justify-between items-center bg-white p-3 rounded border">
-              <span className="font-medium text-gray-700">Bay Enclosure:</span>
+            <li className="flex justify-between items-center bg-white dark:bg-slate-700 p-3 rounded border dark:border-slate-600">
+              <span className="font-medium text-gray-700 dark:text-slate-200">Bay Enclosure:</span>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 geoProtection.bayEnclosure > 0.6 
                   ? 'bg-green-100 text-green-800' 
@@ -632,8 +632,8 @@ const FixedBeachView = ({
                     : 'Exposed'}
               </span>
             </li>
-            <li className="flex justify-between items-center bg-white p-3 rounded border">
-              <span className="font-medium text-gray-700">Wind Direction:</span>
+            <li className="flex justify-between items-center bg-white dark:bg-slate-700 p-3 rounded border dark:border-slate-600">
+              <span className="font-medium text-gray-700 dark:text-slate-200">Wind Direction:</span>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 geoProtection.windProtection > 0.7 
                   ? 'bg-green-100 text-green-800' 
@@ -649,10 +649,10 @@ const FixedBeachView = ({
                     : ' (Fully Exposed)'}
               </span>
             </li>
-            <li className="flex justify-between items-center bg-white p-3 rounded border">
-              <span className="font-medium text-gray-700">Overall Protection:</span>
+            <li className="flex justify-between items-center bg-white dark:bg-slate-700 p-3 rounded border dark:border-slate-600">
+              <span className="font-medium text-gray-700 dark:text-slate-200">Overall Protection:</span>
               <div className="flex items-center">
-                <div className="w-24 h-3 bg-gray-200 rounded-full overflow-hidden mr-2">
+                <div className="w-24 h-3 bg-gray-200 dark:bg-slate-600 rounded-full overflow-hidden mr-2">
                   <div 
                     className={`h-full ${
                       geoProtection.protectionScore > 70 
@@ -677,9 +677,9 @@ const FixedBeachView = ({
             </li>
           </ul>
           
-          <div className="bg-white p-4 rounded border">
-            <h5 className="font-medium mb-2 text-gray-800">Impact on Score</h5>
-            <p className="text-gray-700 mb-3">
+          <div className="bg-white dark:bg-slate-700 p-4 rounded border dark:border-slate-600">
+            <h5 className="font-medium mb-2 text-gray-800 dark:text-slate-100">Impact on Score</h5>
+            <p className="text-gray-700 dark:text-slate-200 mb-3">
               Geographic protection is contributing <span className="font-bold text-blue-600">
               +{geoBonus} points</span> to your overall score.
             </p>
@@ -699,7 +699,7 @@ const FixedBeachView = ({
               </p>
             </div>
             {showDebug && (
-              <pre className="mt-3 text-xs bg-gray-100 p-2 rounded overflow-x-auto">
+              <pre className="mt-3 text-xs bg-gray-100 dark:bg-slate-800 dark:text-slate-300 p-2 rounded overflow-x-auto">
 {JSON.stringify(geoProtection.debugInfo, null, 2)}
               </pre>
             )}
@@ -714,7 +714,7 @@ const FixedBeachView = ({
     if (!scoreBreakdown) return null;
 
     const Progress = ({ score, max, color }) => (
-      <div className="w-24 bg-gray-200 h-2 rounded mt-1 overflow-hidden">
+      <div className="w-24 bg-gray-200 dark:bg-slate-600 h-2 rounded mt-1 overflow-hidden">
         <div
           className={`${color} h-2 rounded`}
           style={{ width: `${Math.min(100, (score / max) * 100)}%` }}
@@ -723,35 +723,35 @@ const FixedBeachView = ({
     );
 
     return (
-      <div className="bg-white p-5 rounded-lg mt-4 shadow-sm border">
-        <h4 className="font-medium mb-4 flex items-center text-gray-800">
+      <div className="bg-white p-5 rounded-lg mt-4 shadow-sm border dark:bg-slate-800 dark:border-slate-700">
+        <h4 className="font-medium mb-4 flex items-center text-gray-800 dark:text-slate-100">
           <Info className="h-5 w-5 mr-2 text-blue-600" />
           Score Breakdown
         </h4>
 
-        <p className="text-sm text-gray-600 mb-3">
+        <p className="text-sm text-gray-600 mb-3 dark:text-slate-300">
           Each factor contributes a set number of points to the final score – shown in parentheses below.
           The progress bar indicates how many of those points were earned. See the FAQ for details.
         </p>
 
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-600">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-600">
+            <thead className="bg-gray-50 dark:bg-slate-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factor</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Points</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">Factor</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">Value</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">Points</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-800 dark:divide-slate-600">
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
                   <span className="font-medium">Wind Speed</span>
-                  <span className="ml-1 text-xs text-gray-400">(37 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(37 pts)</span>
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
                   {scoreBreakdown.windSpeed.raw.toFixed(1)} km/h
-                  <span className="text-xs text-gray-400 ml-1">
+                  <span className="text-xs text-gray-400 dark:text-slate-500 ml-1">
                     (Protected: {scoreBreakdown.windSpeed.protected.toFixed(1)})
                   </span>
                 </td>
@@ -775,13 +775,13 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
                   <span className="font-medium">Wave Height</span>
-                  <span className="ml-1 text-xs text-gray-400">(17 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(17 pts)</span>
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
                   {scoreBreakdown.waveHeight.raw.toFixed(2)} m
-                  <span className="text-xs text-gray-400 ml-1">
+                  <span className="text-xs text-gray-400 dark:text-slate-500 ml-1">
                     (Protected: {scoreBreakdown.waveHeight.protected.toFixed(2)})
                   </span>
                 </td>
@@ -805,11 +805,11 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
                   <span className="font-medium">Swell Height</span>
-                  <span className="ml-1 text-xs text-gray-400">(8 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(8 pts)</span>
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
                   {scoreBreakdown.swellHeight.raw.toFixed(2)} m
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
@@ -832,11 +832,11 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
                   <span className="font-medium">Precipitation</span>
-                  <span className="ml-1 text-xs text-gray-400">(5 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(5 pts)</span>
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
                   {scoreBreakdown.precipitation.value.toFixed(1)} mm
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
@@ -855,11 +855,11 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
                   <span className="font-medium">Air Temperature</span>
-                  <span className="ml-1 text-xs text-gray-400">(8 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(8 pts)</span>
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
                   {scoreBreakdown.temperature.value.toFixed(1)} °C
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
@@ -878,11 +878,11 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
                   <span className="font-medium">Water Temperature</span>
-                  <span className="ml-1 text-xs text-gray-400">(10 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(10 pts)</span>
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
                   {scoreBreakdown.waterTemperature?.value != null
                     ? `${scoreBreakdown.waterTemperature.value.toFixed(1)} °C`
                     : 'N/A'}
@@ -907,11 +907,11 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
                   <span className="font-medium">Cloud Cover</span>
-                  <span className="ml-1 text-xs text-gray-400">(4 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(4 pts)</span>
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
                   {scoreBreakdown.cloudCover.value.toFixed(0)}%
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
@@ -934,11 +934,11 @@ const FixedBeachView = ({
                 </td>
               </tr>
               <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
                   <span className="font-medium">Geographic Protection</span>
-                  <span className="ml-1 text-xs text-gray-400">(9 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(9 pts)</span>
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
                   {scoreBreakdown.geoProtection.value.toFixed(0)}/100
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
@@ -960,8 +960,8 @@ const FixedBeachView = ({
                   </div>
                 </td>
               </tr>
-              <tr className="bg-blue-50">
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
+              <tr className="bg-blue-50 dark:bg-slate-700">
+                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-slate-100">
                   TOTAL SCORE
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap"></td>
@@ -1052,32 +1052,32 @@ const FixedBeachView = ({
     // Exit gracefully if no hours to display
     if (allHours.length === 0) {
       return (
-        <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
-          <h4 className="font-medium mb-4 flex items-center text-gray-800">
+        <div className="bg-white rounded-lg p-5 border shadow-sm mt-4 dark:bg-slate-800 dark:border-slate-700">
+          <h4 className="font-medium mb-4 flex items-center text-gray-800 dark:text-slate-100">
             <Clock className="h-5 w-5 mr-2 text-blue-600" />
             Hourly Wind Speed
           </h4>
-          <p className="text-gray-600">No wind data available for this period.</p>
+          <p className="text-gray-600 dark:text-slate-300">No wind data available for this period.</p>
         </div>
       );
     }
-    
+
     return (
-      <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
-        <h4 className="font-medium mb-4 flex items-center text-gray-800">
-          <Clock className="h-5 w-5 mr-2 text-blue-600" /> 
+      <div className="bg-white rounded-lg p-5 border shadow-sm mt-4 dark:bg-slate-800 dark:border-slate-700">
+        <h4 className="font-medium mb-4 flex items-center text-gray-800 dark:text-slate-100">
+          <Clock className="h-5 w-5 mr-2 text-blue-600" />
           Hourly Wind Speed
         </h4>
-        
+
         <div className="space-y-3">
           {allHours.map(hour => {
             const windSpeed = hour.windSpeed;
             const barWidth = Math.min(80, windSpeed * 6); // Cap at 80% width
-            
+
             let barColor = "bg-green-500";
             let textColor = "text-green-800";
             let bgColor = "bg-green-100";
-            
+
             if (windSpeed >= 12) {
               barColor = "bg-red-500";
               textColor = "text-red-800";
@@ -1087,10 +1087,10 @@ const FixedBeachView = ({
               textColor = "text-yellow-800";
               bgColor = "bg-yellow-100";
             }
-            
+
             return (
               <div key={`${hour.date}-${hour.hour}`} className="flex items-center">
-                <div className="w-32 text-gray-600 font-medium">
+                <div className="w-32 text-gray-600 font-medium dark:text-slate-300">
                   {new Date(hour.time).toLocaleString([], {
                     month: 'short',
                     day: 'numeric',
@@ -1099,7 +1099,7 @@ const FixedBeachView = ({
                     hour12: false
                   })}
                 </div>
-                <div className="flex-grow mx-3 bg-gray-200 h-6 rounded-full overflow-hidden">
+                <div className="flex-grow mx-3 bg-gray-200 h-6 rounded-full overflow-hidden dark:bg-slate-600">
                   <div 
                     className={`h-full ${barColor} rounded-l-full`} 
                     style={{ width: `${barWidth}%` }} 
@@ -1247,20 +1247,20 @@ const FixedBeachView = ({
       </div>
 
       {/* Time range selector */}
-      <div className="p-4 border-b bg-gray-50">
-        <h3 className="text-lg font-medium mb-4">Choose Date & Time Window</h3>
-        
+      <div className="p-4 border-b bg-gray-50 dark:bg-slate-800 dark:border-slate-700">
+        <h3 className="text-lg font-medium mb-4 dark:text-slate-100">Choose Date & Time Window</h3>
+
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">Date</label>
           <div className="relative cursor-pointer" onClick={() => setShowDatePicker(true)}>
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Calendar className="h-5 w-5 text-gray-400" />
+              <Calendar className="h-5 w-5 text-gray-400 dark:text-slate-500" />
             </div>
             <input
               type="text"
               readOnly
               value={timeRange.date}
-              className="w-full pl-10 p-3 bg-white border rounded-lg cursor-pointer text-lg"
+              className="w-full pl-10 p-3 bg-white dark:bg-slate-700 dark:text-slate-100 border dark:border-slate-600 rounded-lg cursor-pointer text-lg"
             />
           </div>
         </div>
@@ -1286,13 +1286,13 @@ const FixedBeachView = ({
         
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
               Start Time
             </label>
             <select
               value={timeRange.startTime}
               onChange={(e) => onTimeRangeChange?.('startTime', e.target.value)}
-              className="w-full p-2 border rounded appearance-none bg-white text-lg"
+              className="w-full p-2 border dark:border-slate-600 rounded appearance-none bg-white dark:bg-slate-700 dark:text-slate-100 text-lg"
             >
               {Array.from({ length: 24 }, (_, i) => {
                 const hourLabel = `${String(i).padStart(2, '0')}:00`;
@@ -1310,13 +1310,13 @@ const FixedBeachView = ({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
               End Time
             </label>
             <select
               value={timeRange.endTime}
               onChange={(e) => onTimeRangeChange?.('endTime', e.target.value)}
-              className="w-full p-2 border rounded appearance-none bg-white text-lg"
+              className="w-full p-2 border dark:border-slate-600 rounded appearance-none bg-white dark:bg-slate-700 dark:text-slate-100 text-lg"
             >
               {Array.from({ length: 24 }, (_, i) => {
                 const hourLabel = `${String(i).padStart(2, '0')}:00`;
@@ -1348,7 +1348,7 @@ const FixedBeachView = ({
       {loading && (
         <div className="p-8 text-center">
           <div className="inline-block animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
-          <p className="text-gray-600">Loading real-time weather data...</p>
+          <p className="text-gray-600 dark:text-slate-300">Loading real-time weather data...</p>
         </div>
       )}
       
@@ -1376,42 +1376,42 @@ const FixedBeachView = ({
           {paddleScore !== null && (
             <div className="flex flex-col md:flex-row gap-6 mb-6">
               {/* Score card - LEFT SIDE */}
-              <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center flex flex-col justify-center relative">
+              <div className="md:w-1/3 bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 text-center flex flex-col justify-center relative">
                 <div
                   className={`text-6xl mb-3 ${condition.color}`}
                 >
                   {condition.emoji}
                 </div>
-                <h3 className="text-3xl font-bold mb-2 flex items-center justify-center">
+                <h3 className="text-3xl font-bold mb-2 flex items-center justify-center dark:text-slate-100">
                   {condition.label}
                   <div className="group relative ml-2">
                     <div className="cursor-help">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" 
-                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" 
-                          className="text-gray-400">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                          className="text-gray-400 dark:text-slate-500">
                         <circle cx="12" cy="12" r="10"></circle>
                         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>
                       </svg>
                     </div>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 
-                                  absolute z-10 w-64 p-3 -left-24 bottom-8 bg-white 
-                                  border border-gray-200 rounded-lg shadow-lg text-sm text-left">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                                  absolute z-10 w-64 p-3 -left-24 bottom-8 bg-white dark:bg-slate-700
+                                  border border-gray-200 dark:border-slate-600 rounded-lg shadow-lg text-sm text-left dark:text-slate-200">
                       {conditionDetails}
                     </div>
                   </div>
                 </h3>
-                <p className="text-gray-600 text-lg mb-4">{condition.message}</p>
-                <div className="mt-2 bg-gray-100 rounded-full h-5 overflow-hidden">
+                <p className="text-gray-600 dark:text-slate-300 text-lg mb-4">{condition.message}</p>
+                <div className="mt-2 bg-gray-100 dark:bg-slate-700 rounded-full h-5 overflow-hidden">
                   <div
                     className={`h-full ${condition.color}`}
                     style={{ width: `${paddleScore}%` }}
                   ></div>
                 </div>
-                <p className="mt-2 text-lg font-medium text-gray-700">
+                <p className="mt-2 text-lg font-medium text-gray-700 dark:text-slate-200">
                   Score: {paddleScore}/100
                 </p>
-                <div className="mt-1 text-xs text-gray-500 flex items-center justify-center gap-2">
+                <div className="mt-1 text-xs text-gray-500 dark:text-slate-400 flex items-center justify-center gap-2">
                   <span>Data quality:</span>
                   <span className={`font-medium ${
                     scoreBreakdown?.dataQuality >= 90 ? 'text-green-600' :
@@ -1432,10 +1432,10 @@ const FixedBeachView = ({
                 <div className="grid grid-cols-2 gap-3">
                   {breakdownMetrics ? (
                     <>
-                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border dark:border-slate-700 flex items-center shadow-sm">
                         <Wind className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
-                          <div className="text-sm text-gray-500">Wind</div>
+                          <div className="text-sm text-gray-500 dark:text-slate-400">Wind</div>
                           <div className={`text-lg font-medium ${
                             breakdownMetrics.windProtected < 8
                               ? 'text-green-600'
@@ -1444,17 +1444,17 @@ const FixedBeachView = ({
                                 : 'text-red-600'
                           }`}>
                             {Math.round(breakdownMetrics.windRaw)} km/h
-                            <span className="text-xs ml-2 text-gray-500">
+                            <span className="text-xs ml-2 text-gray-500 dark:text-slate-400">
                               (Protected: {Math.round(breakdownMetrics.windProtected)} km/h)
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border dark:border-slate-700 flex items-center shadow-sm">
                         <Waves className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
-                          <div className="text-sm text-gray-500">Wave Height</div>
+                          <div className="text-sm text-gray-500 dark:text-slate-400">Wave Height</div>
                           <div className={`text-lg font-medium ${
                             breakdownMetrics.waveProtected < 0.2
                               ? 'text-green-600'
@@ -1463,17 +1463,17 @@ const FixedBeachView = ({
                                 : 'text-red-600'
                           }`}>
                             {breakdownMetrics.waveRaw.toFixed(2)} m
-                            <span className="text-xs ml-2 text-gray-500">
+                            <span className="text-xs ml-2 text-gray-500 dark:text-slate-400">
                               (Protected: {breakdownMetrics.waveProtected.toFixed(2)} m)
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border dark:border-slate-700 flex items-center shadow-sm">
                         <Thermometer className="h-6 w-6 mr-3 text-orange-500" />
                         <div className="flex-grow">
-                          <div className="text-sm text-gray-500">Air Temp</div>
+                          <div className="text-sm text-gray-500 dark:text-slate-400">Air Temp</div>
                           <div className={`text-lg font-medium ${
                             breakdownMetrics.temperature >= 22 && breakdownMetrics.temperature <= 30
                               ? 'text-green-600'
@@ -1486,10 +1486,10 @@ const FixedBeachView = ({
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border dark:border-slate-700 flex items-center shadow-sm">
                         <Waves className="h-6 w-6 mr-3 text-cyan-500" />
                         <div className="flex-grow">
-                          <div className="text-sm text-gray-500">Water Temp</div>
+                          <div className="text-sm text-gray-500 dark:text-slate-400">Water Temp</div>
                           <div className={`text-lg font-medium ${
                             breakdownMetrics.waterTemperature !== null
                               ? breakdownMetrics.waterTemperature >= 18 && breakdownMetrics.waterTemperature <= 26
@@ -1509,23 +1509,23 @@ const FixedBeachView = ({
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border dark:border-slate-700 flex items-center shadow-sm">
                         <Droplets className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
-                          <div className="text-sm text-gray-500">Precipitation</div>
+                          <div className="text-sm text-gray-500 dark:text-slate-400">Precipitation</div>
                           <div className={`text-lg font-medium ${
                             breakdownMetrics.precipitation < 1 ? 'text-green-600' : 'text-red-600'
                           }`}>
                             {breakdownMetrics.precipitation.toFixed(1)} mm
                           </div>
-                          <div className="mt-1 text-xs text-gray-500">
+                          <div className="mt-1 text-xs text-gray-500 dark:text-slate-400">
                             Cloud cover {Math.round(breakdownMetrics.cloudCover)}%
                           </div>
                         </div>
                       </div>
                     </>
                   ) : (
-                    <div className="col-span-2 rounded-lg border border-dashed border-blue-200 p-4 text-sm text-gray-500">
+                    <div className="col-span-2 rounded-lg border border-dashed border-blue-200 dark:border-slate-600 p-4 text-sm text-gray-500 dark:text-slate-400">
                       Forecast metrics will appear once weather data loads.
                     </div>
                   )}
@@ -1589,14 +1589,14 @@ const FixedBeachView = ({
                   )}
                 </div>
 
-                <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                  <h4 className="flex items-center text-lg font-semibold text-gray-800">
+                <div className="rounded-2xl border dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
+                  <h4 className="flex items-center text-lg font-semibold text-gray-800 dark:text-slate-100">
                     <LifeBuoy className="mr-2 h-5 w-5 text-blue-500" /> Session game plan
                   </h4>
-                  <p className="mt-2 text-sm text-gray-500">Forecast window: {readiness.windowLabel}</p>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">Forecast window: {readiness.windowLabel}</p>
                   <ul className="mt-4 space-y-3">
                     {readiness.suggestions.map((tip, index) => (
-                      <li key={index} className="flex items-start text-sm text-gray-600">
+                      <li key={index} className="flex items-start text-sm text-gray-600 dark:text-slate-300">
                         <CheckCircle2 className="mr-2 h-5 w-5 flex-shrink-0 text-blue-500" />
                         <span>{tip}</span>
                       </li>
@@ -1631,7 +1631,7 @@ const FixedBeachView = ({
           {renderHourlyWind()}
           
           <div className="text-center mt-6">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-slate-400">
               This is real-time weather data from Open-Meteo API. Always verify conditions before paddleboarding.
             </p>
           </div>
