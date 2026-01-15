@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import {
   Home,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   RefreshCw,
   AlertCircle,
   MapPin,
@@ -53,6 +55,15 @@ const FixedBeachView = ({
   const [error, setError] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    scoreBreakdown: false,
+    geoProtection: false,
+    hourlyWind: false
+  });
+
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   const toNumberOr = (value, fallback = 0) => {
     const number = typeof value === "number" ? value : Number(value);
@@ -682,20 +693,50 @@ const FixedBeachView = ({
       0
     );
     
+    // Get protection level label
+    const protectionLabel = geoProtection.protectionScore > 60
+      ? 'Well Protected'
+      : geoProtection.protectionScore > 30
+        ? 'Moderate'
+        : 'Exposed';
+
     return (
-      <div className="bg-blue-50 p-5 rounded-lg mt-4 border border-blue-200 shadow-inner">
-        <h4 className="font-medium mb-4 text-lg flex items-center text-blue-800">
-          <MapPin className="h-5 w-5 mr-2 text-blue-600" />
-          Geographic Protection Analysis
-          <button
-            onClick={() => setShowDebug(!showDebug)}
-            className="ml-auto text-xs text-blue-600 underline"
-          >
-            {showDebug ? 'Hide debug' : 'Show debug'}
-          </button>
-        </h4>
-        
-        <div className="grid md:grid-cols-2 gap-6">
+      <div className="bg-blue-50 rounded-lg mt-4 border border-blue-200 shadow-inner">
+        <button
+          onClick={() => toggleSection('geoProtection')}
+          className="w-full p-5 flex items-center justify-between text-left hover:bg-blue-100/50 transition-colors rounded-lg"
+        >
+          <h4 className="font-medium text-lg flex items-center text-blue-800">
+            <MapPin className="h-5 w-5 mr-2 text-blue-600" />
+            Geographic Protection
+            <span className={`ml-2 text-sm font-normal px-2 py-0.5 rounded-full ${
+              geoProtection.protectionScore > 60
+                ? 'bg-green-100 text-green-700'
+                : geoProtection.protectionScore > 30
+                  ? 'bg-yellow-100 text-yellow-700'
+                  : 'bg-red-100 text-red-700'
+            }`}>
+              {protectionLabel}
+            </span>
+          </h4>
+          {expandedSections.geoProtection ? (
+            <ChevronUp className="h-5 w-5 text-blue-400" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-blue-400" />
+          )}
+        </button>
+
+        {expandedSections.geoProtection && (
+          <div className="px-5 pb-5">
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => setShowDebug(!showDebug)}
+                className="text-xs text-blue-600 underline"
+              >
+                {showDebug ? 'Hide debug' : 'Show debug'}
+              </button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6">
           <ul className="space-y-3">
             <li className="flex justify-between items-center bg-white p-3 rounded border">
               <span className="font-medium text-gray-700">Bay Enclosure:</span>
@@ -785,11 +826,13 @@ const FixedBeachView = ({
               </pre>
             )}
           </div>
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
-  
+
   // Render score breakdown
   const renderScoreBreakdown = () => {
     if (!scoreBreakdown) return null;
@@ -814,18 +857,33 @@ const FixedBeachView = ({
     );
 
     return (
-      <div className="bg-white p-5 rounded-lg mt-4 shadow-sm border">
-        <h4 className="font-medium mb-4 flex items-center text-gray-800">
-          <Info className="h-5 w-5 mr-2 text-blue-600" />
-          Score Breakdown
-        </h4>
+      <div className="bg-white rounded-lg mt-4 shadow-sm border">
+        <button
+          onClick={() => toggleSection('scoreBreakdown')}
+          className="w-full p-5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors rounded-lg"
+        >
+          <h4 className="font-medium flex items-center text-gray-800">
+            <Info className="h-5 w-5 mr-2 text-blue-600" />
+            Score Breakdown
+            <span className="ml-2 text-sm font-normal text-gray-500">
+              ({scoreBreakdown.total.score}/100)
+            </span>
+          </h4>
+          {expandedSections.scoreBreakdown ? (
+            <ChevronUp className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          )}
+        </button>
 
-        <p className="text-sm text-gray-600 mb-3">
-          Each factor contributes a set number of points to the final score – shown in parentheses below.
-          The progress bar indicates how many of those points were earned. See the FAQ for details.
-        </p>
+        {expandedSections.scoreBreakdown && (
+          <div className="px-5 pb-5">
+            <p className="text-sm text-gray-600 mb-3">
+              Each factor contributes a set number of points to the final score – shown in parentheses below.
+              The progress bar indicates how many of those points were earned. See the FAQ for details.
+            </p>
 
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -1161,7 +1219,9 @@ const FixedBeachView = ({
               </tr>
             </tbody>
           </table>
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -1773,6 +1833,44 @@ const FixedBeachView = ({
             </div>
           )}
 
+          {/* Beach Location Map - Compact */}
+          {beach && (
+            <div className="mt-4 bg-white rounded-lg shadow-sm border overflow-hidden">
+              <div className="h-48 relative">
+                <MapContainer
+                  center={[beach.latitude, beach.longitude]}
+                  zoom={14}
+                  style={{ height: "100%", width: "100%" }}
+                  scrollWheelZoom={false}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={[beach.latitude, beach.longitude]}>
+                    <Popup>
+                      <strong>{beach.name}</strong>
+                    </Popup>
+                  </Marker>
+                </MapContainer>
+              </div>
+              <div className="px-4 py-2 flex justify-between items-center text-sm border-t bg-gray-50">
+                <span className="text-gray-600">
+                  {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
+                </span>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${beach.latitude},${beach.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline flex items-center font-medium"
+                >
+                  <Navigation className="h-4 w-4 mr-1" />
+                  Directions
+                </a>
+              </div>
+            </div>
+          )}
+
           {readiness && (
             <div className="mt-6 space-y-4">
               <div className="grid gap-4 lg:grid-cols-2">
@@ -1865,50 +1963,6 @@ const FixedBeachView = ({
           
           {/* Geographic Protection */}
           {renderGeoProtectionInfo()}
-
-          {/* Beach Location Map */}
-          {beach && (
-            <div className="bg-white p-5 rounded-lg mt-4 shadow-sm border">
-              <h4 className="font-medium mb-4 flex items-center text-gray-800">
-                <MapPin className="h-5 w-5 mr-2 text-blue-600" />
-                Beach Location
-              </h4>
-              <div className="h-64 rounded-lg overflow-hidden border">
-                <MapContainer
-                  center={[beach.latitude, beach.longitude]}
-                  zoom={14}
-                  style={{ height: "100%", width: "100%" }}
-                  scrollWheelZoom={false}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  <Marker position={[beach.latitude, beach.longitude]}>
-                    <Popup>
-                      <strong>{beach.name}</strong>
-                      <br />
-                      {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
-                    </Popup>
-                  </Marker>
-                </MapContainer>
-              </div>
-              <div className="mt-3 flex justify-between items-center text-sm text-gray-600">
-                <span>
-                  Coordinates: {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
-                </span>
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${beach.latitude},${beach.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline flex items-center"
-                >
-                  <Navigation className="h-4 w-4 mr-1" />
-                  Get Directions
-                </a>
-              </div>
-            </div>
-          )}
 
           {/* Hourly Wind */}
           {renderHourlyWind()}
