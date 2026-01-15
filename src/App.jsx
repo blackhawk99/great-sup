@@ -18,8 +18,12 @@ import {
   Sun,
   Moon,
   Link as LinkIcon,
-  Eye
+  Eye,
+  Search,
+  Menu,
+  X
 } from "lucide-react";
+import { Logo, LogoCompact } from "./components/Logo";
 import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers.jsx";
@@ -50,6 +54,7 @@ const App = () => {
   const [locating, setLocating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("shelter");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, resolvedTheme, setTheme } = useTheme();
   const greekBounds = {
     latMin: 34.6,
@@ -69,10 +74,10 @@ const App = () => {
     "-";
   
   // Use beach manager
-  const { 
-    beaches, 
-    homeBeach, 
-    setHomeBeach, 
+  const {
+    beaches,
+    homeBeach,
+    setHomeBeach,
     addBeach,
     addSuggestedBeach,
     deleteBeach,
@@ -84,7 +89,17 @@ const App = () => {
     mapUrl,
     setMapUrl,
     handleExtractCoordinates,
-    loading: beachLoading
+    loading: beachLoading,
+    // Place search
+    placeSearch,
+    setPlaceSearch,
+    placeResults,
+    searchingPlaces,
+    searchPlaces,
+    selectPlace,
+    clearPlaceSearch,
+    // Coastline snapping
+    resnapAllBeaches
   } = useBeachManager();
   
   // Toast notification
@@ -476,85 +491,172 @@ const App = () => {
       <FAQ isOpen={showFAQ} onClose={() => setShowFAQ(false)} />
       
       {/* Header */}
-      <header className="bg-blue-600 text-white p-4 shadow-md dark:bg-slate-900">
-        <div className="container mx-auto flex justify-between items-center">
-          <h1
-            className="text-2xl font-bold flex items-center cursor-pointer hover:text-blue-100 transition-colors"
-            onClick={() => setView("dashboard")}
-          >
-            <div className="mr-2 text-3xl">🌊</div>
-            Paddleboard Weather Advisor
-          </h1>
-          <nav className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
+      <header className="relative bg-gradient-to-r from-slate-900 via-blue-900 to-cyan-900 text-white shadow-xl">
+        {/* Decorative wave pattern */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10">
+          <svg className="absolute bottom-0 w-full h-12" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,60 C200,120 400,0 600,60 C800,120 1000,0 1200,60 L1200,120 L0,120 Z" fill="currentColor" />
+          </svg>
+        </div>
+
+        <div className="container mx-auto px-4 py-3 relative">
+          <div className="flex items-center justify-between">
+            {/* Logo */}
             <button
-              onClick={toggleFAQ}
-              className="p-2 rounded-full hover:bg-blue-700 transition"
-              title="Help & FAQ"
+              onClick={() => { setView("dashboard"); setMobileMenuOpen(false); }}
+              className="hover:opacity-90 transition-opacity"
             >
-              <HelpCircle className="h-5 w-5" />
+              <div className="hidden sm:block">
+                <Logo />
+              </div>
+              <div className="sm:hidden">
+                <LogoCompact />
+              </div>
             </button>
-            <div className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-xs font-semibold uppercase tracking-wide">
-              <span className="sr-only">Theme selection</span>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center gap-3">
+              {/* Nav buttons */}
+              <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1">
+                <button
+                  onClick={() => setView("dashboard")}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    view === "dashboard"
+                      ? "bg-white/20 text-white shadow-lg"
+                      : "text-white/70 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <Compass className="h-4 w-4 inline mr-1.5" />
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => setView("add")}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    view === "add"
+                      ? "bg-white/20 text-white shadow-lg"
+                      : "text-white/70 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <Plus className="h-4 w-4 inline mr-1.5" />
+                  Add Beach
+                </button>
+              </div>
+
+              {/* Theme switcher */}
+              <div className="flex items-center gap-0.5 bg-white/5 rounded-full p-1">
+                <button
+                  onClick={() => setTheme("light")}
+                  className={`p-2 rounded-full transition-all ${
+                    theme === "light" ? "bg-amber-400 text-slate-900" : "text-white/60 hover:text-white"
+                  }`}
+                  title="Light mode"
+                >
+                  <Sun className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setTheme("system")}
+                  className={`p-2 rounded-full transition-all ${
+                    theme === "system" ? "bg-purple-400 text-slate-900" : "text-white/60 hover:text-white"
+                  }`}
+                  title="System theme"
+                >
+                  <Sparkles className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setTheme("dark")}
+                  className={`p-2 rounded-full transition-all ${
+                    theme === "dark" ? "bg-indigo-400 text-slate-900" : "text-white/60 hover:text-white"
+                  }`}
+                  title="Dark mode"
+                >
+                  <Moon className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Help button */}
               <button
-                type="button"
-                aria-label="Use light theme"
-                aria-pressed={theme === "light"}
-                onClick={() => setTheme("light")}
-                className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
-                  theme === "light"
-                    ? "bg-white/80 text-blue-700"
-                    : "text-white hover:bg-white/20"
+                onClick={toggleFAQ}
+                className="p-2 rounded-full bg-white/5 hover:bg-white/15 transition-colors"
+                title="Help & FAQ"
+              >
+                <HelpCircle className="h-5 w-5 text-white/70" />
+              </button>
+            </nav>
+
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
+
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && (
+            <nav className="md:hidden mt-4 pb-2 border-t border-white/10 pt-4 space-y-2">
+              <button
+                onClick={() => { setView("dashboard"); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
+                  view === "dashboard"
+                    ? "bg-white/20 text-white"
+                    : "text-white/70 hover:bg-white/10"
                 }`}
               >
-                <Sun className="h-4 w-4" />
-                <span className="hidden sm:inline">Light</span>
+                <Compass className="h-5 w-5" />
+                <span className="font-medium">Dashboard</span>
               </button>
               <button
-                type="button"
-                aria-label="Use system theme"
-                aria-pressed={theme === "system"}
-                onClick={() => setTheme("system")}
-                className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
-                  theme === "system"
-                    ? "bg-white/80 text-blue-700"
-                    : "text-white hover:bg-white/20"
+                onClick={() => { setView("add"); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
+                  view === "add"
+                    ? "bg-white/20 text-white"
+                    : "text-white/70 hover:bg-white/10"
                 }`}
               >
-                <Sparkles className="h-4 w-4" />
-                <span className="hidden sm:inline">Auto</span>
+                <Plus className="h-5 w-5" />
+                <span className="font-medium">Add Beach</span>
               </button>
               <button
-                type="button"
-                aria-label="Use dark theme"
-                aria-pressed={theme === "dark"}
-                onClick={() => setTheme("dark")}
-                className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
-                  theme === "dark"
-                    ? "bg-white/80 text-blue-700"
-                    : "text-white hover:bg-white/20"
-                }`}
+                onClick={() => { toggleFAQ(); setMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-white/70 hover:bg-white/10 transition-all"
               >
-                <Moon className="h-4 w-4" />
-                <span className="hidden sm:inline">Dark</span>
+                <HelpCircle className="h-5 w-5" />
+                <span className="font-medium">Help & FAQ</span>
               </button>
-            </div>
-            <button
-              onClick={() => setView("dashboard")}
-              className={`px-3 py-1 rounded-lg ${
-                view === "dashboard" ? "bg-blue-800" : "hover:bg-blue-700"
-              } transition-colors duration-200`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setView("add")}
-              className={`px-3 py-1 rounded-lg ${
-                view === "add" ? "bg-blue-800" : "hover:bg-blue-700"
-              } transition-colors duration-200`}
-            >
-              Add Beach
-            </button>
-          </nav>
+
+              {/* Mobile theme switcher */}
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <span className="text-xs text-white/50 uppercase tracking-wide">Theme:</span>
+                <div className="flex items-center gap-1 bg-white/5 rounded-full p-1">
+                  <button
+                    onClick={() => setTheme("light")}
+                    className={`p-2 rounded-full transition-all ${
+                      theme === "light" ? "bg-amber-400 text-slate-900" : "text-white/60"
+                    }`}
+                  >
+                    <Sun className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setTheme("system")}
+                    className={`p-2 rounded-full transition-all ${
+                      theme === "system" ? "bg-purple-400 text-slate-900" : "text-white/60"
+                    }`}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setTheme("dark")}
+                    className={`p-2 rounded-full transition-all ${
+                      theme === "dark" ? "bg-indigo-400 text-slate-900" : "text-white/60"
+                    }`}
+                  >
+                    <Moon className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </nav>
+          )}
         </div>
       </header>
 
@@ -646,32 +748,32 @@ const App = () => {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <h3 className="flex items-center text-lg font-semibold text-gray-800 dark:text-slate-100">
+              <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
+                <h3 className="flex items-center text-lg font-semibold text-gray-800">
                   <LifeBuoy className="mr-2 h-5 w-5 text-blue-500" /> Session snapshot
                 </h3>
-                <dl className="mt-4 space-y-3 text-sm text-gray-600 dark:text-slate-300">
+                <dl className="mt-4 space-y-3 text-sm text-gray-600">
                   <div className="flex items-center justify-between">
-                    <dt className="font-medium text-gray-500 dark:text-slate-400">Home launch</dt>
-                    <dd className="font-semibold text-gray-900 dark:text-slate-100">
+                    <dt className="font-medium text-gray-500">Home launch</dt>
+                    <dd className="font-semibold text-gray-900">
                       {homeBeach ? homeBeach.name : "Not set"}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <dt className="font-medium text-gray-500 dark:text-slate-400">Gear checklist</dt>
-                    <dd className="font-semibold text-gray-900 dark:text-slate-100">Tap inside a forecast</dd>
+                    <dt className="font-medium text-gray-500">Gear checklist</dt>
+                    <dd className="font-semibold text-gray-900">Tap inside a forecast</dd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <dt className="font-medium text-gray-500 dark:text-slate-400">Forecast window</dt>
-                    <dd className="font-semibold text-gray-900 dark:text-slate-100">
+                    <dt className="font-medium text-gray-500">Forecast window</dt>
+                    <dd className="font-semibold text-gray-900">
                       {timeRange.startTime} – {timeRange.endTime}
                     </dd>
                   </div>
                 </dl>
                 {homeBeach ? (
-                  <div className="mt-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
+                  <div className="mt-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-700">
                     <p className="font-semibold">Ready for {homeBeach.name}?</p>
-                    <p className="text-xs text-blue-600 dark:text-blue-300">
+                    <p className="text-xs text-blue-600">
                       {homeBeach.latitude.toFixed(2)}, {homeBeach.longitude.toFixed(2)}
                     </p>
                     <button
@@ -682,7 +784,7 @@ const App = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-slate-700 dark:text-slate-300">
+                  <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
                     Set any beach as "home" from its forecast page to pin it here for quick access.
                   </div>
                 )}
@@ -748,7 +850,7 @@ const App = () => {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <label htmlFor="beach-sort" className="text-xs font-semibold uppercase tracking-wide text-blue-900 dark:text-slate-200">
+                <label htmlFor="beach-sort" className="text-xs font-semibold uppercase tracking-wide text-blue-900">
                   Sort by
                 </label>
                 <select
@@ -766,10 +868,10 @@ const App = () => {
 
             {hasBeaches ? (
               filteredBeaches.length === 0 ? (
-                <div className="rounded-2xl border bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600 dark:bg-slate-700">🔍</div>
-                  <h3 className="mt-4 text-xl font-semibold text-gray-800 dark:text-slate-100">No matches found</h3>
-                  <p className="mt-2 text-sm text-gray-600 dark:text-slate-300">
+                <div className="rounded-2xl border bg-white p-8 text-center shadow-sm">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600">🔍</div>
+                  <h3 className="mt-4 text-xl font-semibold text-gray-800">No matches found</h3>
+                  <p className="mt-2 text-sm text-gray-600">
                     Try a different beach name, adjust your spelling, or clear the search to see all saved launches.
                   </p>
                   <button
@@ -791,7 +893,7 @@ const App = () => {
                       <div className="flex flex-1 flex-col p-4">
                         <div className="mb-3 flex items-start justify-between">
                           <div>
-                            <h2 className="flex items-center text-lg font-semibold text-gray-800 dark:text-slate-100">
+                            <h2 className="flex items-center text-lg font-semibold text-gray-800">
                               {beach.id === homeBeach?.id && (
                                 <Home className="mr-1 h-4 w-4 text-orange-500" />
                               )}
@@ -819,8 +921,8 @@ const App = () => {
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-                        <p className="flex items-center text-sm text-gray-500 dark:text-slate-400">
-                          <MapPin className="mr-1 h-3 w-3 text-gray-400 dark:text-slate-500" />
+                        <p className="flex items-center text-sm text-gray-500">
+                          <MapPin className="mr-1 h-3 w-3 text-gray-400" />
                           {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
                         </p>
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
@@ -889,10 +991,10 @@ const App = () => {
                 </div>
               )
             ) : (
-              <div className="rounded-2xl border bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600 dark:bg-slate-700">🏝️</div>
-                <h2 className="mt-4 text-2xl font-bold text-gray-800 dark:text-slate-100">No beaches saved yet</h2>
-                <p className="mt-2 text-gray-600 dark:text-slate-300">
+              <div className="rounded-2xl border bg-white p-8 text-center shadow-sm">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600">🏝️</div>
+                <h2 className="mt-4 text-2xl font-bold text-gray-800">No beaches saved yet</h2>
+                <p className="mt-2 text-gray-600">
                   Add your favourite paddleboarding launches to unlock personalised forecasts and checklists.
                 </p>
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -907,14 +1009,14 @@ const App = () => {
                     disabled={locating}
                     className={`rounded-lg border px-6 py-3 ${
                       locating
-                        ? 'border-blue-100 text-blue-300 dark:border-slate-600 dark:text-slate-500'
-                        : 'border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-slate-600 dark:text-blue-300 dark:hover:bg-slate-700'
+                        ? 'border-blue-100 text-blue-300'
+                        : 'border-blue-200 text-blue-600 hover:bg-blue-50'
                     }`}
                   >
                     {locating ? 'Locating…' : 'Use my location'}
                   </button>
                 </div>
-                <p className="mt-4 text-sm text-gray-500 dark:text-slate-400">
+                <p className="mt-4 text-sm text-gray-500">
                   Or open <span className="font-medium">Add Beach</span> to browse curated Greek bays ready to import.
                 </p>
               </div>
@@ -926,12 +1028,12 @@ const App = () => {
                 return (
                   <div
                     key={card.title}
-                    className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+                    className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"
                   >
-                    <h3 className="flex items-center text-lg font-semibold text-gray-800 dark:text-slate-100">
+                    <h3 className="flex items-center text-lg font-semibold text-gray-800">
                       <Icon className="mr-2 h-5 w-5 text-blue-500" /> {card.title}
                     </h3>
-                    <ul className="mt-3 space-y-2 text-sm text-gray-600 dark:text-slate-300">
+                    <ul className="mt-3 space-y-2 text-sm text-gray-600">
                       {card.bullets.map((bullet) => (
                         <li key={bullet} className="leading-relaxed">{bullet}</li>
                       ))}
@@ -944,37 +1046,55 @@ const App = () => {
         )}
 
         {view === "add" && (
-          <div className="bg-white rounded-2xl shadow-lg border border-blue-50 dark:bg-slate-800 dark:border-slate-700">
-            <div className="p-4 border-b flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
+          <div className="bg-white rounded-2xl shadow-lg border border-blue-50">
+            <div className="p-4 border-b flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-xl font-semibold flex items-center dark:text-slate-100">
+                <h2 className="text-xl font-semibold flex items-center">
                   <Plus className="h-5 w-5 mr-2 text-blue-500" />
                   Add New Beach
                 </h2>
-                <p className="text-sm text-gray-600 dark:text-slate-300">Optimised for Greek coastlines. Works with any bay—from Epirus to Rhodes.</p>
+                <p className="text-sm text-gray-600">Optimised for Greek coastlines. Works with any bay—from Epirus to Rhodes.</p>
               </div>
-              <div className="flex items-center gap-2 text-xs text-blue-700 dark:text-blue-300">
-                <Smartphone className="h-4 w-4" /> Mobile-friendly form
+              <div className="flex items-center gap-3">
+                {beaches.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const result = resnapAllBeaches();
+                      if (result.snapped > 0) {
+                        toast.success(`Moved ${result.snapped} of ${result.total} beaches to coastline`);
+                      } else {
+                        toast.success(`All ${result.total} beaches already on coastline`);
+                      }
+                    }}
+                    className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                  >
+                    <MapPin className="h-3.5 w-3.5" />
+                    Snap to coastline
+                  </button>
+                )}
+                <div className="flex items-center gap-2 text-xs text-blue-700">
+                  <Smartphone className="h-4 w-4" /> Mobile-friendly form
+                </div>
               </div>
             </div>
 
             <div className="p-4 space-y-6">
               <div className="grid gap-6 lg:grid-cols-2">
-                <div className="rounded-2xl bg-white shadow-sm border border-blue-100 p-6 dark:bg-slate-800 dark:border-slate-700">
+                <div className="rounded-2xl bg-white shadow-sm border border-blue-100 p-6">
                   <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <h3 className="text-xl font-semibold text-gray-800 dark:text-slate-100">Add a Greek beach</h3>
-                      <p className="text-sm text-gray-600 dark:text-slate-300">Paste a Google Maps link or enter coordinates. Works for every shoreline in Greece—ionian coves, windy Cyclades and calm mainland bays.</p>
+                      <h3 className="text-xl font-semibold text-gray-800">Add a Greek beach</h3>
+                      <p className="text-sm text-gray-600">Paste a Google Maps link or enter coordinates. Works for every shoreline in Greece—ionian coves, windy Cyclades and calm mainland bays.</p>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+                    <div className="flex items-center gap-2 text-sm text-blue-700">
                       <MapPin className="h-4 w-4" />
                       <span>Aegean & Ionian ready</span>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flex flex-col gap-2 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-sm text-blue-800 dark:border-slate-600 dark:bg-blue-900/30 dark:text-blue-200">
-                      <div className="flex items-center gap-2 font-semibold text-blue-900 dark:text-blue-100">
+                    <div className="flex flex-col gap-2 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-sm text-blue-800">
+                      <div className="flex items-center gap-2 font-semibold text-blue-900">
                         <Sparkles className="h-4 w-4" /> Fast lane
                       </div>
                       <p>Drop a Maps link and we auto-fill the name and coordinates. Anything inside Greece works—the checker below flags out-of-bounds spots.</p>
@@ -986,7 +1106,7 @@ const App = () => {
                         value={mapUrl}
                         onChange={(e) => setMapUrl(e.target.value)}
                         placeholder="Paste Google Maps URL here..."
-                        className="flex-grow rounded-lg border px-3 py-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 dark:placeholder:text-slate-400"
+                        className="flex-grow rounded-lg border px-3 py-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
                       />
                       <button
                         onClick={handleExtractCoordinates}
@@ -997,36 +1117,76 @@ const App = () => {
                       </button>
                     </div>
                     {beachLoading && (
-                      <p className="text-xs text-blue-600 mt-2 dark:text-blue-300">
+                      <p className="text-xs text-blue-600 mt-2">
                         Analyzing coastline and geographic protection...
                       </p>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-center rounded-2xl border border-dashed border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 text-center dark:border-slate-600 dark:from-slate-800 dark:to-slate-900">
-                  <div className="space-y-3 max-w-md">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm text-blue-600 dark:bg-slate-700">
-                      <Map className="h-5 w-5" />
+                <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Search className="h-5 w-5 text-blue-600" />
+                      <p className="text-base font-semibold text-blue-900">Search by name</p>
                     </div>
-                    <p className="text-base font-semibold text-blue-900 dark:text-slate-100">Tap to add from your phone</p>
-                    <p className="text-sm text-gray-600 dark:text-slate-300">Works on iPhone: paste a Maps link, confirm the preview, and save. The layout stays thumb-friendly.</p>
-                    <button
-                      onClick={handleFindNearest}
-                      className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-                      disabled={locating}
-                    >
-                      {locating ? 'Finding nearest location...' : 'Use my current location'}
-                    </button>
+                    <p className="text-sm text-gray-600">Type a beach name to search worldwide. We'll find coordinates for you.</p>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={placeSearch}
+                        onChange={(e) => {
+                          setPlaceSearch(e.target.value);
+                          searchPlaces(e.target.value);
+                        }}
+                        placeholder="e.g., Bondi Beach, Malibu..."
+                        className="w-full rounded-lg border px-3 py-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      />
+                      {searchingPlaces && (
+                        <div className="absolute right-3 top-3">
+                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+                        </div>
+                      )}
+
+                      {placeResults.length > 0 && (
+                        <div className="absolute z-20 mt-1 w-full rounded-lg border bg-white shadow-lg max-h-64 overflow-y-auto">
+                          {placeResults.map((place) => (
+                            <button
+                              key={place.id}
+                              onClick={() => selectPlace(place)}
+                              className="w-full px-3 py-2 text-left hover:bg-blue-50 border-b last:border-b-0 transition-colors"
+                            >
+                              <div className="font-medium text-gray-800">{place.name}</div>
+                              <div className="text-xs text-gray-500 truncate">{place.fullName}</div>
+                              <div className="text-xs text-blue-600">
+                                {place.latitude.toFixed(4)}, {place.longitude.toFixed(4)}
+                                {place.country && ` • ${place.country}`}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t">
+                      <button
+                        onClick={handleFindNearest}
+                        className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                        disabled={locating}
+                      >
+                        {locating ? 'Finding nearest location...' : 'Or use my current location'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="grid gap-4 lg:grid-cols-3">
-                <div className="lg:col-span-2 bg-white p-4 rounded-lg border shadow-sm dark:bg-slate-800 dark:border-slate-700">
+                <div className="lg:col-span-2 bg-white p-4 rounded-lg border shadow-sm">
                   <div className="grid gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-200">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         Beach Name
                       </label>
                       <input
@@ -1036,12 +1196,12 @@ const App = () => {
                           setNewBeach({ ...newBeach, name: e.target.value })
                         }
                         placeholder="e.g., Kavouri Beach"
-                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 dark:placeholder:text-slate-400"
+                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-200">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                           Latitude
                         </label>
                         <input
@@ -1052,11 +1212,11 @@ const App = () => {
                             setNewBeach({ ...newBeach, latitude: e.target.value })
                           }
                           placeholder="e.g., 37.8235"
-                          className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 dark:placeholder:text-slate-400"
+                          className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-200">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                           Longitude
                         </label>
                         <input
@@ -1070,7 +1230,7 @@ const App = () => {
                             })
                           }
                           placeholder="e.g., 23.7761"
-                          className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 dark:placeholder:text-slate-400"
+                          className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                       </div>
                     </div>
@@ -1087,7 +1247,7 @@ const App = () => {
                         !newBeach.name ||
                         !newBeach.latitude ||
                         !newBeach.longitude
-                          ? "bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-slate-600 dark:text-slate-400"
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                           : "bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                       }`}
                     >
@@ -1096,12 +1256,12 @@ const App = () => {
                   </div>
                 </div>
 
-                <div className="space-y-3 rounded-lg border border-blue-100 bg-gradient-to-b from-blue-50 to-white p-4 shadow-sm dark:border-slate-700 dark:from-slate-800 dark:to-slate-900">
-                  <div className="flex items-center gap-2 text-blue-900 dark:text-blue-200">
+                <div className="space-y-3 rounded-lg border border-blue-100 bg-gradient-to-b from-blue-50 to-white p-4 shadow-sm">
+                  <div className="flex items-center gap-2 text-blue-900">
                     <Sunrise className="h-5 w-5" />
                     <p className="font-semibold">Greek beach checker</p>
                   </div>
-                  <p className="text-sm text-gray-700 dark:text-slate-300">We sanity-check your coordinates. Anything within {greekBounds.latMin}°–{greekBounds.latMax}° N and {greekBounds.lonMin}°–{greekBounds.lonMax}° E is Greek territory.</p>
+                  <p className="text-sm text-gray-700">We sanity-check your coordinates. Anything within {greekBounds.latMin}°–{greekBounds.latMax}° N and {greekBounds.lonMin}°–{greekBounds.lonMax}° E is Greek territory.</p>
                   <div
                     className={`rounded-lg border p-3 text-sm ${
                       greekReadiness.state === "ready"
@@ -1124,26 +1284,26 @@ const App = () => {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-slate-400">
+                  <div className="flex items-start gap-2 text-xs text-gray-600">
                     <ImageIcon className="mt-0.5 h-4 w-4 text-blue-500" />
                     <p>Preview uses OpenStreetMap tiles so you can visually verify coves before saving.</p>
                   </div>
                 </div>
               </div>
 
-              <div className="border-t pt-6 dark:border-slate-700">
-                <h3 className="text-lg font-medium mb-3 dark:text-slate-100">
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-medium mb-3">
                   Popular Greek Beaches
                 </h3>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {suggestedLocations.map((location, index) => (
                     <div
                       key={index}
-                      className="bg-white border rounded-lg p-4 hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition shadow-sm dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700 dark:hover:border-slate-600"
+                      className="bg-white border rounded-lg p-4 hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition shadow-sm"
                       onClick={() => handleAddSuggested(location)}
                     >
-                      <h4 className="font-medium text-blue-700 dark:text-blue-300">{location.name}</h4>
-                      <p className="text-sm text-gray-500 mb-2 dark:text-slate-400">
+                      <h4 className="font-medium text-blue-700">{location.name}</h4>
+                      <p className="text-sm text-gray-500 mb-2">
                         {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
                       </p>
                       <a 
@@ -1181,11 +1341,11 @@ const App = () => {
 
       {/* Mobile quick actions */}
       <div className="fixed inset-x-4 bottom-4 z-40 md:hidden">
-        <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-white p-3 shadow-xl backdrop-blur dark:border-slate-700 dark:bg-slate-800">
+        <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-white p-3 shadow-xl backdrop-blur">
           <button
             onClick={() => setView("dashboard")}
             className={`flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold ${
-              view === "dashboard" ? "bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200" : "text-blue-800 hover:bg-blue-50 dark:text-slate-200 dark:hover:bg-slate-700"
+              view === "dashboard" ? "bg-blue-50 text-blue-700" : "text-blue-800 hover:bg-blue-50"
             }`}
           >
             <Home className="h-4 w-4" />
@@ -1194,7 +1354,7 @@ const App = () => {
           <button
             onClick={() => setView("add")}
             className={`flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold ${
-              view === "add" ? "bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200" : "text-blue-800 hover:bg-blue-50 dark:text-slate-200 dark:hover:bg-slate-700"
+              view === "add" ? "bg-blue-50 text-blue-700" : "text-blue-800 hover:bg-blue-50"
             }`}
           >
             <Plus className="h-4 w-4" />
@@ -1202,7 +1362,7 @@ const App = () => {
           </button>
           <button
             onClick={handleFindNearest}
-            className="flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50 dark:text-slate-200 dark:hover:bg-slate-700"
+            className="flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
             disabled={locating}
           >
             <MapPin className="h-4 w-4" />
@@ -1210,7 +1370,7 @@ const App = () => {
           </button>
           <button
             onClick={toggleFAQ}
-            className="flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50 dark:text-slate-200 dark:hover:bg-slate-700"
+            className="flex flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
           >
             <HelpCircle className="h-4 w-4" />
             Help

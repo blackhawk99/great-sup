@@ -3,6 +3,79 @@ import * as turf from '@turf/turf';
 import { greeceCoastlines } from '../data/greece-coastlines';
 import { greeceIslands } from '../data/greece-islands';
 
+// Snap coordinates to nearest coastline point
+export function snapToCoastline(latitude, longitude, maxDistance = 2) {
+  try {
+    const point = turf.point([longitude, latitude]);
+    let nearestPoint = null;
+    let minDistance = Infinity;
+
+    // Check coastlines
+    for (const feature of greeceCoastlines.features) {
+      if (feature.geometry.type === 'LineString') {
+        try {
+          const line = turf.lineString(feature.geometry.coordinates);
+          const nearest = turf.nearestPointOnLine(line, point, { units: 'kilometers' });
+
+          if (nearest.properties.dist < minDistance) {
+            minDistance = nearest.properties.dist;
+            nearestPoint = nearest;
+          }
+        } catch (e) {
+          // Skip invalid geometries
+        }
+      }
+    }
+
+    // Check island coastlines
+    for (const feature of greeceIslands.features) {
+      if (feature.geometry.type === 'Polygon') {
+        try {
+          const polygon = turf.polygon(feature.geometry.coordinates);
+          const boundary = turf.polygonToLine(polygon);
+          const nearest = turf.nearestPointOnLine(boundary, point, { units: 'kilometers' });
+
+          if (nearest.properties.dist < minDistance) {
+            minDistance = nearest.properties.dist;
+            nearestPoint = nearest;
+          }
+        } catch (e) {
+          // Skip invalid geometries
+        }
+      }
+    }
+
+    // Only snap if within maxDistance km
+    if (nearestPoint && minDistance <= maxDistance) {
+      const [newLng, newLat] = nearestPoint.geometry.coordinates;
+      return {
+        latitude: newLat,
+        longitude: newLng,
+        snapped: true,
+        distance: minDistance,
+        originalLatitude: latitude,
+        originalLongitude: longitude
+      };
+    }
+
+    // Return original if no coastline found nearby
+    return {
+      latitude,
+      longitude,
+      snapped: false,
+      distance: minDistance === Infinity ? null : minDistance
+    };
+  } catch (error) {
+    console.error("Error snapping to coastline:", error);
+    return {
+      latitude,
+      longitude,
+      snapped: false,
+      error: error.message
+    };
+  }
+}
+
 // Generate rays from a point in all directions
 export function generateRays(center, numRays, distance) {
   const rays = [];
@@ -325,13 +398,37 @@ function analyzeBayGeometry(beachPoint) {
   const longRangeEnclosure = rayResults[3]?.hitRate || 0;  // 3.0km
   
   // Find patterns characteristic of different bay types
-  
-  // Deep/protected bay: high enclosure at all scales
-  const isDeepBay = shortRangeEnclosure > 0.7 && midRangeEnclosure > 0.6 && longRangeEnclosure > 0.5;
-  
-  // Shallow bay/cove: high enclosure short range, medium at longer
-  const isShallowBay = shortRangeEnclosure > 0.6 && midRangeEnclosure > 0.4 && longRangeEnclosure < 0.4;
-  
+
+  // Deep/protected bay: high enclosure at all scales (e.g., Navarino Bay)
+  const isDeepBay = shortRangeEnclosure > 0.65 && midRangeEnclosure > 0.55 && longRangeEnclosure > 0.45;
+
+  // Medium bay: good enclosure at short/mid range (e.g., Vouliagmeni, 800m-1.5km wide bays)
+  // These provide excellent SUP protection even if longer rays reach open water
+  const isMediumBay = !isDeepBay && shortRangeEnclosure > 0.55 && midRangeEnclosure > 0.4;
+
+  // Peninsula beach: enclosure INCREASES with distance (e.g., Astir Beach on Vouliagmeni peninsula)
+  // Immediate area is open but surrounded by land at larger scale - provides regional wind shelter
+  const isPeninsulaBeach = !isDeepBay && !isMediumBay &&
+    longRangeEnclosure > midRangeEnclosure &&
+    midRangeEnclosure > shortRangeEnclosure &&
+    longRangeEnclosure > 0.5;
+
+  // Wide bay: moderate short but good mid/long enclosure (e.g., Kapsali - wide mouth but headlands at distance)
+  // Bay is wide at entrance but protected by surrounding geography
+  const isWideBay = !isDeepBay && !isMediumBay && !isPeninsulaBeach &&
+    shortRangeEnclosure > 0.35 &&
+    midRangeEnclosure > 0.5 &&
+    longRangeEnclosure > 0.45;
+
+  // Shallow bay/cove: high enclosure short range, drops off at longer (small coves)
+  const isShallowBay = !isDeepBay && !isMediumBay && !isPeninsulaBeach && !isWideBay && shortRangeEnclosure > 0.5 && midRangeEnclosure > 0.3;
+
+  // Moderate coast: decent protection at multiple ranges but doesn't fit specific bay patterns
+  // Catches beaches with some shelter that would otherwise be marked "exposed"
+  const isModerateCoast = !isDeepBay && !isMediumBay && !isPeninsulaBeach && !isWideBay && !isShallowBay &&
+    ((shortRangeEnclosure > 0.3 && midRangeEnclosure > 0.3) ||
+     (shortRangeEnclosure + midRangeEnclosure + longRangeEnclosure) / 3 > 0.35);
+
   // Analyze the actual pattern for more precise results
   let enclosurePattern = '';
   if (enclosureCurve[0] > 0.8 && enclosureCurve[1] > 0.7 && enclosureCurve[2] > 0.6) {
@@ -346,7 +443,11 @@ function analyzeBayGeometry(beachPoint) {
   
   return {
     isDeepBay,
+    isMediumBay,
+    isPeninsulaBeach,
+    isWideBay,
     isShallowBay,
+    isModerateCoast,
     shortRangeEnclosure,
     midRangeEnclosure,
     longRangeEnclosure,
@@ -399,15 +500,36 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     let enclosureScore;
 
     if (bayGeometry.isDeepBay) {
-      // Deep bay - high protection
+      // Deep bay - high protection (e.g., Navarino)
       enclosureScore = Math.min(0.95, (shortEnclosure * 0.3) + (mediumEnclosure * 0.3) + (longEnclosure * 0.4) + 0.2);
       console.log("Using deep bay enclosure calculation:", enclosureScore);
+    } else if (bayGeometry.isMediumBay) {
+      // Medium bay - good protection for SUP (e.g., Vouliagmeni, 800m-1.5km wide)
+      // Short/medium range matters most, long range less important
+      enclosureScore = Math.min(0.85, (shortEnclosure * 0.45) + (mediumEnclosure * 0.35) + (longEnclosure * 0.1) + 0.1);
+      console.log("Using medium bay enclosure calculation:", enclosureScore);
+    } else if (bayGeometry.isPeninsulaBeach) {
+      // Peninsula beach - inverted pattern where long range has MORE enclosure (e.g., Astir)
+      // Regional geography provides wind shelter even though immediate area is open
+      // Weight long range highly since that's where the protection comes from
+      enclosureScore = Math.min(0.75, (shortEnclosure * 0.15) + (mediumEnclosure * 0.35) + (longEnclosure * 0.4) + 0.05);
+      console.log("Using peninsula beach enclosure calculation:", enclosureScore);
+    } else if (bayGeometry.isWideBay) {
+      // Wide bay - moderate short but good mid/long (e.g., Kapsali with wide mouth but headlands)
+      // Weight medium/long more since that's where the actual protection is
+      enclosureScore = Math.min(0.70, (shortEnclosure * 0.2) + (mediumEnclosure * 0.4) + (longEnclosure * 0.3) + 0.05);
+      console.log("Using wide bay enclosure calculation:", enclosureScore);
     } else if (bayGeometry.isShallowBay) {
-      // Shallow bay - medium-high protection
+      // Shallow bay/cove - medium protection
       enclosureScore = (shortEnclosure * 0.5) + (mediumEnclosure * 0.3) + (longEnclosure * 0.2);
       console.log("Using shallow bay enclosure calculation:", enclosureScore);
+    } else if (bayGeometry.isModerateCoast) {
+      // Moderate coast - some protection but not a defined bay shape
+      // Better than fully exposed, give a small bonus
+      enclosureScore = Math.min(0.55, (shortEnclosure * 0.4) + (mediumEnclosure * 0.35) + (longEnclosure * 0.25) + 0.05);
+      console.log("Using moderate coast enclosure calculation:", enclosureScore);
     } else {
-      // Regular coastline
+      // Regular coastline - exposed
       enclosureScore = (shortEnclosure * 0.6) + (mediumEnclosure * 0.3) + (longEnclosure * 0.1);
       console.log("Using standard enclosure calculation:", enclosureScore);
     }
@@ -472,11 +594,15 @@ return {
         totalWaveProtection
       ),
       isDeepBay: bayGeometry.isDeepBay,
+      isMediumBay: bayGeometry.isMediumBay,
+      isPeninsulaBeach: bayGeometry.isPeninsulaBeach,
+      isWideBay: bayGeometry.isWideBay,
+      isModerateCoast: bayGeometry.isModerateCoast,
       debugInfo: {
         shortEnclosure,
         mediumEnclosure,
         longEnclosure,
-        bayType: bayGeometry.isDeepBay ? 'deep' : bayGeometry.isShallowBay ? 'shallow' : 'normal'
+        bayType: bayGeometry.isDeepBay ? 'deep' : bayGeometry.isMediumBay ? 'medium' : bayGeometry.isPeninsulaBeach ? 'peninsula' : bayGeometry.isWideBay ? 'wide' : bayGeometry.isShallowBay ? 'shallow' : bayGeometry.isModerateCoast ? 'moderate' : 'exposed'
       }
     };
   } catch (error) {

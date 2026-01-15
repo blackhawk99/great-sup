@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import {
   Home,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   RefreshCw,
   AlertCircle,
   MapPin,
@@ -15,10 +17,25 @@ import {
   Calendar,
   Info,
   LifeBuoy,
-  CheckCircle2
+  CheckCircle2,
+  Sun,
+  Sunrise,
+  Sunset,
+  Navigation
 } from "lucide-react";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection, DatePickerModal } from "./helpers.jsx";
+
+// Fix for default marker icon in Leaflet with bundlers
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
 
 const FixedBeachView = ({ 
   beach, 
@@ -38,6 +55,18 @@ const FixedBeachView = ({
   const [error, setError] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    scoreBreakdown: true,
+    geoProtection: true,
+    hourlyWind: true,
+    weeklyForecast: true
+  });
+  const [weeklyScores, setWeeklyScores] = useState([]);
+  const [conditionTrends, setConditionTrends] = useState(null);
+
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   const toNumberOr = (value, fallback = 0) => {
     const number = typeof value === "number" ? value : Number(value);
@@ -103,10 +132,15 @@ const FixedBeachView = ({
 
     const updateScores = async () => {
       await calculateScores(weatherData, marineData, beach);
+      // Calculate weekly forecast and trends after main score
+      if (geoProtection) {
+        calculateWeeklyForecast(weatherData, marineData, geoProtection);
+      }
+      calculateTrends(weatherData);
     };
 
     updateScores();
-  }, [timeRange.startTime, timeRange.endTime, weatherData, marineData, beach]);
+  }, [timeRange.startTime, timeRange.endTime, weatherData, marineData, beach, geoProtection]);
 
   // Fetch real weather data
   const fetchWeatherData = async () => {
@@ -124,10 +158,16 @@ const FixedBeachView = ({
       tomorrow.setDate(tomorrow.getDate() + 1);
       const formattedTomorrow = tomorrow.toISOString().split('T')[0];
       
-      // API URLs
-      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m&daily=precipitation_sum,windspeed_10m_max&start_date=${formattedDate}&end_date=${formattedTomorrow}&timezone=auto`;
-      
-      const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,wave_direction,sea_surface_temperature&daily=wave_height_max,wave_direction_dominant&start_date=${formattedDate}&end_date=${formattedTomorrow}&timezone=auto`;
+      // Calculate 7-day range for "Best Day This Week" feature
+      const weekEnd = new Date(today);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const formattedWeekEnd = weekEnd.toISOString().split('T')[0];
+
+      // API URLs - include gusts, UV index, sunrise/sunset (7 days for best day feature)
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m,windgusts_10m,uv_index&daily=precipitation_sum,windspeed_10m_max,sunrise,sunset,uv_index_max&start_date=${formattedDate}&end_date=${formattedWeekEnd}&timezone=auto`;
+
+      // Marine API - include swell period, ocean currents, and sea level for tides (7 days)
+      const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,swell_wave_period,wave_direction,sea_surface_temperature,ocean_current_velocity&daily=wave_height_max,wave_direction_dominant&start_date=${formattedDate}&end_date=${formattedWeekEnd}&timezone=auto`;
       
       // Fetch data
       const [weatherRes, marineRes] = await Promise.all([
@@ -178,17 +218,19 @@ const FixedBeachView = ({
 
       const tempValues = selectValues(weather?.hourly?.temperature_2m, relevantIndices);
       const windValues = selectValues(weather?.hourly?.windspeed_10m, relevantIndices);
+      const gustValues = selectValues(weather?.hourly?.windgusts_10m, relevantIndices);
       const cloudValues = selectValues(weather?.hourly?.cloudcover, relevantIndices);
       const precipValues = selectValues(weather?.hourly?.precipitation, relevantIndices);
       const windDirValues = selectValues(weather?.hourly?.winddirection_10m, relevantIndices);
 
       // Track data quality - count available vs expected data points
-      const expectedDataPoints = relevantIndices.length * 7; // 7 metrics per hour
-      const availableDataPoints = tempValues.length + windValues.length + cloudValues.length +
-        precipValues.length + windDirValues.length;
+      const expectedDataPoints = relevantIndices.length * 8; // 8 metrics per hour (added gusts)
+      const availableDataPoints = tempValues.length + windValues.length + gustValues.length +
+        cloudValues.length + precipValues.length + windDirValues.length;
 
       const avgTemp = average(tempValues, toNumberOr(weather?.hourly?.temperature_2m?.[0], 0));
       const avgWind = average(windValues, 0);
+      const avgGusts = average(gustValues, 0);
       const avgCloud = average(cloudValues, 0);
       const maxPrecip = precipValues.length ? Math.max(...precipValues) : 0;
 
@@ -205,6 +247,10 @@ const FixedBeachView = ({
         avgWindDir = (avgWindDir + 360) % 360;
       }
 
+      // UV Index
+      const uvValues = selectValues(weather?.hourly?.uv_index, relevantIndices);
+      const maxUvIndex = uvValues.length ? Math.max(...uvValues) : toNumberOr(weather?.daily?.uv_index_max?.[0], 0);
+
       const hourlyWaveValues = selectValues(marine?.hourly?.wave_height, relevantIndices);
       const waveHeight = average(hourlyWaveValues, toNumberOr(marine?.daily?.wave_height_max?.[0], 0));
 
@@ -215,10 +261,17 @@ const FixedBeachView = ({
       const waterTempValues = selectValues(marine?.hourly?.sea_surface_temperature, relevantIndices);
       const avgWaterTemp = waterTempValues.length ? average(waterTempValues, null) : null;
 
+      // Swell period and currents
+      const swellPeriodValues = selectValues(marine?.hourly?.swell_wave_period, relevantIndices);
+      const avgSwellPeriod = swellPeriodValues.length ? average(swellPeriodValues, 6) : 6; // Default 6s (normal)
+      const currentValues = selectValues(marine?.hourly?.ocean_current_velocity, relevantIndices);
+      const avgCurrentSpeed = currentValues.length ? average(currentValues, 0) : 0;
+
       // Add marine data to quality calculation
-      const marineDataPoints = hourlyWaveValues.length + swellValues.length;
+      const marineDataPoints = hourlyWaveValues.length + swellValues.length + waterTempValues.length +
+        swellPeriodValues.length + currentValues.length;
       const totalAvailable = availableDataPoints + marineDataPoints;
-      const totalExpected = expectedDataPoints + relevantIndices.length * 2; // +2 for wave & swell
+      const totalExpected = expectedDataPoints + relevantIndices.length * 5; // +5 for wave, swell, waterTemp, swellPeriod, currents
       const dataQuality = Math.round((totalAvailable / totalExpected) * 100);
 
       const waveDirection = toNumberOr(marine?.daily?.wave_direction_dominant?.[0], avgWindDir);
@@ -239,76 +292,101 @@ const FixedBeachView = ({
       const protectedWaveHeight = waveHeight * (1 - waveProtectionFactor * 0.9);
       const protectedSwellHeight = avgSwellHeight * (1 - waveProtectionFactor * 0.85);
 
+      // Calculate gust factor for safety warnings
+      const gustFactor = avgWind > 0 ? avgGusts / avgWind : 1;
+
       // Initialize score breakdown (weights sum to 100)
+      // For SUP: wind & waves critical, gusts/currents for safety, water temp important
       const breakdown = {
-        windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 37 },
-        waveHeight: { raw: waveHeight, protected: protectedWaveHeight, score: 0, maxPossible: 17 },
-        swellHeight: { raw: avgSwellHeight, protected: protectedSwellHeight, score: 0, maxPossible: 10 },
+        windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 20 },
+        gusts: { value: avgGusts, factor: gustFactor, score: 0, maxPossible: 5 },
+        waveHeight: { raw: waveHeight, protected: protectedWaveHeight, score: 0, maxPossible: 20 },
+        swellHeight: { raw: avgSwellHeight, protected: protectedSwellHeight, period: avgSwellPeriod, score: 0, maxPossible: 8 },
+        currents: { value: avgCurrentSpeed, score: 0, maxPossible: 10 },
         precipitation: { value: maxPrecip, score: 0, maxPossible: 5 },
-        temperature: { value: avgTemp, score: 0, maxPossible: 8 },
-        waterTemperature: { value: avgWaterTemp, score: 0, maxPossible: 10 },
+        temperature: { value: avgTemp, score: 0, maxPossible: 4 },
+        waterTemperature: { value: avgWaterTemp, score: 0, maxPossible: 12 },
         cloudCover: { value: avgCloud, score: 0, maxPossible: 4 },
-        geoProtection: { value: protectionScore, score: 0, maxPossible: 9 },
+        geoProtection: { value: protectionScore, score: 0, maxPossible: 12 },
+        uvIndex: { value: maxUvIndex }, // Informational, not scored
+        windDirection: { value: avgWindDir }, // Informational, not scored
         total: { score: 0, rawScore: 0, bonus: 0, maxPossible: 100 },
         dataQuality: dataQuality // 0-100% indicating data completeness
       };
-      
+
       // Calculate individual scores (weights sum to 100)
       let totalScore = 0;
 
-      // Wind speed score (0-37 points)
-      breakdown.windSpeed.score = Math.max(0, 37 - protectedWindSpeed * (37 / 20));
+      // Wind speed score (0-20 points) - critical for SUP stability
+      breakdown.windSpeed.score = Math.max(0, 20 - protectedWindSpeed * (20 / 20));
       totalScore += breakdown.windSpeed.score;
 
-      // Wave height score (0-17 points)
-      breakdown.waveHeight.score = protectedWaveHeight < 0.2 ? 17 :
-                                  Math.max(0, 17 - (protectedWaveHeight - 0.2) * (17 / 0.4));
+      // Gusts score (0-5 points) - gusty conditions are dangerous
+      // Gust factor > 1.5 means unpredictable conditions
+      const gustPenalty = gustFactor > 1.5 ? (gustFactor - 1.5) * 0.5 : 0;
+      breakdown.gusts.score = Math.max(0, 5 * (1 - gustPenalty));
+      totalScore += breakdown.gusts.score;
+
+      // Wave height score (0-20 points) - equally critical for SUP
+      breakdown.waveHeight.score = protectedWaveHeight < 0.2 ? 20 :
+                                  Math.max(0, 20 - (protectedWaveHeight - 0.2) * (20 / 0.4));
       totalScore += breakdown.waveHeight.score;
 
-      // Swell height score (0-10 points)
-      breakdown.swellHeight.score = protectedSwellHeight < 0.3 ? 10 :
-                                   Math.max(0, 10 - (protectedSwellHeight - 0.3) * (10 / 0.3));
+      // Swell height score (0-8 points) - adjusted by period
+      // Long period (>10s) = gentle rollers, short period (<6s) = choppy
+      const swellPeriodFactor = avgSwellPeriod >= 10 ? 1.5 : avgSwellPeriod >= 7 ? 1.0 : 0.7;
+      const effectiveSwell = protectedSwellHeight / swellPeriodFactor;
+      breakdown.swellHeight.score = effectiveSwell < 0.3 ? 8 :
+                                   Math.max(0, 8 - (effectiveSwell - 0.3) * (8 / 0.3));
       totalScore += breakdown.swellHeight.score;
+
+      // Currents score (0-10 points) - strong currents are dangerous
+      // 0 km/h = perfect, >5 km/h = dangerous
+      breakdown.currents.score = avgCurrentSpeed < 1 ? 10 :
+                                Math.max(0, 10 - (avgCurrentSpeed - 1) * 2.5);
+      totalScore += breakdown.currents.score;
 
       // Precipitation score (0-5 points)
       breakdown.precipitation.score = maxPrecip < 1 ? 5 : 0;
       totalScore += breakdown.precipitation.score;
 
-      // Air temperature score (0-8 points) - bell curve 22-32°C ideal
-      if (avgTemp >= 22 && avgTemp <= 32) {
-        breakdown.temperature.score = 8;
-      } else if (avgTemp < 22) {
-        breakdown.temperature.score = Math.max(0, 8 - (22 - avgTemp) * 0.8);
+      // Air temperature score (0-4 points) - less critical, can wear layers
+      if (avgTemp >= 15 && avgTemp <= 30) {
+        breakdown.temperature.score = 4;
+      } else if (avgTemp < 15) {
+        breakdown.temperature.score = Math.max(0, 4 - (15 - avgTemp) * 0.4);
       } else {
-        breakdown.temperature.score = Math.max(0, 8 - (avgTemp - 32) * 0.8);
+        breakdown.temperature.score = Math.max(0, 4 - (avgTemp - 30) * 0.4);
       }
       totalScore += breakdown.temperature.score;
 
-      // Water temperature score (0-10 points) - bell curve 18-26°C ideal for paddleboarding
+      // Water temperature score (0-12 points) - important for safety if you fall in
       if (avgWaterTemp !== null) {
         if (avgWaterTemp >= 18 && avgWaterTemp <= 26) {
-          breakdown.waterTemperature.score = 10;
+          breakdown.waterTemperature.score = 12;
         } else if (avgWaterTemp < 18) {
-          breakdown.waterTemperature.score = Math.max(0, 10 - (18 - avgWaterTemp));
+          breakdown.waterTemperature.score = Math.max(0, 12 - (18 - avgWaterTemp) * 1.2);
         } else {
-          breakdown.waterTemperature.score = Math.max(0, 10 - (avgWaterTemp - 26));
+          breakdown.waterTemperature.score = Math.max(0, 12 - (avgWaterTemp - 26) * 1.2);
         }
         totalScore += breakdown.waterTemperature.score;
       }
 
       // Cloud cover score (0-4 points)
-      breakdown.cloudCover.score = avgCloud < 40 ? 4 :
-                                  Math.max(0, 4 - (avgCloud - 40) / 15);
+      breakdown.cloudCover.score = avgCloud < 50 ? 4 :
+                                  Math.max(0, 4 - (avgCloud - 50) / 12.5);
       totalScore += breakdown.cloudCover.score;
 
-      // Geographic protection score (0-9 points)
-      breakdown.geoProtection.score = (protection.protectionScore / 100) * 9;
+      // Geographic protection score (0-12 points)
+      breakdown.geoProtection.score = (protection.protectionScore / 100) * 12;
       totalScore += breakdown.geoProtection.score;
 
       // Round scores for display
       breakdown.windSpeed.score = Math.round(breakdown.windSpeed.score);
+      breakdown.gusts.score = Math.round(breakdown.gusts.score);
       breakdown.waveHeight.score = Math.round(breakdown.waveHeight.score);
       breakdown.swellHeight.score = Math.round(breakdown.swellHeight.score);
+      breakdown.currents.score = Math.round(breakdown.currents.score);
       breakdown.precipitation.score = Math.round(breakdown.precipitation.score);
       breakdown.temperature.score = Math.round(breakdown.temperature.score);
       breakdown.waterTemperature.score = Math.round(breakdown.waterTemperature.score);
@@ -332,6 +410,153 @@ const FixedBeachView = ({
       setPaddleScore(null);
       setScoreBreakdown(null);
     }
+  };
+
+  // Calculate 7-day forecast scores for "Best Day This Week"
+  const calculateWeeklyForecast = (weather, marine, geoProtection) => {
+    if (!weather?.hourly?.time || !weather?.daily) return [];
+
+    const scores = [];
+    const today = new Date(timeRange.date);
+
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const targetDate = new Date(today);
+      targetDate.setDate(targetDate.getDate() + dayOffset);
+      const dateStr = targetDate.toISOString().split('T')[0];
+
+      // Find indices for morning (8-12) - typically best SUP time
+      const morningIndices = [];
+      const afternoonIndices = [];
+
+      weather.hourly.time.forEach((t, i) => {
+        const d = new Date(t);
+        if (d.toISOString().split('T')[0] === dateStr) {
+          const hour = d.getHours();
+          if (hour >= 8 && hour <= 12) morningIndices.push(i);
+          if (hour >= 14 && hour <= 18) afternoonIndices.push(i);
+        }
+      });
+
+      const calcPeriodScore = (indices) => {
+        if (!indices.length) return null;
+        const wind = average(selectValues(weather.hourly.windspeed_10m, indices));
+        const wave = average(selectValues(marine?.hourly?.wave_height, indices)) || 0;
+        const precip = Math.max(...selectValues(weather.hourly.precipitation, indices).map(v => v || 0), 0);
+
+        // Simplified score calculation
+        let score = 100;
+        score -= Math.min(40, wind * 2.5); // Wind penalty
+        score -= Math.min(30, wave * 60);  // Wave penalty
+        if (precip > 0.5) score -= 20;
+        if (geoProtection?.protectionScore > 50) score += 5;
+        return Math.max(0, Math.min(100, Math.round(score)));
+      };
+
+      const morningScore = calcPeriodScore(morningIndices);
+      const afternoonScore = calcPeriodScore(afternoonIndices);
+      const bestScore = Math.max(morningScore || 0, afternoonScore || 0);
+      const bestPeriod = (morningScore || 0) >= (afternoonScore || 0) ? 'AM' : 'PM';
+
+      // Get daily data
+      const dayIndex = weather.daily.time?.findIndex(t => t === dateStr) ?? -1;
+      const maxWind = dayIndex >= 0 ? weather.daily.windspeed_10m_max?.[dayIndex] : null;
+      const maxPrecip = dayIndex >= 0 ? weather.daily.precipitation_sum?.[dayIndex] : null;
+
+      scores.push({
+        date: targetDate,
+        dateStr,
+        dayName: targetDate.toLocaleDateString('en-US', { weekday: 'short' }),
+        morningScore,
+        afternoonScore,
+        bestScore,
+        bestPeriod,
+        maxWind: maxWind?.toFixed(0) || '?',
+        hasRain: (maxPrecip || 0) > 1,
+        isToday: dayOffset === 0
+      });
+    }
+
+    setWeeklyScores(scores);
+    return scores;
+  };
+
+  // Calculate condition trends (improving/worsening)
+  const calculateTrends = (weather) => {
+    if (!weather?.hourly?.time) return null;
+
+    const now = new Date();
+    const nowHour = now.getHours();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Find current hour index
+    const currentIndex = weather.hourly.time.findIndex(t => {
+      const d = new Date(t);
+      return d.toISOString().split('T')[0] === todayStr && d.getHours() === nowHour;
+    });
+
+    if (currentIndex < 0 || currentIndex + 3 >= weather.hourly.time.length) return null;
+
+    const currentWind = weather.hourly.windspeed_10m?.[currentIndex] || 0;
+    const futureWind = weather.hourly.windspeed_10m?.[currentIndex + 3] || 0;
+    const windChange = futureWind - currentWind;
+
+    let windTrend = 'stable';
+    if (windChange < -3) windTrend = 'improving';
+    else if (windChange > 3) windTrend = 'worsening';
+
+    const trends = {
+      wind: {
+        current: currentWind.toFixed(0),
+        future: futureWind.toFixed(0),
+        change: windChange.toFixed(0),
+        trend: windTrend,
+        message: windTrend === 'improving'
+          ? `Wind dropping ${currentWind.toFixed(0)}→${futureWind.toFixed(0)} km/h`
+          : windTrend === 'worsening'
+            ? `Wind rising ${currentWind.toFixed(0)}→${futureWind.toFixed(0)} km/h`
+            : 'Wind steady'
+      }
+    };
+
+    setConditionTrends(trends);
+    return trends;
+  };
+
+  // Get equipment recommendations based on conditions
+  const getEquipmentRecommendations = () => {
+    if (!scoreBreakdown) return [];
+    const recs = [];
+
+    const waterTemp = scoreBreakdown.waterTemperature?.value;
+    const airTemp = scoreBreakdown.temperature?.value;
+    const wind = scoreBreakdown.windSpeed?.protected;
+    const uvIndex = scoreBreakdown.uvIndex?.value;
+
+    if (waterTemp !== null && waterTemp < 18) {
+      recs.push({ icon: '🧥', item: 'Wetsuit', reason: `Water ${waterTemp.toFixed(0)}°C - hypothermia risk` });
+    } else if (waterTemp !== null && waterTemp < 22) {
+      recs.push({ icon: '👕', item: 'Rashguard', reason: `Water ${waterTemp.toFixed(0)}°C - can get chilly` });
+    }
+
+    if (uvIndex !== null && uvIndex >= 6) {
+      recs.push({ icon: '🧴', item: 'Sunscreen SPF50+', reason: `UV Index ${uvIndex.toFixed(0)} - high exposure` });
+      recs.push({ icon: '🕶️', item: 'Sunglasses', reason: 'Protect eyes from glare' });
+    } else if (uvIndex !== null && uvIndex >= 3) {
+      recs.push({ icon: '🧴', item: 'Sunscreen SPF30', reason: `UV Index ${uvIndex.toFixed(0)}` });
+    }
+
+    if (wind !== null && wind > 10) {
+      recs.push({ icon: '🦺', item: 'Leash (coiled)', reason: `Wind ${wind.toFixed(0)} km/h - board can blow away` });
+    }
+
+    if (airTemp !== null && airTemp < 15) {
+      recs.push({ icon: '🧢', item: 'Windproof layer', reason: `Air ${airTemp.toFixed(0)}°C` });
+    }
+
+    // Always recommend
+    recs.push({ icon: '💧', item: 'Water bottle', reason: 'Stay hydrated' });
+
+    return recs;
   };
 
   const getPaddleReadiness = () => {
@@ -479,22 +704,30 @@ const FixedBeachView = ({
     };
   };
   
-  // Get condition text based on score and actual conditions
+  // Get condition text based on score AND actual conditions
+  // This ensures messaging is consistent with getPaddleReadiness
   const getCondition = (score) => {
     if (!scoreBreakdown) {
       return { label: "Loading", emoji: "⏳", message: "Calculating conditions...", color: "text-gray-500" };
     }
 
     const temp = toNumberOr(scoreBreakdown.temperature?.value, 0);
+    const waterTemp = toNumberOr(scoreBreakdown.waterTemperature?.value, 20);
     const windSpeed = toNumberOr(scoreBreakdown.windSpeed?.protected, 0);
+    const waveHeight = toNumberOr(scoreBreakdown.waveHeight?.protected, 0);
     const precipitation = toNumberOr(scoreBreakdown.precipitation?.value, 0);
 
-    if (score >= 85) {
-      if (temp < 18) {
+    // Check if core paddling conditions (wind & waves) are excellent
+    const excellentWindWaves = windSpeed < 8 && waveHeight < 0.3;
+    const goodWindWaves = windSpeed < 12 && waveHeight < 0.5;
+
+    // Excellent core conditions - show positive even if score lower due to temp/geo
+    if (excellentWindWaves) {
+      if (temp < 15 || waterTemp < 15) {
         return {
           label: "Chilly but Calm",
           emoji: "🧊",
-          message: "Great conditions, but bring a wetsuit.",
+          message: "Flat water, but dress warm.",
           color: "text-blue-500"
         };
       }
@@ -506,44 +739,63 @@ const FixedBeachView = ({
           color: "text-blue-500"
         };
       }
-      if (windSpeed > 15) {
+      if (score >= 85) {
         return {
-          label: "Excellent",
+          label: "Perfect",
           emoji: "✅",
-          message: "Some wind, but well-protected location.",
+          message: "Flat like oil. Paddle on.",
           color: "text-green-500"
         };
       }
       return {
-        label: "Perfect",
-        emoji: "✅",
-        message: "Flat like oil. Paddle on.",
+        label: "Solid",
+        emoji: "👍",
+        message: "Great paddling conditions.",
         color: "text-green-500"
       };
     }
 
+    // Good core conditions
+    if (goodWindWaves) {
+      if (temp < 15 || waterTemp < 15) {
+        return {
+          label: "Cool & Manageable",
+          emoji: "🧊",
+          message: "Light chop possible, dress warm.",
+          color: "text-blue-500"
+        };
+      }
+      return {
+        label: "Good",
+        emoji: "👍",
+        message: "Nice conditions with light texture.",
+        color: "text-green-500"
+      };
+    }
+
+    // Score-based fallback for challenging conditions
     if (score >= 70) {
       return {
         label: "Okay-ish",
         emoji: "⚠️",
-        message: "Minor chop. Go early.",
+        message: "Some chop expected. Stay alert.",
         color: "text-yellow-500"
       };
     }
 
     if (score >= 50) {
       return {
-        label: "Not Great",
-        emoji: "❌",
+        label: "Challenging",
+        emoji: "⚠️",
         message: "Wind or waves make it tricky.",
         color: "text-orange-500"
       };
     }
 
     return {
-      label: "Nope",
+      label: "Not Recommended",
       emoji: "🚫",
-      message: "Not recommended.",
+      message: "Conditions too rough for SUP.",
       color: "text-red-500"
     };
   };
@@ -590,9 +842,9 @@ const FixedBeachView = ({
   // Render geographic protection information
   const renderGeoProtectionInfo = () => {
     if (!geoProtection) return null;
-    
-    // Calculate the bonus points added to score from geographic protection
-    const geoBonus = Math.round((geoProtection.protectionScore / 100) * 10);
+
+    // Calculate the bonus points added to score from geographic protection (max 12 pts)
+    const geoBonus = Math.round((geoProtection.protectionScore / 100) * 12);
     const avgWindDirection = toNumberOr(
       geoProtection?.debugInfo?.windDirection ??
       geoProtection?.dominantWindDirection ??
@@ -601,23 +853,53 @@ const FixedBeachView = ({
       0
     );
     
+    // Get protection level label
+    const protectionLabel = geoProtection.protectionScore > 60
+      ? 'Well Protected'
+      : geoProtection.protectionScore > 30
+        ? 'Moderate'
+        : 'Exposed';
+
     return (
-      <div className="bg-blue-50 dark:bg-slate-800 p-5 rounded-lg mt-4 border border-blue-200 dark:border-slate-700 shadow-inner">
-        <h4 className="font-medium mb-4 text-lg flex items-center text-blue-800 dark:text-blue-300">
-          <MapPin className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
-          Geographic Protection Analysis
-          <button
-            onClick={() => setShowDebug(!showDebug)}
-            className="ml-auto text-xs text-blue-600 dark:text-blue-400 underline"
-          >
-            {showDebug ? 'Hide debug' : 'Show debug'}
-          </button>
-        </h4>
-        
-        <div className="grid md:grid-cols-2 gap-6">
+      <div className="bg-blue-50 rounded-lg mt-4 border border-blue-200 shadow-inner">
+        <button
+          onClick={() => toggleSection('geoProtection')}
+          className="w-full p-5 flex items-center justify-between text-left hover:bg-blue-100/50 transition-colors rounded-lg"
+        >
+          <h4 className="font-medium text-lg flex items-center text-blue-800">
+            <MapPin className="h-5 w-5 mr-2 text-blue-600" />
+            Geographic Protection
+            <span className={`ml-2 text-sm font-normal px-2 py-0.5 rounded-full ${
+              geoProtection.protectionScore > 60
+                ? 'bg-green-100 text-green-700'
+                : geoProtection.protectionScore > 30
+                  ? 'bg-yellow-100 text-yellow-700'
+                  : 'bg-red-100 text-red-700'
+            }`}>
+              {protectionLabel}
+            </span>
+          </h4>
+          {expandedSections.geoProtection ? (
+            <ChevronUp className="h-5 w-5 text-blue-400" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-blue-400" />
+          )}
+        </button>
+
+        {expandedSections.geoProtection && (
+          <div className="px-5 pb-5">
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => setShowDebug(!showDebug)}
+                className="text-xs text-blue-600 underline"
+              >
+                {showDebug ? 'Hide debug' : 'Show debug'}
+              </button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6">
           <ul className="space-y-3">
-            <li className="flex justify-between items-center bg-white dark:bg-slate-700 p-3 rounded border dark:border-slate-600">
-              <span className="font-medium text-gray-700 dark:text-slate-200">Bay Enclosure:</span>
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Bay Enclosure:</span>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 geoProtection.bayEnclosure > 0.6 
                   ? 'bg-green-100 text-green-800' 
@@ -632,8 +914,8 @@ const FixedBeachView = ({
                     : 'Exposed'}
               </span>
             </li>
-            <li className="flex justify-between items-center bg-white dark:bg-slate-700 p-3 rounded border dark:border-slate-600">
-              <span className="font-medium text-gray-700 dark:text-slate-200">Wind Direction:</span>
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Wind Direction:</span>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 geoProtection.windProtection > 0.7 
                   ? 'bg-green-100 text-green-800' 
@@ -649,10 +931,10 @@ const FixedBeachView = ({
                     : ' (Fully Exposed)'}
               </span>
             </li>
-            <li className="flex justify-between items-center bg-white dark:bg-slate-700 p-3 rounded border dark:border-slate-600">
-              <span className="font-medium text-gray-700 dark:text-slate-200">Overall Protection:</span>
+            <li className="flex justify-between items-center bg-white p-3 rounded border">
+              <span className="font-medium text-gray-700">Overall Protection:</span>
               <div className="flex items-center">
-                <div className="w-24 h-3 bg-gray-200 dark:bg-slate-600 rounded-full overflow-hidden mr-2">
+                <div className="w-24 h-3 bg-gray-200 rounded-full overflow-hidden mr-2">
                   <div 
                     className={`h-full ${
                       geoProtection.protectionScore > 70 
@@ -677,9 +959,9 @@ const FixedBeachView = ({
             </li>
           </ul>
           
-          <div className="bg-white dark:bg-slate-700 p-4 rounded border dark:border-slate-600">
-            <h5 className="font-medium mb-2 text-gray-800 dark:text-slate-100">Impact on Score</h5>
-            <p className="text-gray-700 dark:text-slate-200 mb-3">
+          <div className="bg-white p-4 rounded border">
+            <h5 className="font-medium mb-2 text-gray-800">Impact on Score</h5>
+            <p className="text-gray-700 mb-3">
               Geographic protection is contributing <span className="font-bold text-blue-600">
               +{geoBonus} points</span> to your overall score.
             </p>
@@ -699,22 +981,24 @@ const FixedBeachView = ({
               </p>
             </div>
             {showDebug && (
-              <pre className="mt-3 text-xs bg-gray-100 dark:bg-slate-800 dark:text-slate-300 p-2 rounded overflow-x-auto">
+              <pre className="mt-3 text-xs bg-gray-100 p-2 rounded overflow-x-auto">
 {JSON.stringify(geoProtection.debugInfo, null, 2)}
               </pre>
             )}
           </div>
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
-  
+
   // Render score breakdown
   const renderScoreBreakdown = () => {
     if (!scoreBreakdown) return null;
 
     const Progress = ({ score, max, color }) => (
-      <div className="w-24 bg-gray-200 dark:bg-slate-600 h-2 rounded mt-1 overflow-hidden">
+      <div className="w-24 bg-gray-200 h-2 rounded mt-1 overflow-hidden">
         <div
           className={`${color} h-2 rounded`}
           style={{ width: `${Math.min(100, (score / max) * 100)}%` }}
@@ -722,280 +1006,388 @@ const FixedBeachView = ({
       </div>
     );
 
+    // Info tooltip component
+    const InfoTip = ({ tip }) => (
+      <span className="relative group ml-1 cursor-help">
+        <Info className="h-3.5 w-3.5 text-gray-400 inline hover:text-blue-500" />
+        <span className="absolute left-0 bottom-full mb-2 w-64 p-2 text-xs text-white bg-gray-800 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none whitespace-normal">
+          {tip}
+        </span>
+      </span>
+    );
+
+    // Score item component for mobile-friendly display
+    const ScoreItem = ({ label, tip, maxPts, value, score, max, extraInfo }) => {
+      const percentage = (score / max) * 100;
+      const color = percentage >= 75 ? 'bg-emerald-500' : percentage >= 50 ? 'bg-amber-500' : 'bg-red-500';
+      const textColor = percentage >= 75 ? 'text-emerald-600' : percentage >= 50 ? 'text-amber-600' : 'text-red-600';
+
+      return (
+        <div className="bg-white rounded-xl border border-gray-100 p-3 hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-gray-800 text-sm">{label}</span>
+              <InfoTip tip={tip} />
+            </div>
+            <span className={`font-bold text-sm ${textColor}`}>{score}/{max}</span>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+            <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${percentage}%` }} />
+          </div>
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>{value}</span>
+            {extraInfo && <span className="text-gray-400">{extraInfo}</span>}
+          </div>
+        </div>
+      );
+    };
+
     return (
-      <div className="bg-white p-5 rounded-lg mt-4 shadow-sm border dark:bg-slate-800 dark:border-slate-700">
-        <h4 className="font-medium mb-4 flex items-center text-gray-800 dark:text-slate-100">
-          <Info className="h-5 w-5 mr-2 text-blue-600" />
-          Score Breakdown
+      <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl mt-4 shadow-sm border border-blue-100">
+        <button
+          onClick={() => toggleSection('scoreBreakdown')}
+          className="w-full p-4 flex items-center justify-between text-left hover:bg-white/50 transition-colors rounded-2xl"
+        >
+          <h4 className="font-semibold flex items-center text-gray-800">
+            <div className="p-2 bg-blue-100 rounded-lg mr-3">
+              <Info className="h-4 w-4 text-blue-600" />
+            </div>
+            Score Breakdown
+          </h4>
+          <div className="flex items-center gap-3">
+            <span className={`text-lg font-bold ${
+              scoreBreakdown.total.score >= 85 ? 'text-emerald-600' :
+              scoreBreakdown.total.score >= 70 ? 'text-amber-600' :
+              scoreBreakdown.total.score >= 50 ? 'text-orange-600' : 'text-red-600'
+            }`}>
+              {scoreBreakdown.total.score}/100
+            </span>
+            {expandedSections.scoreBreakdown ? (
+              <ChevronUp className="h-5 w-5 text-gray-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-gray-400" />
+            )}
+          </div>
+        </button>
+
+        {expandedSections.scoreBreakdown && (
+          <div className="px-4 pb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <ScoreItem
+                label="Wind"
+                tip="Lower wind = better stability. Under 10 km/h is ideal for SUP."
+                value={`${scoreBreakdown.windSpeed.protected.toFixed(1)} km/h`}
+                score={scoreBreakdown.windSpeed.score}
+                max={scoreBreakdown.windSpeed.maxPossible}
+                extraInfo={`Raw: ${scoreBreakdown.windSpeed.raw.toFixed(0)}`}
+              />
+              <ScoreItem
+                label="Waves"
+                tip="Flat water (<0.2m) is ideal. Larger waves make balancing harder."
+                value={`${scoreBreakdown.waveHeight.protected.toFixed(2)} m`}
+                score={scoreBreakdown.waveHeight.score}
+                max={scoreBreakdown.waveHeight.maxPossible}
+                extraInfo={`Raw: ${scoreBreakdown.waveHeight.raw.toFixed(2)}`}
+              />
+              <ScoreItem
+                label="Water Temp"
+                tip="18-26°C is ideal. Below 15°C risks hypothermia — wetsuit required!"
+                value={scoreBreakdown.waterTemperature?.value != null ? `${scoreBreakdown.waterTemperature.value.toFixed(1)}°C` : 'N/A'}
+                score={scoreBreakdown.waterTemperature?.score ?? 0}
+                max={scoreBreakdown.waterTemperature?.maxPossible ?? 12}
+              />
+              <ScoreItem
+                label="Protection"
+                tip="How much the coastline shelters this beach from wind and waves."
+                value={`${scoreBreakdown.geoProtection.value.toFixed(0)}/100`}
+                score={scoreBreakdown.geoProtection.score}
+                max={scoreBreakdown.geoProtection.maxPossible}
+              />
+              <ScoreItem
+                label="Currents"
+                tip="Strong currents (>3 km/h) can push you off course or make returning difficult."
+                value={`${scoreBreakdown.currents?.value?.toFixed(1) ?? 'N/A'} km/h`}
+                score={scoreBreakdown.currents?.score ?? 0}
+                max={scoreBreakdown.currents?.maxPossible ?? 10}
+              />
+              <ScoreItem
+                label="Swell"
+                tip="Ocean swells from distant storms. Long period (>10s) = gentle rollers."
+                value={`${scoreBreakdown.swellHeight.raw.toFixed(2)} m`}
+                score={scoreBreakdown.swellHeight.score}
+                max={scoreBreakdown.swellHeight.maxPossible}
+                extraInfo={`${scoreBreakdown.swellHeight.period?.toFixed(0) ?? '?'}s period`}
+              />
+              <ScoreItem
+                label="Gusts"
+                tip="Sudden wind bursts that can knock you off balance."
+                value={`${scoreBreakdown.gusts?.value?.toFixed(1) ?? 'N/A'} km/h`}
+                score={scoreBreakdown.gusts?.score ?? 0}
+                max={scoreBreakdown.gusts?.maxPossible ?? 5}
+              />
+              <ScoreItem
+                label="Rain"
+                tip="No rain is best. Heavy rain reduces visibility and makes the board slippery."
+                value={`${scoreBreakdown.precipitation.value.toFixed(1)} mm`}
+                score={scoreBreakdown.precipitation.score}
+                max={scoreBreakdown.precipitation.maxPossible}
+              />
+              <ScoreItem
+                label="Air Temp"
+                tip="Comfortable range is 15-30°C. Less critical than water temp."
+                value={`${scoreBreakdown.temperature.value.toFixed(1)}°C`}
+                score={scoreBreakdown.temperature.score}
+                max={scoreBreakdown.temperature.maxPossible}
+              />
+              <ScoreItem
+                label="Clouds"
+                tip="Clear skies preferred but clouds don't affect paddling much."
+                value={`${scoreBreakdown.cloudCover.value.toFixed(0)}%`}
+                score={scoreBreakdown.cloudCover.score}
+                max={scoreBreakdown.cloudCover.maxPossible}
+              />
+            </div>
+
+            {/* Total Score */}
+            <div className={`mt-4 p-4 rounded-xl border-2 ${
+              scoreBreakdown.total.score >= 85 ? 'bg-emerald-50 border-emerald-200' :
+              scoreBreakdown.total.score >= 70 ? 'bg-amber-50 border-amber-200' :
+              scoreBreakdown.total.score >= 50 ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-gray-700">Total Score</span>
+                <span className={`text-2xl font-bold ${
+                  scoreBreakdown.total.score >= 85 ? 'text-emerald-600' :
+                  scoreBreakdown.total.score >= 70 ? 'text-amber-600' :
+                  scoreBreakdown.total.score >= 50 ? 'text-orange-600' : 'text-red-600'
+                }`}>
+                  {scoreBreakdown.total.score}<span className="text-base font-normal text-gray-400">/100</span>
+                </span>
+              </div>
+              <div className="h-3 bg-white/50 rounded-full overflow-hidden mt-2">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    scoreBreakdown.total.score >= 85 ? 'bg-emerald-500' :
+                    scoreBreakdown.total.score >= 70 ? 'bg-amber-500' :
+                    scoreBreakdown.total.score >= 50 ? 'bg-orange-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${scoreBreakdown.total.score}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render 7-day forecast "Best Day This Week"
+  const renderWeeklyForecast = () => {
+    if (!weeklyScores.length) return null;
+
+    const bestDay = weeklyScores.reduce((best, day) =>
+      day.bestScore > (best?.bestScore || 0) ? day : best, null);
+
+    return (
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl mt-4 shadow-sm border border-indigo-100">
+        <button
+          onClick={() => toggleSection('weeklyForecast')}
+          className="w-full p-4 flex items-center justify-between text-left hover:bg-white/50 transition-colors rounded-2xl"
+        >
+          <h4 className="font-semibold flex items-center text-gray-800">
+            <div className="p-2 bg-indigo-100 rounded-lg mr-3">
+              <Calendar className="h-4 w-4 text-indigo-600" />
+            </div>
+            Best Day This Week
+          </h4>
+          <div className="flex items-center gap-2">
+            {bestDay && (
+              <span className="text-sm font-medium text-indigo-600">
+                {bestDay.dayName} {bestDay.bestPeriod} ({bestDay.bestScore}/100)
+              </span>
+            )}
+            {expandedSections.weeklyForecast ? (
+              <ChevronUp className="h-5 w-5 text-gray-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-gray-400" />
+            )}
+          </div>
+        </button>
+
+        {expandedSections.weeklyForecast && (
+          <div className="px-4 pb-4">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+              {weeklyScores.map((day, i) => {
+                const isBest = day === bestDay;
+                const scoreColor = day.bestScore >= 80 ? 'bg-emerald-500' :
+                  day.bestScore >= 60 ? 'bg-amber-500' :
+                  day.bestScore >= 40 ? 'bg-orange-500' : 'bg-red-500';
+
+                return (
+                  <div
+                    key={i}
+                    className={`text-center p-2 rounded-xl transition-all ${
+                      isBest ? 'bg-indigo-100 ring-2 ring-indigo-400' :
+                      day.isToday ? 'bg-white shadow-sm' : 'bg-white/50'
+                    }`}
+                  >
+                    <div className={`text-xs font-medium ${day.isToday ? 'text-indigo-600' : 'text-gray-500'}`}>
+                      {day.dayName}
+                    </div>
+                    <div className={`text-lg font-bold mt-1 ${
+                      day.bestScore >= 70 ? 'text-emerald-600' :
+                      day.bestScore >= 50 ? 'text-amber-600' : 'text-red-600'
+                    }`}>
+                      {day.bestScore}
+                    </div>
+                    <div className="text-[10px] text-gray-400">{day.bestPeriod}</div>
+                    <div className={`h-1 rounded-full mt-1 ${scoreColor}`} style={{width: `${day.bestScore}%`, margin: '0 auto'}} />
+                    {day.hasRain && <span className="text-xs">🌧️</span>}
+                    {isBest && <span className="text-xs">⭐</span>}
+                  </div>
+                );
+              })}
+            </div>
+            {bestDay && !bestDay.isToday && (
+              <div className="mt-3 p-3 bg-indigo-100 rounded-xl text-sm text-indigo-800">
+                <strong>{bestDay.dayName} {bestDay.bestPeriod}</strong> looks perfect!
+                {bestDay.bestScore >= 80 ? ' Expect glassy conditions.' :
+                 bestDay.bestScore >= 60 ? ' Should be a solid session.' : ' Better than other days.'}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render condition trends
+  const renderConditionTrends = () => {
+    if (!conditionTrends) return null;
+
+    const { wind } = conditionTrends;
+    const trendIcon = wind.trend === 'improving' ? '↓' :
+      wind.trend === 'worsening' ? '↑' : '→';
+    const trendColor = wind.trend === 'improving' ? 'text-emerald-600 bg-emerald-50' :
+      wind.trend === 'worsening' ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50';
+
+    return (
+      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${trendColor}`}>
+        <span className="text-lg">{trendIcon}</span>
+        <span>{wind.message}</span>
+        <span className="text-xs opacity-70">(next 3hrs)</span>
+      </div>
+    );
+  };
+
+  // Render equipment recommendations
+  const renderEquipment = () => {
+    const equipment = getEquipmentRecommendations();
+    if (!equipment.length) return null;
+
+    return (
+      <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+        <h4 className="font-medium text-amber-800 mb-3 flex items-center">
+          <span className="mr-2">🎒</span> What to Bring
         </h4>
-
-        <p className="text-sm text-gray-600 mb-3 dark:text-slate-300">
-          Each factor contributes a set number of points to the final score – shown in parentheses below.
-          The progress bar indicates how many of those points were earned. See the FAQ for details.
-        </p>
-
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-600">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-600">
-            <thead className="bg-gray-50 dark:bg-slate-700">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">Factor</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">Value</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">Points</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-800 dark:divide-slate-600">
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Wind Speed</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(37 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.windSpeed.raw.toFixed(1)} km/h
-                  <span className="text-xs text-gray-400 dark:text-slate-500 ml-1">
-                    (Protected: {scoreBreakdown.windSpeed.protected.toFixed(1)})
-                  </span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.windSpeed.score > 30 ? 'text-green-600' :
-                    scoreBreakdown.windSpeed.score > 20 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.windSpeed.score}/{scoreBreakdown.windSpeed.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.windSpeed.score}
-                      max={scoreBreakdown.windSpeed.maxPossible}
-                      color={
-                        scoreBreakdown.windSpeed.score > 30 ? 'bg-green-500' :
-                        scoreBreakdown.windSpeed.score > 20 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Wave Height</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(17 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.waveHeight.raw.toFixed(2)} m
-                  <span className="text-xs text-gray-400 dark:text-slate-500 ml-1">
-                    (Protected: {scoreBreakdown.waveHeight.protected.toFixed(2)})
-                  </span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.waveHeight.score > 15 ? 'text-green-600' :
-                    scoreBreakdown.waveHeight.score > 10 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.waveHeight.score}/{scoreBreakdown.waveHeight.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.waveHeight.score}
-                      max={scoreBreakdown.waveHeight.maxPossible}
-                      color={
-                        scoreBreakdown.waveHeight.score > 15 ? 'bg-green-500' :
-                        scoreBreakdown.waveHeight.score > 10 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Swell Height</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(8 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.swellHeight.raw.toFixed(2)} m
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.swellHeight.score > 7 ? 'text-green-600' :
-                    scoreBreakdown.swellHeight.score > 5 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.swellHeight.score}/{scoreBreakdown.swellHeight.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.swellHeight.score}
-                      max={scoreBreakdown.swellHeight.maxPossible}
-                      color={
-                        scoreBreakdown.swellHeight.score > 7 ? 'bg-green-500' :
-                        scoreBreakdown.swellHeight.score > 5 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Precipitation</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(5 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.precipitation.value.toFixed(1)} mm
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.precipitation.value < 1 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.precipitation.score}/{scoreBreakdown.precipitation.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.precipitation.score}
-                      max={scoreBreakdown.precipitation.maxPossible}
-                      color={scoreBreakdown.precipitation.value < 1 ? 'bg-green-500' : 'bg-red-500'}
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Air Temperature</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(8 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.temperature.value.toFixed(1)} °C
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.temperature.score > 4 ? 'text-green-600' : 'text-yellow-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.temperature.score}/{scoreBreakdown.temperature.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.temperature.score}
-                      max={scoreBreakdown.temperature.maxPossible}
-                      color={scoreBreakdown.temperature.score > 4 ? 'bg-green-500' : 'bg-yellow-500'}
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Water Temperature</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(10 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.waterTemperature?.value != null
-                    ? `${scoreBreakdown.waterTemperature.value.toFixed(1)} °C`
-                    : 'N/A'}
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    (scoreBreakdown.waterTemperature?.score ?? 0) > 6 ? 'text-green-600' :
-                    (scoreBreakdown.waterTemperature?.score ?? 0) > 3 ? 'text-yellow-600' : 'text-blue-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.waterTemperature?.score ?? 0}/{scoreBreakdown.waterTemperature?.maxPossible ?? 8}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.waterTemperature?.score ?? 0}
-                      max={scoreBreakdown.waterTemperature?.maxPossible ?? 8}
-                      color={
-                        (scoreBreakdown.waterTemperature?.score ?? 0) > 6 ? 'bg-green-500' :
-                        (scoreBreakdown.waterTemperature?.score ?? 0) > 3 ? 'bg-yellow-500' : 'bg-blue-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Cloud Cover</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(4 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.cloudCover.value.toFixed(0)}%
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.cloudCover.score > 3 ? 'text-green-600' :
-                    scoreBreakdown.cloudCover.score > 2 ? 'text-yellow-600' : 'text-gray-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.cloudCover.score}/{scoreBreakdown.cloudCover.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.cloudCover.score}
-                      max={scoreBreakdown.cloudCover.maxPossible}
-                      color={
-                        scoreBreakdown.cloudCover.score > 3 ? 'bg-green-500' :
-                        scoreBreakdown.cloudCover.score > 2 ? 'bg-yellow-500' : 'bg-gray-400'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Geographic Protection</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(9 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.geoProtection.value.toFixed(0)}/100
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.geoProtection.score > 7 ? 'text-green-600' :
-                    scoreBreakdown.geoProtection.score > 4 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.geoProtection.score}/{scoreBreakdown.geoProtection.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.geoProtection.score}
-                      max={scoreBreakdown.geoProtection.maxPossible}
-                      color={
-                        scoreBreakdown.geoProtection.score > 7 ? 'bg-green-500' :
-                        scoreBreakdown.geoProtection.score > 4 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr className="bg-blue-50 dark:bg-slate-700">
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-slate-100">
-                  TOTAL SCORE
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap"></td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.total.score >= 85 ? 'text-green-600' :
-                    scoreBreakdown.total.score >= 70 ? 'text-yellow-600' :
-                    scoreBreakdown.total.score >= 50 ? 'text-orange-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.total.score}/{scoreBreakdown.total.maxPossible}
-                      {scoreBreakdown.total.rawScore > scoreBreakdown.total.maxPossible && (
-                        <span className="text-xs text-gray-500 ml-1">
-                          (raw {scoreBreakdown.total.rawScore})
-                        </span>
-                      )}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.total.score}
-                      max={scoreBreakdown.total.maxPossible}
-                      color={
-                        scoreBreakdown.total.score >= 85 ? 'bg-green-500' :
-                        scoreBreakdown.total.score >= 70 ? 'bg-yellow-500' :
-                        scoreBreakdown.total.score >= 50 ? 'bg-orange-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="flex flex-wrap gap-2">
+          {equipment.slice(0, 5).map((item, i) => (
+            <div key={i} className="bg-white rounded-lg px-3 py-2 text-sm border border-amber-100 shadow-sm">
+              <span className="mr-1">{item.icon}</span>
+              <span className="font-medium">{item.item}</span>
+              <span className="text-gray-500 text-xs ml-1">({item.reason})</span>
+            </div>
+          ))}
         </div>
       </div>
     );
+  };
+
+  // Render tide information (Mediterranean has minimal tides)
+  const renderTideInfo = () => {
+    // Calculate approximate tide state based on moon phase
+    const now = new Date(timeRange.date);
+    const lunarCycle = 29.53059; // days
+    const knownNewMoon = new Date('2024-01-11'); // Reference new moon
+    const daysSinceNew = (now - knownNewMoon) / (1000 * 60 * 60 * 24);
+    const moonAge = daysSinceNew % lunarCycle;
+
+    // Spring tides occur at new moon (0) and full moon (~14.76 days)
+    // Neap tides occur at first quarter (~7.38) and third quarter (~22.14)
+    const isSpringTide = (moonAge < 2 || Math.abs(moonAge - 14.76) < 2);
+    const isNeapTide = (Math.abs(moonAge - 7.38) < 2 || Math.abs(moonAge - 22.14) < 2);
+
+    // Mediterranean tidal range is very small: 20-60cm typically
+    const tidalRange = isSpringTide ? '40-60cm' : isNeapTide ? '15-25cm' : '25-40cm';
+    const tideType = isSpringTide ? 'Spring Tide' : isNeapTide ? 'Neap Tide' : 'Normal Tide';
+
+    // Approximate high/low tide times (simplified - 2 high/low per day, ~6hrs apart)
+    const hour = parseInt(timeRange.startTime.split(':')[0]);
+    // Simple approximation: tides shift ~50 min later each day
+    const tideShift = (daysSinceNew * 50) % (12 * 60); // minutes into 12-hour cycle
+    const nextHighHour = Math.floor(tideShift / 60) % 12;
+    const nextLowHour = (nextHighHour + 6) % 12;
+
+    return (
+      <div className="bg-cyan-50 rounded-xl p-4 border border-cyan-200">
+        <h4 className="font-medium text-cyan-800 mb-3 flex items-center">
+          <span className="mr-2">🌊</span> Tide Information
+        </h4>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white rounded-lg p-3 text-center">
+            <div className="text-xs text-gray-500">Type</div>
+            <div className="font-semibold text-cyan-700">{tideType}</div>
+          </div>
+          <div className="bg-white rounded-lg p-3 text-center">
+            <div className="text-xs text-gray-500">Range</div>
+            <div className="font-semibold text-cyan-700">{tidalRange}</div>
+          </div>
+          <div className="bg-white rounded-lg p-3 text-center">
+            <div className="text-xs text-gray-500">High ~</div>
+            <div className="font-semibold text-cyan-700">
+              {nextHighHour.toString().padStart(2, '0')}:00 / {(nextHighHour + 12).toString().padStart(2, '0')}:00
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-3 text-center">
+            <div className="text-xs text-gray-500">Low ~</div>
+            <div className="font-semibold text-cyan-700">
+              {nextLowHour.toString().padStart(2, '0')}:00 / {(nextLowHour + 12).toString().padStart(2, '0')}:00
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-cyan-600 mt-3">
+          ℹ️ Mediterranean tides are minimal ({tidalRange} range). Times are approximate.
+        </p>
+      </div>
+    );
+  };
+
+  // Share functionality
+  const handleShare = async () => {
+    const text = `🏄 SUP Conditions at ${beach?.name}\n` +
+      `📊 Score: ${paddleScore}/100\n` +
+      `💨 Wind: ${scoreBreakdown?.windSpeed?.protected?.toFixed(1) || '?'} km/h\n` +
+      `🌊 Waves: ${scoreBreakdown?.waveHeight?.protected?.toFixed(2) || '?'} m\n` +
+      `🌡️ Water: ${scoreBreakdown?.waterTemperature?.value?.toFixed(0) || '?'}°C\n` +
+      `📅 ${new Date(timeRange.date).toLocaleDateString()} ${timeRange.startTime}-${timeRange.endTime}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `SUP Conditions - ${beach?.name}`,
+          text: text
+        });
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          // Fallback to clipboard
+          await navigator.clipboard.writeText(text);
+          alert('Conditions copied to clipboard!');
+        }
+      }
+    } else {
+      await navigator.clipboard.writeText(text);
+      alert('Conditions copied to clipboard!');
+    }
   };
 
   // Render hourly wind speed visualization (FIXED VERSION)
@@ -1052,32 +1444,32 @@ const FixedBeachView = ({
     // Exit gracefully if no hours to display
     if (allHours.length === 0) {
       return (
-        <div className="bg-white rounded-lg p-5 border shadow-sm mt-4 dark:bg-slate-800 dark:border-slate-700">
-          <h4 className="font-medium mb-4 flex items-center text-gray-800 dark:text-slate-100">
+        <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
+          <h4 className="font-medium mb-4 flex items-center text-gray-800">
             <Clock className="h-5 w-5 mr-2 text-blue-600" />
             Hourly Wind Speed
           </h4>
-          <p className="text-gray-600 dark:text-slate-300">No wind data available for this period.</p>
+          <p className="text-gray-600">No wind data available for this period.</p>
         </div>
       );
     }
-
+    
     return (
-      <div className="bg-white rounded-lg p-5 border shadow-sm mt-4 dark:bg-slate-800 dark:border-slate-700">
-        <h4 className="font-medium mb-4 flex items-center text-gray-800 dark:text-slate-100">
-          <Clock className="h-5 w-5 mr-2 text-blue-600" />
+      <div className="bg-white rounded-lg p-5 border shadow-sm mt-4">
+        <h4 className="font-medium mb-4 flex items-center text-gray-800">
+          <Clock className="h-5 w-5 mr-2 text-blue-600" /> 
           Hourly Wind Speed
         </h4>
-
+        
         <div className="space-y-3">
           {allHours.map(hour => {
             const windSpeed = hour.windSpeed;
             const barWidth = Math.min(80, windSpeed * 6); // Cap at 80% width
-
+            
             let barColor = "bg-green-500";
             let textColor = "text-green-800";
             let bgColor = "bg-green-100";
-
+            
             if (windSpeed >= 12) {
               barColor = "bg-red-500";
               textColor = "text-red-800";
@@ -1087,10 +1479,10 @@ const FixedBeachView = ({
               textColor = "text-yellow-800";
               bgColor = "bg-yellow-100";
             }
-
+            
             return (
               <div key={`${hour.date}-${hour.hour}`} className="flex items-center">
-                <div className="w-32 text-gray-600 font-medium dark:text-slate-300">
+                <div className="w-32 text-gray-600 font-medium">
                   {new Date(hour.time).toLocaleString([], {
                     month: 'short',
                     day: 'numeric',
@@ -1099,7 +1491,7 @@ const FixedBeachView = ({
                     hour12: false
                   })}
                 </div>
-                <div className="flex-grow mx-3 bg-gray-200 h-6 rounded-full overflow-hidden dark:bg-slate-600">
+                <div className="flex-grow mx-3 bg-gray-200 h-6 rounded-full overflow-hidden">
                   <div 
                     className={`h-full ${barColor} rounded-l-full`} 
                     style={{ width: `${barWidth}%` }} 
@@ -1132,15 +1524,23 @@ const FixedBeachView = ({
     ? {
         windRaw: toNumberOr(scoreBreakdown.windSpeed?.raw, 0),
         windProtected: toNumberOr(scoreBreakdown.windSpeed?.protected, 0),
+        windDirection: toNumberOr(scoreBreakdown.windDirection?.value, 0),
         waveRaw: toNumberOr(scoreBreakdown.waveHeight?.raw, 0),
         waveProtected: toNumberOr(scoreBreakdown.waveHeight?.protected, 0),
         swellProtected: toNumberOr(scoreBreakdown.swellHeight?.protected, 0),
         temperature: toNumberOr(scoreBreakdown.temperature?.value, 0),
         waterTemperature: toNumberOr(scoreBreakdown.waterTemperature?.value, null),
         precipitation: toNumberOr(scoreBreakdown.precipitation?.value, 0),
-        cloudCover: toNumberOr(scoreBreakdown.cloudCover?.value, 0)
+        cloudCover: toNumberOr(scoreBreakdown.cloudCover?.value, 0),
+        uvIndex: toNumberOr(scoreBreakdown.uvIndex?.value, 0)
       }
     : null;
+
+  // Get sunrise/sunset from weather data
+  const sunTimes = weatherData?.daily ? {
+    sunrise: weatherData.daily.sunrise?.[0],
+    sunset: weatherData.daily.sunset?.[0]
+  } : null;
 
   return (
     <>
@@ -1247,20 +1647,20 @@ const FixedBeachView = ({
       </div>
 
       {/* Time range selector */}
-      <div className="p-4 border-b bg-gray-50 dark:bg-slate-800 dark:border-slate-700">
-        <h3 className="text-lg font-medium mb-4 dark:text-slate-100">Choose Date & Time Window</h3>
-
+      <div className="p-4 border-b bg-gray-50">
+        <h3 className="text-lg font-medium mb-4">Choose Date & Time Window</h3>
+        
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">Date</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
           <div className="relative cursor-pointer" onClick={() => setShowDatePicker(true)}>
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Calendar className="h-5 w-5 text-gray-400 dark:text-slate-500" />
+              <Calendar className="h-5 w-5 text-gray-400" />
             </div>
             <input
               type="text"
               readOnly
               value={timeRange.date}
-              className="w-full pl-10 p-3 bg-white dark:bg-slate-700 dark:text-slate-100 border dark:border-slate-600 rounded-lg cursor-pointer text-lg"
+              className="w-full pl-10 p-3 bg-white border rounded-lg cursor-pointer text-lg"
             />
           </div>
         </div>
@@ -1286,13 +1686,13 @@ const FixedBeachView = ({
         
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Start Time
             </label>
             <select
               value={timeRange.startTime}
               onChange={(e) => onTimeRangeChange?.('startTime', e.target.value)}
-              className="w-full p-2 border dark:border-slate-600 rounded appearance-none bg-white dark:bg-slate-700 dark:text-slate-100 text-lg"
+              className="w-full p-2 border rounded appearance-none bg-white text-lg"
             >
               {Array.from({ length: 24 }, (_, i) => {
                 const hourLabel = `${String(i).padStart(2, '0')}:00`;
@@ -1310,13 +1710,13 @@ const FixedBeachView = ({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               End Time
             </label>
             <select
               value={timeRange.endTime}
               onChange={(e) => onTimeRangeChange?.('endTime', e.target.value)}
-              className="w-full p-2 border dark:border-slate-600 rounded appearance-none bg-white dark:bg-slate-700 dark:text-slate-100 text-lg"
+              className="w-full p-2 border rounded appearance-none bg-white text-lg"
             >
               {Array.from({ length: 24 }, (_, i) => {
                 const hourLabel = `${String(i).padStart(2, '0')}:00`;
@@ -1348,7 +1748,7 @@ const FixedBeachView = ({
       {loading && (
         <div className="p-8 text-center">
           <div className="inline-block animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
-          <p className="text-gray-600 dark:text-slate-300">Loading real-time weather data...</p>
+          <p className="text-gray-600">Loading real-time weather data...</p>
         </div>
       )}
       
@@ -1376,42 +1776,42 @@ const FixedBeachView = ({
           {paddleScore !== null && (
             <div className="flex flex-col md:flex-row gap-6 mb-6">
               {/* Score card - LEFT SIDE */}
-              <div className="md:w-1/3 bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 text-center flex flex-col justify-center relative">
+              <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center flex flex-col justify-center relative">
                 <div
                   className={`text-6xl mb-3 ${condition.color}`}
                 >
                   {condition.emoji}
                 </div>
-                <h3 className="text-3xl font-bold mb-2 flex items-center justify-center dark:text-slate-100">
+                <h3 className="text-3xl font-bold mb-2 flex items-center justify-center">
                   {condition.label}
                   <div className="group relative ml-2">
                     <div className="cursor-help">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                          className="text-gray-400 dark:text-slate-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" 
+                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" 
+                          className="text-gray-400">
                         <circle cx="12" cy="12" r="10"></circle>
                         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>
                       </svg>
                     </div>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                                  absolute z-10 w-64 p-3 -left-24 bottom-8 bg-white dark:bg-slate-700
-                                  border border-gray-200 dark:border-slate-600 rounded-lg shadow-lg text-sm text-left dark:text-slate-200">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 
+                                  absolute z-10 w-64 p-3 -left-24 bottom-8 bg-white 
+                                  border border-gray-200 rounded-lg shadow-lg text-sm text-left">
                       {conditionDetails}
                     </div>
                   </div>
                 </h3>
-                <p className="text-gray-600 dark:text-slate-300 text-lg mb-4">{condition.message}</p>
-                <div className="mt-2 bg-gray-100 dark:bg-slate-700 rounded-full h-5 overflow-hidden">
+                <p className="text-gray-600 text-lg mb-4">{condition.message}</p>
+                <div className="mt-2 bg-gray-100 rounded-full h-5 overflow-hidden">
                   <div
                     className={`h-full ${condition.color}`}
                     style={{ width: `${paddleScore}%` }}
                   ></div>
                 </div>
-                <p className="mt-2 text-lg font-medium text-gray-700 dark:text-slate-200">
+                <p className="mt-2 text-lg font-medium text-gray-700">
                   Score: {paddleScore}/100
                 </p>
-                <div className="mt-1 text-xs text-gray-500 dark:text-slate-400 flex items-center justify-center gap-2">
+                <div className="mt-1 text-xs text-gray-500 flex items-center justify-center gap-2">
                   <span>Data quality:</span>
                   <span className={`font-medium ${
                     scoreBreakdown?.dataQuality >= 90 ? 'text-green-600' :
@@ -1425,6 +1825,12 @@ const FixedBeachView = ({
                     </span>
                   )}
                 </div>
+                {/* Condition Trends */}
+                {conditionTrends && (
+                  <div className="mt-3">
+                    {renderConditionTrends()}
+                  </div>
+                )}
               </div>
               
               {/* Weather Factors - RIGHT SIDE */}
@@ -1432,10 +1838,10 @@ const FixedBeachView = ({
                 <div className="grid grid-cols-2 gap-3">
                   {breakdownMetrics ? (
                     <>
-                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border dark:border-slate-700 flex items-center shadow-sm">
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
                         <Wind className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
-                          <div className="text-sm text-gray-500 dark:text-slate-400">Wind</div>
+                          <div className="text-sm text-gray-500">Wind</div>
                           <div className={`text-lg font-medium ${
                             breakdownMetrics.windProtected < 8
                               ? 'text-green-600'
@@ -1444,17 +1850,17 @@ const FixedBeachView = ({
                                 : 'text-red-600'
                           }`}>
                             {Math.round(breakdownMetrics.windRaw)} km/h
-                            <span className="text-xs ml-2 text-gray-500 dark:text-slate-400">
+                            <span className="text-xs ml-2 text-gray-500">
                               (Protected: {Math.round(breakdownMetrics.windProtected)} km/h)
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border dark:border-slate-700 flex items-center shadow-sm">
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
                         <Waves className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
-                          <div className="text-sm text-gray-500 dark:text-slate-400">Wave Height</div>
+                          <div className="text-sm text-gray-500">Wave Height</div>
                           <div className={`text-lg font-medium ${
                             breakdownMetrics.waveProtected < 0.2
                               ? 'text-green-600'
@@ -1463,17 +1869,17 @@ const FixedBeachView = ({
                                 : 'text-red-600'
                           }`}>
                             {breakdownMetrics.waveRaw.toFixed(2)} m
-                            <span className="text-xs ml-2 text-gray-500 dark:text-slate-400">
+                            <span className="text-xs ml-2 text-gray-500">
                               (Protected: {breakdownMetrics.waveProtected.toFixed(2)} m)
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border dark:border-slate-700 flex items-center shadow-sm">
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
                         <Thermometer className="h-6 w-6 mr-3 text-orange-500" />
                         <div className="flex-grow">
-                          <div className="text-sm text-gray-500 dark:text-slate-400">Air Temp</div>
+                          <div className="text-sm text-gray-500">Air Temp</div>
                           <div className={`text-lg font-medium ${
                             breakdownMetrics.temperature >= 22 && breakdownMetrics.temperature <= 30
                               ? 'text-green-600'
@@ -1486,10 +1892,10 @@ const FixedBeachView = ({
                         </div>
                       </div>
 
-                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border dark:border-slate-700 flex items-center shadow-sm">
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
                         <Waves className="h-6 w-6 mr-3 text-cyan-500" />
                         <div className="flex-grow">
-                          <div className="text-sm text-gray-500 dark:text-slate-400">Water Temp</div>
+                          <div className="text-sm text-gray-500">Water Temp</div>
                           <div className={`text-lg font-medium ${
                             breakdownMetrics.waterTemperature !== null
                               ? breakdownMetrics.waterTemperature >= 18 && breakdownMetrics.waterTemperature <= 26
@@ -1509,27 +1915,128 @@ const FixedBeachView = ({
                         </div>
                       </div>
 
-                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border dark:border-slate-700 flex items-center shadow-sm">
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
                         <Droplets className="h-6 w-6 mr-3 text-blue-600" />
                         <div className="flex-grow">
-                          <div className="text-sm text-gray-500 dark:text-slate-400">Precipitation</div>
+                          <div className="text-sm text-gray-500">Precipitation</div>
                           <div className={`text-lg font-medium ${
                             breakdownMetrics.precipitation < 1 ? 'text-green-600' : 'text-red-600'
                           }`}>
                             {breakdownMetrics.precipitation.toFixed(1)} mm
                           </div>
-                          <div className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                          <div className="mt-1 text-xs text-gray-500">
                             Cloud cover {Math.round(breakdownMetrics.cloudCover)}%
                           </div>
                         </div>
                       </div>
+
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                        <Sun className={`h-6 w-6 mr-3 ${
+                          breakdownMetrics.uvIndex >= 8 ? 'text-red-500' :
+                          breakdownMetrics.uvIndex >= 6 ? 'text-orange-500' :
+                          breakdownMetrics.uvIndex >= 3 ? 'text-yellow-500' : 'text-green-500'
+                        }`} />
+                        <div className="flex-grow">
+                          <div className="text-sm text-gray-500">UV Index</div>
+                          <div className={`text-lg font-medium ${
+                            breakdownMetrics.uvIndex >= 8 ? 'text-red-600' :
+                            breakdownMetrics.uvIndex >= 6 ? 'text-orange-600' :
+                            breakdownMetrics.uvIndex >= 3 ? 'text-yellow-600' : 'text-green-600'
+                          }`}>
+                            {breakdownMetrics.uvIndex.toFixed(1)}
+                            <span className="text-xs ml-1">
+                              {breakdownMetrics.uvIndex >= 11 ? '(Extreme)' :
+                               breakdownMetrics.uvIndex >= 8 ? '(Very High)' :
+                               breakdownMetrics.uvIndex >= 6 ? '(High)' :
+                               breakdownMetrics.uvIndex >= 3 ? '(Moderate)' : '(Low)'}
+                            </span>
+                          </div>
+                          {breakdownMetrics.uvIndex >= 6 && (
+                            <div className="text-xs text-orange-600">
+                              {breakdownMetrics.uvIndex >= 8 ? 'SPF 50+, hat & rash vest!' : 'Sunscreen every 2 hours'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {sunTimes && (
+                        <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm col-span-2">
+                          <div className="flex items-center justify-around w-full">
+                            <div className="flex items-center">
+                              <Sunrise className="h-5 w-5 mr-2 text-orange-400" />
+                              <div>
+                                <div className="text-xs text-gray-500">Sunrise</div>
+                                <div className="text-sm font-medium">
+                                  {sunTimes.sunrise ? new Date(sunTimes.sunrise).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center">
+                              <Navigation
+                                className="h-8 w-8 text-blue-500 mx-4"
+                                style={{ transform: `rotate(${breakdownMetrics.windDirection}deg)` }}
+                              />
+                              <div className="text-xs text-gray-500">
+                                Wind from {getCardinalDirection(breakdownMetrics.windDirection)}
+                              </div>
+                            </div>
+                            <div className="flex items-center">
+                              <Sunset className="h-5 w-5 mr-2 text-orange-500" />
+                              <div>
+                                <div className="text-xs text-gray-500">Sunset</div>
+                                <div className="text-sm font-medium">
+                                  {sunTimes.sunset ? new Date(sunTimes.sunset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </>
                   ) : (
-                    <div className="col-span-2 rounded-lg border border-dashed border-blue-200 dark:border-slate-600 p-4 text-sm text-gray-500 dark:text-slate-400">
+                    <div className="col-span-2 rounded-lg border border-dashed border-blue-200 p-4 text-sm text-gray-500">
                       Forecast metrics will appear once weather data loads.
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Beach Location Map - Compact */}
+          {beach && (
+            <div className="mt-4 bg-white rounded-lg shadow-sm border overflow-hidden">
+              <div className="h-48 relative">
+                <MapContainer
+                  center={[beach.latitude, beach.longitude]}
+                  zoom={14}
+                  style={{ height: "100%", width: "100%" }}
+                  scrollWheelZoom={false}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={[beach.latitude, beach.longitude]}>
+                    <Popup>
+                      <strong>{beach.name}</strong>
+                    </Popup>
+                  </Marker>
+                </MapContainer>
+              </div>
+              <div className="px-4 py-2 flex justify-between items-center text-sm border-t bg-gray-50">
+                <span className="text-gray-600">
+                  {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
+                </span>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${beach.latitude},${beach.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline flex items-center font-medium"
+                >
+                  <Navigation className="h-4 w-4 mr-1" />
+                  Directions
+                </a>
               </div>
             </div>
           )}
@@ -1589,14 +2096,14 @@ const FixedBeachView = ({
                   )}
                 </div>
 
-                <div className="rounded-2xl border dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
-                  <h4 className="flex items-center text-lg font-semibold text-gray-800 dark:text-slate-100">
+                <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                  <h4 className="flex items-center text-lg font-semibold text-gray-800">
                     <LifeBuoy className="mr-2 h-5 w-5 text-blue-500" /> Session game plan
                   </h4>
-                  <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">Forecast window: {readiness.windowLabel}</p>
+                  <p className="mt-2 text-sm text-gray-500">Forecast window: {readiness.windowLabel}</p>
                   <ul className="mt-4 space-y-3">
                     {readiness.suggestions.map((tip, index) => (
-                      <li key={index} className="flex items-start text-sm text-gray-600 dark:text-slate-300">
+                      <li key={index} className="flex items-start text-sm text-gray-600">
                         <CheckCircle2 className="mr-2 h-5 w-5 flex-shrink-0 text-blue-500" />
                         <span>{tip}</span>
                       </li>
@@ -1608,9 +2115,55 @@ const FixedBeachView = ({
             </div>
           )}
 
+          {/* Daylight warning */}
+          {sunTimes?.sunrise && sunTimes?.sunset && (() => {
+            const sunriseHour = new Date(sunTimes.sunrise).getHours();
+            const sunsetHour = new Date(sunTimes.sunset).getHours();
+            const startHour = parseInt(timeRange.startTime.split(':')[0], 10);
+            const endHour = parseInt(timeRange.endTime.split(':')[0], 10);
+            const isBeforeSunrise = startHour < sunriseHour;
+            const isAfterSunset = endHour > sunsetHour;
+            const isFullyDark = startHour >= sunsetHour || endHour <= sunriseHour;
+
+            if (isFullyDark) {
+              return (
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 mb-4">
+                  <h4 className="font-bold text-purple-700 flex items-center mb-2">
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    NIGHTTIME SELECTED
+                  </h4>
+                  <p className="text-purple-700">
+                    Your selected time ({timeRange.startTime}-{timeRange.endTime}) is outside daylight hours.
+                    Sunrise is at {new Date(sunTimes.sunrise).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} and
+                    sunset at {new Date(sunTimes.sunset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                    Paddleboarding in the dark is not recommended.
+                  </p>
+                </div>
+              );
+            }
+
+            if (isBeforeSunrise || isAfterSunset) {
+              return (
+                <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 mb-4">
+                  <h4 className="font-bold text-amber-700 flex items-center mb-2">
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    PARTIAL DARKNESS
+                  </h4>
+                  <p className="text-amber-700">
+                    Part of your selected time window is outside daylight hours.
+                    Sunrise: {new Date(sunTimes.sunrise).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })},
+                    Sunset: {new Date(sunTimes.sunset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                  </p>
+                </div>
+              );
+            }
+
+            return null;
+          })()}
+
           {/* Safety alert */}
           {scoreBreakdown && scoreBreakdown.windSpeed.raw > 30 && (
-            <div className="bg-red-50 p-4 rounded-lg border border-red-200 mb-6">
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200 mb-4">
               <h4 className="font-bold text-red-700 flex items-center mb-2">
                 <AlertCircle className="h-5 w-5 mr-2" />
                 HIGH WIND ALERT
@@ -1621,18 +2174,34 @@ const FixedBeachView = ({
             </div>
           )}
           
+          {/* Equipment Recommendations */}
+          {renderEquipment()}
+
+          {/* Tide Information */}
+          {renderTideInfo()}
+
+          {/* 7-Day Forecast */}
+          {renderWeeklyForecast()}
+
           {/* Score Breakdown */}
           {renderScoreBreakdown()}
-          
+
           {/* Geographic Protection */}
           {renderGeoProtectionInfo()}
-          
+
           {/* Hourly Wind */}
           {renderHourlyWind()}
-          
-          <div className="text-center mt-6">
-            <p className="text-sm text-gray-600 dark:text-slate-400">
-              This is real-time weather data from Open-Meteo API. Always verify conditions before paddleboarding.
+
+          <div className="text-center mt-6 space-y-3">
+            <button
+              onClick={handleShare}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Navigation className="h-4 w-4" />
+              Share Conditions
+            </button>
+            <p className="text-sm text-gray-600">
+              Real-time data from Open-Meteo API. Always verify conditions before paddleboarding.
             </p>
           </div>
         </div>

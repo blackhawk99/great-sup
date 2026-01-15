@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { analyzeBayProtection } from "./utils/coastlineAnalysis";
+import { analyzeBayProtection, snapToCoastline } from "./utils/coastlineAnalysis";
 import { parseGoogleMapsUrl } from "./helpers.jsx";
 import { resolveGoogleMapsShortUrl } from "./proxy";
 import { getCardinalDirection } from "./helpers.jsx";
@@ -16,7 +16,12 @@ export const useBeachManager = () => {
   });
   const [mapUrl, setMapUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
+  // Place search state
+  const [placeSearch, setPlaceSearch] = useState("");
+  const [placeResults, setPlaceResults] = useState([]);
+  const [searchingPlaces, setSearchingPlaces] = useState(false);
+
   // Load saved beaches from localStorage on component mount
   useEffect(() => {
     try {
@@ -173,25 +178,33 @@ export const useBeachManager = () => {
       if (!newBeach.name || !newBeach.latitude || !newBeach.longitude) {
         throw new Error("Please fill in all beach details");
       }
-      
-      const lat = parseFloat(newBeach.latitude);
-      const lng = parseFloat(newBeach.longitude);
-      
+
+      let lat = parseFloat(newBeach.latitude);
+      let lng = parseFloat(newBeach.longitude);
+
       if (isNaN(lat) || isNaN(lng)) {
         throw new Error("Invalid coordinates");
       }
-      
+
+      // Snap coordinates to nearest coastline (within 2km)
+      const snapped = snapToCoastline(lat, lng, 2);
+      if (snapped.snapped) {
+        console.log(`Snapped beach from (${lat}, ${lng}) to (${snapped.latitude}, ${snapped.longitude}) - ${(snapped.distance * 1000).toFixed(0)}m adjustment`);
+        lat = snapped.latitude;
+        lng = snapped.longitude;
+      }
+
       // Check for duplicates
-      const isDuplicate = beaches.some(beach => 
-        (Math.abs(beach.latitude - lat) < 0.01 && 
+      const isDuplicate = beaches.some(beach =>
+        (Math.abs(beach.latitude - lat) < 0.01 &&
          Math.abs(beach.longitude - lng) < 0.01) ||
         beach.name.toLowerCase() === newBeach.name.toLowerCase()
       );
-      
+
       if (isDuplicate) {
         throw new Error("This beach already exists in your list!");
       }
-      
+
       // Create the beach
       const beachToAdd = {
         id: `beach-${Date.now()}`,
@@ -200,6 +213,7 @@ export const useBeachManager = () => {
         longitude: lng,
         googleMapsUrl: newBeach.googleMapsUrl || mapUrl,
         createdAt: Date.now(),
+        snappedToCoastline: snapped.snapped,
       };
       
       // If we have pre-analyzed protection data, add it
@@ -224,25 +238,36 @@ export const useBeachManager = () => {
       if (!location || !location.name || !location.latitude || !location.longitude) {
         throw new Error("Invalid location data");
       }
-      
+
+      // Snap coordinates to nearest coastline (within 2km)
+      let lat = location.latitude;
+      let lng = location.longitude;
+      const snapped = snapToCoastline(lat, lng, 2);
+      if (snapped.snapped) {
+        console.log(`Snapped beach from (${lat}, ${lng}) to (${snapped.latitude}, ${snapped.longitude}) - ${(snapped.distance * 1000).toFixed(0)}m adjustment`);
+        lat = snapped.latitude;
+        lng = snapped.longitude;
+      }
+
       // Check for duplicates
-      const isDuplicate = beaches.some(beach => 
-        (Math.abs(beach.latitude - location.latitude) < 0.01 && 
-         Math.abs(beach.longitude - location.longitude) < 0.01) ||
+      const isDuplicate = beaches.some(beach =>
+        (Math.abs(beach.latitude - lat) < 0.01 &&
+         Math.abs(beach.longitude - lng) < 0.01) ||
         beach.name.toLowerCase() === location.name.toLowerCase()
       );
-      
+
       if (isDuplicate) {
         throw new Error("This beach already exists in your list!");
       }
-      
+
       const beachToAdd = {
         id: `beach-${Date.now()}`,
         name: location.name,
-        latitude: location.latitude,
-        longitude: location.longitude,
+        latitude: lat,
+        longitude: lng,
         googleMapsUrl: location.googleMapsUrl,
         createdAt: Date.now(),
+        snappedToCoastline: snapped.snapped,
       };
 
       setBeaches([...beaches, beachToAdd]);
@@ -252,7 +277,121 @@ export const useBeachManager = () => {
       throw error;
     }
   };
-  
+
+  // Re-snap all existing beaches to coastline
+  const resnapAllBeaches = () => {
+    const updatedBeaches = beaches.map(beach => {
+      const snapped = snapToCoastline(beach.latitude, beach.longitude, 2);
+      if (snapped.snapped) {
+        console.log(`Re-snapped ${beach.name}: (${beach.latitude.toFixed(4)}, ${beach.longitude.toFixed(4)}) → (${snapped.latitude.toFixed(4)}, ${snapped.longitude.toFixed(4)}) - ${(snapped.distance * 1000).toFixed(0)}m`);
+        return {
+          ...beach,
+          latitude: snapped.latitude,
+          longitude: snapped.longitude,
+          snappedToCoastline: true,
+          originalLatitude: beach.latitude,
+          originalLongitude: beach.longitude,
+        };
+      }
+      return beach;
+    });
+
+    const snappedCount = updatedBeaches.filter((b, i) =>
+      b.latitude !== beaches[i].latitude || b.longitude !== beaches[i].longitude
+    ).length;
+
+    setBeaches(updatedBeaches);
+    return { total: beaches.length, snapped: snappedCount };
+  };
+
+  // Search for places using Nominatim API (OpenStreetMap)
+  const searchPlaces = async (query) => {
+    if (!query || query.length < 3) {
+      setPlaceResults([]);
+      return;
+    }
+
+    setSearchingPlaces(true);
+    try {
+      // Search with viewbox for Greece region, but allow worldwide results
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        `q=${encodeURIComponent(query + " beach")}&` +
+        `format=json&` +
+        `limit=8&` +
+        `addressdetails=1&` +
+        `extratags=1`
+      );
+
+      if (!response.ok) {
+        throw new Error("Search failed");
+      }
+
+      const data = await response.json();
+
+      // Filter and format results
+      const results = data
+        .filter(place => {
+          // Prefer beaches, bays, coastlines
+          const type = place.type?.toLowerCase() || "";
+          const cls = place.class?.toLowerCase() || "";
+          return (
+            type.includes("beach") ||
+            type.includes("bay") ||
+            type.includes("water") ||
+            type.includes("coastline") ||
+            cls.includes("natural") ||
+            cls.includes("leisure") ||
+            place.display_name.toLowerCase().includes("beach") ||
+            place.display_name.toLowerCase().includes("bay")
+          );
+        })
+        .map(place => ({
+          id: place.place_id,
+          name: place.display_name.split(",")[0],
+          fullName: place.display_name,
+          latitude: parseFloat(place.lat),
+          longitude: parseFloat(place.lon),
+          type: place.type,
+          country: place.address?.country || "",
+        }));
+
+      // If no beach-specific results, show all results
+      setPlaceResults(results.length > 0 ? results : data.slice(0, 6).map(place => ({
+        id: place.place_id,
+        name: place.display_name.split(",")[0],
+        fullName: place.display_name,
+        latitude: parseFloat(place.lat),
+        longitude: parseFloat(place.lon),
+        type: place.type,
+        country: place.address?.country || "",
+      })));
+    } catch (error) {
+      console.error("Place search error:", error);
+      setPlaceResults([]);
+    } finally {
+      setSearchingPlaces(false);
+    }
+  };
+
+  // Select a place from search results
+  const selectPlace = (place) => {
+    setNewBeach({
+      name: place.name,
+      latitude: place.latitude.toString(),
+      longitude: place.longitude.toString(),
+      googleMapsUrl: `https://www.google.com/maps?q=${place.latitude},${place.longitude}`,
+    });
+    setPlaceSearch("");
+    setPlaceResults([]);
+  };
+
+  // Clear place search
+  const clearPlaceSearch = () => {
+    setPlaceSearch("");
+    setPlaceResults([]);
+  };
+
   return {
     beaches,
     homeBeach,
@@ -268,6 +407,16 @@ export const useBeachManager = () => {
     setNewBeach,
     mapUrl,
     setMapUrl,
-    loading
+    loading,
+    // Place search
+    placeSearch,
+    setPlaceSearch,
+    placeResults,
+    searchingPlaces,
+    searchPlaces,
+    selectPlace,
+    clearPlaceSearch,
+    // Coastline snapping
+    resnapAllBeaches
   };
 };
