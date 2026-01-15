@@ -9,6 +9,7 @@
  *   windSpeed, windGusts, windDirection,
  *   weatherCode,  // WMO weather code (95-99 = thunderstorm)
  *   waveHeight, swellHeight, swellPeriod, waveDirection,
+ *   waterTemperature,  // Sea surface temperature
  *   tideHeight,
  *   currentSpeed, currentDirection
  * }
@@ -21,9 +22,9 @@ export async function fetchPaddleConditions({ latitude, longitude, startDate, en
     `&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,windgusts_10m,winddirection_10m,weather_code` +
     `&start_date=${startDate}&end_date=${endDate}&timezone=${timezone}`;
 
-  // 2) Marine data: waves + tides (added swell period)
+  // 2) Marine data: waves + tides + water temperature
   const marineUrl = `${base}/marine?latitude=${latitude}&longitude=${longitude}` +
-    `&hourly=wave_height,swell_wave_height,swell_wave_period,wave_direction,tide_height` +
+    `&hourly=wave_height,swell_wave_height,swell_wave_period,wave_direction,tide_height,sea_surface_temperature` +
     `&start_date=${startDate}&end_date=${endDate}&timezone=${timezone}`;
 
   // 3) Ocean currents (Open-Meteo marine endpoint also serves currents)
@@ -88,6 +89,7 @@ export async function fetchPaddleConditions({ latitude, longitude, startDate, en
     swellHeight:      safeGet(marineData?.hourly?.swell_wave_height, i),
     swellPeriod:      safeGet(marineData?.hourly?.swell_wave_period, i),
     waveDirection:    safeGet(marineData?.hourly?.wave_direction, i),
+    waterTemperature: safeGet(marineData?.hourly?.sea_surface_temperature, i),
     tideHeight:       safeGet(marineData?.hourly?.tide_height, i),
     currentSpeed:     safeGet(currentsData?.hourly?.current_speed, i),
     currentDirection: safeGet(currentsData?.hourly?.current_direction, i),
