@@ -21,8 +21,19 @@ import {
   Sunset,
   Navigation
 } from "lucide-react";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection, DatePickerModal } from "./helpers.jsx";
+
+// Fix for default marker icon in Leaflet with bundlers
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
 
 const FixedBeachView = ({ 
   beach, 
@@ -1854,7 +1865,51 @@ const FixedBeachView = ({
           
           {/* Geographic Protection */}
           {renderGeoProtectionInfo()}
-          
+
+          {/* Beach Location Map */}
+          {beach && (
+            <div className="bg-white p-5 rounded-lg mt-4 shadow-sm border">
+              <h4 className="font-medium mb-4 flex items-center text-gray-800">
+                <MapPin className="h-5 w-5 mr-2 text-blue-600" />
+                Beach Location
+              </h4>
+              <div className="h-64 rounded-lg overflow-hidden border">
+                <MapContainer
+                  center={[beach.latitude, beach.longitude]}
+                  zoom={14}
+                  style={{ height: "100%", width: "100%" }}
+                  scrollWheelZoom={false}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={[beach.latitude, beach.longitude]}>
+                    <Popup>
+                      <strong>{beach.name}</strong>
+                      <br />
+                      {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
+                    </Popup>
+                  </Marker>
+                </MapContainer>
+              </div>
+              <div className="mt-3 flex justify-between items-center text-sm text-gray-600">
+                <span>
+                  Coordinates: {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
+                </span>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${beach.latitude},${beach.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline flex items-center"
+                >
+                  <Navigation className="h-4 w-4 mr-1" />
+                  Get Directions
+                </a>
+              </div>
+            </div>
+          )}
+
           {/* Hourly Wind */}
           {renderHourlyWind()}
           
