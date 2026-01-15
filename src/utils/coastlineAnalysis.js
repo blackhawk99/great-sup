@@ -325,12 +325,16 @@ function analyzeBayGeometry(beachPoint) {
   const longRangeEnclosure = rayResults[3]?.hitRate || 0;  // 3.0km
   
   // Find patterns characteristic of different bay types
-  
-  // Deep/protected bay: high enclosure at all scales
-  const isDeepBay = shortRangeEnclosure > 0.7 && midRangeEnclosure > 0.6 && longRangeEnclosure > 0.5;
-  
-  // Shallow bay/cove: high enclosure short range, medium at longer
-  const isShallowBay = shortRangeEnclosure > 0.6 && midRangeEnclosure > 0.4 && longRangeEnclosure < 0.4;
+
+  // Deep/protected bay: high enclosure at all scales (e.g., Navarino Bay)
+  const isDeepBay = shortRangeEnclosure > 0.65 && midRangeEnclosure > 0.55 && longRangeEnclosure > 0.45;
+
+  // Medium bay: good enclosure at short/mid range (e.g., Vouliagmeni, 800m-1.5km wide bays)
+  // These provide excellent SUP protection even if longer rays reach open water
+  const isMediumBay = !isDeepBay && shortRangeEnclosure > 0.55 && midRangeEnclosure > 0.4;
+
+  // Shallow bay/cove: high enclosure short range, drops off at longer (small coves)
+  const isShallowBay = !isDeepBay && !isMediumBay && shortRangeEnclosure > 0.5 && midRangeEnclosure > 0.3;
   
   // Analyze the actual pattern for more precise results
   let enclosurePattern = '';
@@ -346,6 +350,7 @@ function analyzeBayGeometry(beachPoint) {
   
   return {
     isDeepBay,
+    isMediumBay,
     isShallowBay,
     shortRangeEnclosure,
     midRangeEnclosure,
@@ -399,15 +404,20 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     let enclosureScore;
 
     if (bayGeometry.isDeepBay) {
-      // Deep bay - high protection
+      // Deep bay - high protection (e.g., Navarino)
       enclosureScore = Math.min(0.95, (shortEnclosure * 0.3) + (mediumEnclosure * 0.3) + (longEnclosure * 0.4) + 0.2);
       console.log("Using deep bay enclosure calculation:", enclosureScore);
+    } else if (bayGeometry.isMediumBay) {
+      // Medium bay - good protection for SUP (e.g., Vouliagmeni, 800m-1.5km wide)
+      // Short/medium range matters most, long range less important
+      enclosureScore = Math.min(0.85, (shortEnclosure * 0.45) + (mediumEnclosure * 0.35) + (longEnclosure * 0.1) + 0.1);
+      console.log("Using medium bay enclosure calculation:", enclosureScore);
     } else if (bayGeometry.isShallowBay) {
-      // Shallow bay - medium-high protection
+      // Shallow bay/cove - medium protection
       enclosureScore = (shortEnclosure * 0.5) + (mediumEnclosure * 0.3) + (longEnclosure * 0.2);
       console.log("Using shallow bay enclosure calculation:", enclosureScore);
     } else {
-      // Regular coastline
+      // Regular coastline - exposed
       enclosureScore = (shortEnclosure * 0.6) + (mediumEnclosure * 0.3) + (longEnclosure * 0.1);
       console.log("Using standard enclosure calculation:", enclosureScore);
     }
@@ -472,11 +482,12 @@ return {
         totalWaveProtection
       ),
       isDeepBay: bayGeometry.isDeepBay,
+      isMediumBay: bayGeometry.isMediumBay,
       debugInfo: {
         shortEnclosure,
         mediumEnclosure,
         longEnclosure,
-        bayType: bayGeometry.isDeepBay ? 'deep' : bayGeometry.isShallowBay ? 'shallow' : 'normal'
+        bayType: bayGeometry.isDeepBay ? 'deep' : bayGeometry.isMediumBay ? 'medium' : bayGeometry.isShallowBay ? 'shallow' : 'exposed'
       }
     };
   } catch (error) {
