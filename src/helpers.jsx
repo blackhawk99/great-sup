@@ -95,7 +95,11 @@ export const DatePickerModal = ({ currentDate = new Date(), onSelect, onClose })
   };
   
   const handleSelect = () => {
-    const formattedDate = selectedDate.toISOString().split('T')[0];
+    // Use local date format (not UTC) to avoid timezone issues
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    const formattedDate = `${year}-${month}-${day}`;
     onSelect(formattedDate);
   };
 

@@ -37,6 +37,12 @@ const formatLocalTime = (date, options = { hour: '2-digit', minute: '2-digit' })
   return d.toLocaleTimeString(undefined, options);
 };
 
+// Helper to get local date string (YYYY-MM-DD) without UTC conversion
+const getLocalDateString = (date) => {
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 // Fix for default marker icon in Leaflet with bundlers
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -1648,17 +1654,17 @@ const FixedBeachView = ({
         </div>
         
         <div className="flex space-x-4 mb-4">
-          <button 
-            onClick={() => onTimeRangeChange?.('date', new Date().toISOString().split('T')[0])}
+          <button
+            onClick={() => onTimeRangeChange?.('date', getLocalDateString(new Date()))}
             className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-lg text-lg font-medium hover:bg-blue-600"
           >
             Today
           </button>
-          <button 
+          <button
             onClick={() => {
               const tomorrow = new Date();
               tomorrow.setDate(tomorrow.getDate() + 1);
-              onTimeRangeChange?.('date', tomorrow.toISOString().split('T')[0]);
+              onTimeRangeChange?.('date', getLocalDateString(tomorrow));
             }}
             className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-lg text-lg font-medium hover:bg-blue-600"
           >
