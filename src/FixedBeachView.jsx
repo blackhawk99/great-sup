@@ -1,5 +1,6 @@
 // FixedBeachView.jsx - Production-ready with all required features
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Home,
   ChevronLeft,
@@ -37,15 +38,16 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-const FixedBeachView = ({ 
-  beach, 
-  homeBeach, 
-  onSetHomeBeach, 
-  setView, 
+const FixedBeachView = ({
+  beach,
+  homeBeach,
+  onSetHomeBeach,
+  setView,
   onDataUpdate,
   timeRange,
   onTimeRangeChange
 }) => {
+  const { t } = useTranslation();
   const [weatherData, setWeatherData] = useState(null);
   const [marineData, setMarineData] = useState(null);
   const [paddleScore, setPaddleScore] = useState(null);
@@ -1052,7 +1054,7 @@ const FixedBeachView = ({
             <div className="p-2 bg-blue-100 rounded-lg mr-3">
               <Info className="h-4 w-4 text-blue-600" />
             </div>
-            Score Breakdown
+            {t('score.breakdown')}
           </h4>
           <div className="flex items-center gap-3">
             <span className={`text-lg font-bold ${
@@ -1628,7 +1630,7 @@ const FixedBeachView = ({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Time
+              {t('time.startTime')}
             </label>
             <select
               value={timeRange.startTime}
@@ -1652,7 +1654,7 @@ const FixedBeachView = ({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              End Time
+              {t('time.endTime')}
             </label>
             <select
               value={timeRange.endTime}
@@ -1676,20 +1678,20 @@ const FixedBeachView = ({
           </div>
         </div>
         
-        <button 
+        <button
           onClick={fetchWeatherData}
           className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center text-lg"
         >
           <RefreshCw className="h-5 w-5 mr-2" />
-          Update Forecast
+          {t('weather.refresh', 'Update Forecast')}
         </button>
       </div>
-      
+
       {/* Loading state */}
       {loading && (
         <div className="p-8 text-center">
           <div className="inline-block animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
-          <p className="text-gray-600">Loading real-time weather data...</p>
+          <p className="text-gray-600">{t('weather.loading')}</p>
         </div>
       )}
       
@@ -2003,19 +2005,19 @@ const FixedBeachView = ({
 
                   <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                     <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
-                      <div className="text-xs uppercase text-blue-100">Wind</div>
+                      <div className="text-xs uppercase text-blue-100">{t('weather.wind')}</div>
                       <div className="text-lg font-semibold">{Math.round(readiness.wind)} km/h</div>
                     </div>
                     <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
-                      <div className="text-xs uppercase text-blue-100">Waves</div>
+                      <div className="text-xs uppercase text-blue-100">{t('weather.waves')}</div>
                       <div className="text-lg font-semibold">{readiness.wave.toFixed(2)} m</div>
                     </div>
                     <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
-                      <div className="text-xs uppercase text-blue-100">Air temp</div>
+                      <div className="text-xs uppercase text-blue-100">{t('weather.airTemp')}</div>
                       <div className="text-lg font-semibold">{Math.round(readiness.temperature)}°C</div>
                     </div>
                     <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
-                      <div className="text-xs uppercase text-blue-100">Water temp</div>
+                      <div className="text-xs uppercase text-blue-100">{t('weather.waterTemp')}</div>
                       <div className="text-lg font-semibold">
                         {readiness.waterTemperature !== null
                           ? `${Math.round(readiness.waterTemperature)}°C`
@@ -2028,9 +2030,9 @@ const FixedBeachView = ({
                     <div className="mt-6 flex items-center rounded-xl bg-white/15 px-4 py-3 text-sm backdrop-blur">
                       <Clock className="mr-3 h-5 w-5 text-white" />
                       <div>
-                        <p className="font-semibold">Sweet spot timing</p>
+                        <p className="font-semibold">{t('safety.sweetSpot')}</p>
                         <p className="text-blue-100">
-                          {readiness.bestHour.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — wind {Math.round(readiness.bestHour.wind)} km/h
+                          {readiness.bestHour.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — {t('weather.wind').toLowerCase()} {Math.round(readiness.bestHour.wind)} km/h
                         </p>
                       </div>
                     </div>

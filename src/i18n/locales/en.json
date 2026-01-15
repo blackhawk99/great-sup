@@ -43,6 +43,7 @@
     "loading": "Loading weather data...",
     "error": "Failed to load weather data",
     "retry": "Retry",
+    "refresh": "Update Forecast",
     "wind": "Wind",
     "windSpeed": "Wind Speed",
     "windGusts": "Gusts",
