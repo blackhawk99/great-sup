@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { analyzeBayProtection } from "./utils/coastlineAnalysis";
+import { analyzeBayProtection, snapToCoastline } from "./utils/coastlineAnalysis";
 import { parseGoogleMapsUrl } from "./helpers.jsx";
 import { resolveGoogleMapsShortUrl } from "./proxy";
 import { getCardinalDirection } from "./helpers.jsx";
@@ -178,25 +178,33 @@ export const useBeachManager = () => {
       if (!newBeach.name || !newBeach.latitude || !newBeach.longitude) {
         throw new Error("Please fill in all beach details");
       }
-      
-      const lat = parseFloat(newBeach.latitude);
-      const lng = parseFloat(newBeach.longitude);
-      
+
+      let lat = parseFloat(newBeach.latitude);
+      let lng = parseFloat(newBeach.longitude);
+
       if (isNaN(lat) || isNaN(lng)) {
         throw new Error("Invalid coordinates");
       }
-      
+
+      // Snap coordinates to nearest coastline (within 2km)
+      const snapped = snapToCoastline(lat, lng, 2);
+      if (snapped.snapped) {
+        console.log(`Snapped beach from (${lat}, ${lng}) to (${snapped.latitude}, ${snapped.longitude}) - ${(snapped.distance * 1000).toFixed(0)}m adjustment`);
+        lat = snapped.latitude;
+        lng = snapped.longitude;
+      }
+
       // Check for duplicates
-      const isDuplicate = beaches.some(beach => 
-        (Math.abs(beach.latitude - lat) < 0.01 && 
+      const isDuplicate = beaches.some(beach =>
+        (Math.abs(beach.latitude - lat) < 0.01 &&
          Math.abs(beach.longitude - lng) < 0.01) ||
         beach.name.toLowerCase() === newBeach.name.toLowerCase()
       );
-      
+
       if (isDuplicate) {
         throw new Error("This beach already exists in your list!");
       }
-      
+
       // Create the beach
       const beachToAdd = {
         id: `beach-${Date.now()}`,
@@ -205,6 +213,7 @@ export const useBeachManager = () => {
         longitude: lng,
         googleMapsUrl: newBeach.googleMapsUrl || mapUrl,
         createdAt: Date.now(),
+        snappedToCoastline: snapped.snapped,
       };
       
       // If we have pre-analyzed protection data, add it
@@ -229,25 +238,36 @@ export const useBeachManager = () => {
       if (!location || !location.name || !location.latitude || !location.longitude) {
         throw new Error("Invalid location data");
       }
-      
+
+      // Snap coordinates to nearest coastline (within 2km)
+      let lat = location.latitude;
+      let lng = location.longitude;
+      const snapped = snapToCoastline(lat, lng, 2);
+      if (snapped.snapped) {
+        console.log(`Snapped beach from (${lat}, ${lng}) to (${snapped.latitude}, ${snapped.longitude}) - ${(snapped.distance * 1000).toFixed(0)}m adjustment`);
+        lat = snapped.latitude;
+        lng = snapped.longitude;
+      }
+
       // Check for duplicates
-      const isDuplicate = beaches.some(beach => 
-        (Math.abs(beach.latitude - location.latitude) < 0.01 && 
-         Math.abs(beach.longitude - location.longitude) < 0.01) ||
+      const isDuplicate = beaches.some(beach =>
+        (Math.abs(beach.latitude - lat) < 0.01 &&
+         Math.abs(beach.longitude - lng) < 0.01) ||
         beach.name.toLowerCase() === location.name.toLowerCase()
       );
-      
+
       if (isDuplicate) {
         throw new Error("This beach already exists in your list!");
       }
-      
+
       const beachToAdd = {
         id: `beach-${Date.now()}`,
         name: location.name,
-        latitude: location.latitude,
-        longitude: location.longitude,
+        latitude: lat,
+        longitude: lng,
         googleMapsUrl: location.googleMapsUrl,
         createdAt: Date.now(),
+        snappedToCoastline: snapped.snapped,
       };
 
       setBeaches([...beaches, beachToAdd]);

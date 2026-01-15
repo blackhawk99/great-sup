@@ -3,6 +3,79 @@ import * as turf from '@turf/turf';
 import { greeceCoastlines } from '../data/greece-coastlines';
 import { greeceIslands } from '../data/greece-islands';
 
+// Snap coordinates to nearest coastline point
+export function snapToCoastline(latitude, longitude, maxDistance = 2) {
+  try {
+    const point = turf.point([longitude, latitude]);
+    let nearestPoint = null;
+    let minDistance = Infinity;
+
+    // Check coastlines
+    for (const feature of greeceCoastlines.features) {
+      if (feature.geometry.type === 'LineString') {
+        try {
+          const line = turf.lineString(feature.geometry.coordinates);
+          const nearest = turf.nearestPointOnLine(line, point, { units: 'kilometers' });
+
+          if (nearest.properties.dist < minDistance) {
+            minDistance = nearest.properties.dist;
+            nearestPoint = nearest;
+          }
+        } catch (e) {
+          // Skip invalid geometries
+        }
+      }
+    }
+
+    // Check island coastlines
+    for (const feature of greeceIslands.features) {
+      if (feature.geometry.type === 'Polygon') {
+        try {
+          const polygon = turf.polygon(feature.geometry.coordinates);
+          const boundary = turf.polygonToLine(polygon);
+          const nearest = turf.nearestPointOnLine(boundary, point, { units: 'kilometers' });
+
+          if (nearest.properties.dist < minDistance) {
+            minDistance = nearest.properties.dist;
+            nearestPoint = nearest;
+          }
+        } catch (e) {
+          // Skip invalid geometries
+        }
+      }
+    }
+
+    // Only snap if within maxDistance km
+    if (nearestPoint && minDistance <= maxDistance) {
+      const [newLng, newLat] = nearestPoint.geometry.coordinates;
+      return {
+        latitude: newLat,
+        longitude: newLng,
+        snapped: true,
+        distance: minDistance,
+        originalLatitude: latitude,
+        originalLongitude: longitude
+      };
+    }
+
+    // Return original if no coastline found nearby
+    return {
+      latitude,
+      longitude,
+      snapped: false,
+      distance: minDistance === Infinity ? null : minDistance
+    };
+  } catch (error) {
+    console.error("Error snapping to coastline:", error);
+    return {
+      latitude,
+      longitude,
+      snapped: false,
+      error: error.message
+    };
+  }
+}
+
 // Generate rays from a point in all directions
 export function generateRays(center, numRays, distance) {
   const rays = [];
