@@ -17,7 +17,9 @@ import {
   Link as LinkIcon,
   Eye,
   Search,
-  Star
+  Star,
+  Menu,
+  X
 } from "lucide-react";
 import { Logo, LogoCompact } from "./components/Logo";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
@@ -52,6 +54,7 @@ const App = () => {
   const [locating, setLocating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("shelter");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const greekBounds = {
     latMin: 34.6,
     latMax: 41.9,
@@ -297,22 +300,10 @@ const App = () => {
     handleDataUpdate();
   };
   
-  // Handle time range change with basic validation
+  // Handle time range change - let the value be set directly
+  // FixedBeachView handles auto-adjustment for invalid ranges
   const handleTimeRangeChange = (field, value) => {
-    const updated = { ...timeRange, [field]: value };
-    const start = parseInt(updated.startTime.split(':')[0], 10);
-    const end = parseInt(updated.endTime.split(':')[0], 10);
-
-    // Prevent selecting a start time after the end time or vice versa
-    if (start > end) {
-      if (field === 'startTime') {
-        updated.endTime = value;
-      } else if (field === 'endTime') {
-        updated.startTime = value;
-      }
-    }
-
-    setTimeRange(updated);
+    setTimeRange(prev => ({ ...prev, [field]: value }));
   };
   
   // Handle add beach
@@ -562,7 +553,67 @@ const App = () => {
               </button>
             </nav>
 
+            {/* Mobile hamburger menu button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="h-6 w-6 text-white" />
+              ) : (
+                <Menu className="h-6 w-6 text-white" />
+              )}
+            </button>
           </div>
+
+          {/* Mobile dropdown menu */}
+          {mobileMenuOpen && (
+            <div className="md:hidden mt-3 pb-3 border-t border-white/10 pt-3">
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => { setView("dashboard"); setMobileMenuOpen(false); }}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${
+                    view === "dashboard"
+                      ? "bg-white/20 text-white"
+                      : "text-white/80 hover:bg-white/10"
+                  }`}
+                >
+                  <Compass className="h-5 w-5" />
+                  {t('nav.home')}
+                </button>
+                <button
+                  onClick={() => { setView("add"); setMobileMenuOpen(false); }}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${
+                    view === "add"
+                      ? "bg-white/20 text-white"
+                      : "text-white/80 hover:bg-white/10"
+                  }`}
+                >
+                  <Plus className="h-5 w-5" />
+                  {t('dashboard.addBeachHint', 'Add Beach')}
+                </button>
+                <button
+                  onClick={() => { handleFindNearest(); setMobileMenuOpen(false); }}
+                  disabled={locating}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-left text-white/80 hover:bg-white/10 transition-all"
+                >
+                  <MapPin className="h-5 w-5" />
+                  {locating ? t('common.locating') : t('search.findNearby')}
+                </button>
+                <button
+                  onClick={() => { toggleFAQ(); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-left text-white/80 hover:bg-white/10 transition-all"
+                >
+                  <HelpCircle className="h-5 w-5" />
+                  {t('nav.help')}
+                </button>
+                <div className="px-4 py-2">
+                  <LanguageSwitcher />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
