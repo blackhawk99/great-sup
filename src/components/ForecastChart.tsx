@@ -33,19 +33,16 @@ interface ForecastChartProps {
   theme?: 'light' | 'dark'
 }
 
-// Greek timezone for consistent display
-const GREEK_TIMEZONE = 'Europe/Athens'
-
-// Format time for display (Greek timezone)
+// Format time for display (user's local timezone)
 const formatTime = (timeStr: string) => {
   const date = new Date(timeStr)
-  return date.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: GREEK_TIMEZONE })
+  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
-// Format date for tooltip (Greek timezone)
+// Format date for tooltip (user's local timezone)
 const formatDate = (timeStr: string) => {
   const date = new Date(timeStr)
-  return date.toLocaleDateString('el-GR', { weekday: 'short', month: 'short', day: 'numeric', timeZone: GREEK_TIMEZONE })
+  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
 // Custom tooltip component

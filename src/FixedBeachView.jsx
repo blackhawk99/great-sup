@@ -30,14 +30,11 @@ import "leaflet/dist/leaflet.css";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection, DatePickerModal } from "./helpers.jsx";
 
-// Greek timezone constant for consistent time display
-const GREEK_TIMEZONE = 'Europe/Athens';
-
-// Helper to format time in Greek timezone
-const formatGreekTime = (date, options = { hour: '2-digit', minute: '2-digit' }) => {
+// Helper to format time in user's local timezone
+const formatLocalTime = (date, options = { hour: '2-digit', minute: '2-digit' }) => {
   if (!date) return 'N/A';
   const d = date instanceof Date ? date : new Date(date);
-  return d.toLocaleTimeString('el-GR', { ...options, timeZone: GREEK_TIMEZONE });
+  return d.toLocaleTimeString(undefined, options);
 };
 
 // Fix for default marker icon in Leaflet with bundlers
@@ -166,11 +163,11 @@ const FixedBeachView = ({
       const formattedWeekEnd = weekEnd.toISOString().split('T')[0];
 
       // API URLs - include gusts, UV index, sunrise/sunset (7 days for best day feature)
-      // Using Europe/Athens timezone for consistent Greek time display
-      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m,windgusts_10m,uv_index&daily=precipitation_sum,windspeed_10m_max,sunrise,sunset,uv_index_max&start_date=${formattedDate}&end_date=${formattedWeekEnd}&timezone=Europe/Athens`;
+      // Using auto timezone - API will use the location's local timezone
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m,windgusts_10m,uv_index&daily=precipitation_sum,windspeed_10m_max,sunrise,sunset,uv_index_max&start_date=${formattedDate}&end_date=${formattedWeekEnd}&timezone=auto`;
 
       // Marine API - include swell period, ocean currents, and sea level for tides (7 days)
-      const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,swell_wave_period,wave_direction,sea_surface_temperature,ocean_current_velocity&daily=wave_height_max,wave_direction_dominant&start_date=${formattedDate}&end_date=${formattedWeekEnd}&timezone=Europe/Athens`;
+      const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,swell_wave_period,wave_direction,sea_surface_temperature,ocean_current_velocity&daily=wave_height_max,wave_direction_dominant&start_date=${formattedDate}&end_date=${formattedWeekEnd}&timezone=auto`;
       
       // Fetch data
       const [weatherRes, marineRes] = await Promise.all([
@@ -708,10 +705,9 @@ const FixedBeachView = ({
     });
 
     if (warmestHour && selectedHours.length > 1) {
-      const warmestTime = warmestHour.time.toLocaleTimeString('el-GR', {
+      const warmestTime = warmestHour.time.toLocaleTimeString(undefined, {
         hour: '2-digit',
-        minute: '2-digit',
-        timeZone: GREEK_TIMEZONE
+        minute: '2-digit'
       });
       const isSunny = warmestHour.cloudcover < 30;
       const isWarm = warmestHour.temperature >= 22;
@@ -732,10 +728,9 @@ const FixedBeachView = ({
     }
 
     if (bestHour) {
-      const bestLabel = bestHour.time.toLocaleTimeString('el-GR', {
+      const bestLabel = bestHour.time.toLocaleTimeString(undefined, {
         hour: '2-digit',
-        minute: '2-digit',
-        timeZone: GREEK_TIMEZONE
+        minute: '2-digit'
       });
       const waveText = Number.isFinite(bestHour.wave)
         ? bestHour.wave.toFixed(1)
@@ -1939,13 +1934,13 @@ const FixedBeachView = ({
                         <div className="flex items-center gap-1">
                           <Sunrise className="h-4 w-4 text-orange-400" />
                           <span className="text-gray-600">
-                            {sunTimes.sunrise ? new Date(sunTimes.sunrise).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', timeZone: GREEK_TIMEZONE }) : 'N/A'}
+                            {sunTimes.sunrise ? new Date(sunTimes.sunrise).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Sunset className="h-4 w-4 text-orange-500" />
                           <span className="text-gray-600">
-                            {sunTimes.sunset ? new Date(sunTimes.sunset).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', timeZone: GREEK_TIMEZONE }) : 'N/A'}
+                            {sunTimes.sunset ? new Date(sunTimes.sunset).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                           </span>
                         </div>
                       </div>
@@ -2042,7 +2037,7 @@ const FixedBeachView = ({
                       <div>
                         <p className="font-semibold">{t('safety.sweetSpot')}</p>
                         <p className="text-blue-100">
-                          {readiness.bestHour.time.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', timeZone: GREEK_TIMEZONE })} — {t('weather.wind').toLowerCase()} {Math.round(readiness.bestHour.wind)} km/h
+                          {readiness.bestHour.time.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} — {t('weather.wind').toLowerCase()} {Math.round(readiness.bestHour.wind)} km/h
                         </p>
                       </div>
                     </div>
@@ -2087,8 +2082,8 @@ const FixedBeachView = ({
                   </h4>
                   <p className="text-purple-700">
                     Your selected time ({timeRange.startTime}-{timeRange.endTime}) is outside daylight hours.
-                    Sunrise is at {new Date(sunTimes.sunrise).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', timeZone: GREEK_TIMEZONE })} and
-                    sunset at {new Date(sunTimes.sunset).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', timeZone: GREEK_TIMEZONE })}.
+                    Sunrise is at {new Date(sunTimes.sunrise).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} and
+                    sunset at {new Date(sunTimes.sunset).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}.
                     Paddleboarding in the dark is not recommended.
                   </p>
                 </div>
@@ -2104,8 +2099,8 @@ const FixedBeachView = ({
                   </h4>
                   <p className="text-amber-700">
                     Part of your selected time window is outside daylight hours.
-                    Sunrise: {new Date(sunTimes.sunrise).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', timeZone: GREEK_TIMEZONE })},
-                    Sunset: {new Date(sunTimes.sunset).toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', timeZone: GREEK_TIMEZONE })}.
+                    Sunrise: {new Date(sunTimes.sunrise).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })},
+                    Sunset: {new Date(sunTimes.sunset).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}.
                   </p>
                 </div>
               );

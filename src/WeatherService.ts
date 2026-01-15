@@ -67,7 +67,7 @@ export async function fetchPaddleConditions({
   longitude,
   startDate,
   endDate,
-  timezone = 'Europe/Athens'
+  timezone = 'auto'
 }: FetchParams): Promise<HourlyCondition[]> {
   const base = 'https://api.open-meteo.com/v1'
 

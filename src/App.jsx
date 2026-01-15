@@ -63,16 +63,13 @@ const App = () => {
   };
   
   
-  // Greek timezone for consistent display
-  const GREEK_TIMEZONE = 'Europe/Athens';
-
-  // Format last updated time strings (Greek timezone)
+  // Use browser's local timezone automatically
   const formattedUpdateTime = lastUpdated ?
-    lastUpdated.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', timeZone: GREEK_TIMEZONE }) :
+    lastUpdated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) :
     "-";
 
   const formattedUpdateDate = lastUpdated ?
-    lastUpdated.toLocaleDateString('el-GR', { year: 'numeric', month: 'long', day: 'numeric', timeZone: GREEK_TIMEZONE }) :
+    lastUpdated.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) :
     "-";
   
   // Use beach manager
