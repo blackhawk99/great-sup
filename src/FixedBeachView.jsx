@@ -14,24 +14,10 @@ import {
   Clock,
   Calendar,
   Info,
-  LifeBuoy,
-  CheckCircle2,
-  ListChecks
+  LifeBuoy
 } from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection, DatePickerModal } from "./helpers.jsx";
-
-const DEFAULT_CHECKLIST_ITEMS = [
-  { id: "leash", label: "Leash attached to board" },
-  { id: "pfd", label: "Personal flotation device on board" },
-  { id: "hydrate", label: "Water bottle filled" },
-  { id: "sun", label: "Sun protection applied" },
-  { id: "route", label: "Out-and-back route planned" },
-  { id: "conditions", label: "Conditions double-checked" }
-];
-
-const createDefaultChecklist = () =>
-  DEFAULT_CHECKLIST_ITEMS.map((item) => ({ ...item, done: false }));
 
 const FixedBeachView = ({ 
   beach, 
@@ -51,8 +37,6 @@ const FixedBeachView = ({
   const [error, setError] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [checklist, setChecklist] = useState(() => createDefaultChecklist());
-  const [checklistLoaded, setChecklistLoaded] = useState(false);
 
   const toNumberOr = (value, fallback = 0) => {
     const number = typeof value === "number" ? value : Number(value);
@@ -123,49 +107,6 @@ const FixedBeachView = ({
     updateScores();
   }, [timeRange.startTime, timeRange.endTime, weatherData, marineData, beach]);
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !beach?.id) {
-      return;
-    }
-
-    try {
-      const stored = localStorage.getItem(`sup-checklist-${beach.id}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setChecklist(
-            parsed.map((item) => ({
-              ...item,
-              done: Boolean(item.done)
-            }))
-          );
-          setChecklistLoaded(true);
-          return;
-        }
-      }
-    } catch (storageError) {
-      console.error("Failed to load checklist state", storageError);
-    }
-
-    setChecklist(createDefaultChecklist());
-    setChecklistLoaded(true);
-  }, [beach?.id]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !beach?.id || !checklistLoaded) {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        `sup-checklist-${beach.id}`,
-        JSON.stringify(checklist)
-      );
-    } catch (storageError) {
-      console.error("Failed to save checklist state", storageError);
-    }
-  }, [beach?.id, checklist, checklistLoaded]);
-  
   // Fetch real weather data
   const fetchWeatherData = async () => {
     if (!beach) return;
@@ -376,18 +317,6 @@ const FixedBeachView = ({
       setPaddleScore(null);
       setScoreBreakdown(null);
     }
-  };
-
-  const toggleChecklistItem = (itemId) => {
-    setChecklist((items) =>
-      items.map((item) =>
-        item.id === itemId ? { ...item, done: !item.done } : item
-      )
-    );
-  };
-
-  const resetChecklist = () => {
-    setChecklist(createDefaultChecklist());
   };
 
   const getPaddleReadiness = () => {
@@ -1148,10 +1077,6 @@ const FixedBeachView = ({
   // Get condition details for tooltip
   const conditionDetails = getConditionDetails();
   const readiness = getPaddleReadiness();
-  const completedChecklist = checklist.filter((item) => item.done).length;
-  const checklistProgress = checklist.length
-    ? Math.round((completedChecklist / checklist.length) * 100)
-    : 0;
 
   const breakdownMetrics = scoreBreakdown
     ? {
@@ -1598,63 +1523,6 @@ const FixedBeachView = ({
                 </div>
               </div>
 
-              <div className="rounded-2xl border bg-white p-5 shadow-sm">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h4 className="flex items-center text-lg font-semibold text-gray-800">
-                      <ListChecks className="mr-2 h-5 w-5 text-blue-500" /> Launch checklist
-                    </h4>
-                    <p className="text-sm text-gray-500">Track your prep for {beach?.name || 'this beach'}. Saved per spot.</p>
-                  </div>
-                  <button
-                    onClick={resetChecklist}
-                    className="self-start rounded-lg border border-blue-200 px-3 py-1 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
-                  >
-                    Reset
-                  </button>
-                </div>
-
-                <div className="mt-4">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-full rounded-full bg-blue-500 transition-all"
-                      style={{ width: `${checklistProgress}%` }}
-                    ></div>
-                  </div>
-                  <p className="mt-2 text-xs text-gray-500">
-                    {completedChecklist}/{checklist.length} ready
-                  </p>
-                </div>
-
-                <ul className="mt-4 space-y-2">
-                  {checklist.map((item) => (
-                    <li key={item.id}>
-                      <label className={`flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition ${
-                        item.done ? 'border-blue-200 bg-blue-50' : 'border-gray-200 hover:border-blue-200'
-                      }`}>
-                        <input
-                          type="checkbox"
-                          checked={item.done}
-                          onChange={() => toggleChecklistItem(item.id)}
-                          className="sr-only"
-                        />
-                        <span
-                          className={`flex h-5 w-5 items-center justify-center rounded-full border ${
-                            item.done
-                              ? 'border-blue-500 bg-blue-500 text-white'
-                              : 'border-gray-300 text-transparent'
-                          }`}
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                        </span>
-                        <span className={`text-sm ${item.done ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                          {item.label}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
           )}
 

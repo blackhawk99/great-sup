@@ -14,7 +14,8 @@ const WORST_CASE_DEFAULTS = {
   swellHeight: 1.5,     // Significant swell - meters
   swellPeriod: 4,       // Short period = choppy (worst case) - seconds
   precipitation: 5,     // Heavy rain - mm/hr
-  temperature: 10,      // Cold (hypothermia risk) - °C
+  temperature: 10,      // Cold air (hypothermia risk) - °C
+  waterTemperature: 12, // Cold water (hypothermia risk) - °C
   cloudcover: 100,      // Overcast - %
   tideHeight: 0,        // Extreme low tide - meters
   currentSpeed: 2.0,    // Strong current - m/s
@@ -60,6 +61,7 @@ export async function calculatePaddleScore(beach, hours, range) {
   const swellPeriod = avg('swellPeriod');
   const precip      = avg('precipitation');
   const temp        = avg('temperature');
+  const waterTemp   = avg('waterTemperature');
   const cloud       = avg('cloudcover');
   const tide        = avg('tideHeight');
   const currentSpd  = avg('currentSpeed');
@@ -96,21 +98,22 @@ export async function calculatePaddleScore(beach, hours, range) {
   const effectiveSwellSeverity = swellHeight / swellPeriodFactor; // Adjusted for period
 
   // Scoring weights (normalized to sum to 100)
-  // Wind: 32, Waves: 15, Swell: 9, Gusts: 6, Precip: 4, Temp: 9, Cloud: 4, Geo: 9, Tide: 8, Currents: 4
-  const ptsWind   = linearScore(protectedWindSpeed, 0, 20) * 32;
-  const ptsWaves  = linearScore(protectedWaveHeight, 0, 1.0) * 15;
-  const ptsSwell  = linearScore(effectiveSwellSeverity, 0, 0.5) * 9;
-  const ptsGusts  = clamp(1 - gustPenalty, 0, 1) * 6;  // New: gust penalty
-  const ptsPrecip = linearScore(precip, 0, 5) * 4;
-  const ptsTemp   = bellScore(temp, 18, 28) * 9;
-  const ptsCloud  = linearScore(cloud, 0, 100) * 4;
-  const ptsGeo    = clamp((20 - protectedWindSpeed) / 20, 0, 1) * 9;
-  const ptsTide   = inRangeScore(tide, 0.5, 2.0) * 8;
-  const ptsCurrents = clamp(1 - clamp(currentSpd / 1.5, 0, 1), 0, 1) * 4;
+  // Wind: 30, Waves: 14, Swell: 8, Gusts: 5, Precip: 4, AirTemp: 6, WaterTemp: 8, Cloud: 3, Geo: 8, Tide: 7, Currents: 7
+  const ptsWind      = linearScore(protectedWindSpeed, 0, 20) * 30;
+  const ptsWaves     = linearScore(protectedWaveHeight, 0, 1.0) * 14;
+  const ptsSwell     = linearScore(effectiveSwellSeverity, 0, 0.5) * 8;
+  const ptsGusts     = clamp(1 - gustPenalty, 0, 1) * 5;
+  const ptsPrecip    = linearScore(precip, 0, 5) * 4;
+  const ptsTemp      = bellScore(temp, 18, 28) * 6;       // Air temperature
+  const ptsWaterTemp = bellScore(waterTemp, 18, 26) * 8;  // Water temperature (crucial for safety)
+  const ptsCloud     = linearScore(cloud, 0, 100) * 3;
+  const ptsGeo       = clamp((20 - protectedWindSpeed) / 20, 0, 1) * 8;
+  const ptsTide      = inRangeScore(tide, 0.5, 2.0) * 7;
+  const ptsCurrents  = clamp(1 - clamp(currentSpd / 1.5, 0, 1), 0, 1) * 7;
 
   let total = Math.round(
     ptsWind + ptsWaves + ptsSwell + ptsGusts + ptsPrecip +
-    ptsTemp + ptsCloud + ptsGeo + ptsTide + ptsCurrents
+    ptsTemp + ptsWaterTemp + ptsCloud + ptsGeo + ptsTide + ptsCurrents
   );
 
   // CRITICAL: Thunderstorms make conditions extremely dangerous
@@ -130,6 +133,9 @@ export async function calculatePaddleScore(beach, hours, range) {
     warnings.unshift(`⚡ THUNDERSTORM WARNING: ${thunderstormHours} hour(s) with storm activity - DO NOT paddle!`);
   }
 
+  if (waterTemp < 15) {
+    warnings.push(`🥶 Cold water: ${waterTemp.toFixed(1)}°C - hypothermia risk, wear a wetsuit!`);
+  }
   if (gustFactor > 1.8) {
     warnings.push(`Strong gusts: ${Math.round(windGusts)} km/h (${Math.round(gustFactor * 100 - 100)}% above average)`);
   }
@@ -146,16 +152,17 @@ export async function calculatePaddleScore(beach, hours, range) {
     warnings,
     hasThunderstorm,
     breakdown: {
-      wind:         { value: protectedWindSpeed, score: Math.round(ptsWind) },
-      waves:        { value: protectedWaveHeight, score: Math.round(ptsWaves) },
-      swell:        { value: swellHeight, period: swellPeriod, score: Math.round(ptsSwell) },
-      gusts:        { value: windGusts, factor: gustFactor, score: Math.round(ptsGusts) },
-      precipitation:{ value: precip,               score: Math.round(ptsPrecip) },
-      temperature:  { value: temp,                 score: Math.round(ptsTemp) },
-      cloudcover:   { value: cloud,                score: Math.round(ptsCloud) },
-      geographic:   { value: null,                 score: Math.round(ptsGeo) },
-      tide:         { value: tide,                 score: Math.round(ptsTide) },
-      currents:     { value: currentSpd,           score: Math.round(ptsCurrents) },
+      wind:            { value: protectedWindSpeed, score: Math.round(ptsWind) },
+      waves:           { value: protectedWaveHeight, score: Math.round(ptsWaves) },
+      swell:           { value: swellHeight, period: swellPeriod, score: Math.round(ptsSwell) },
+      gusts:           { value: windGusts, factor: gustFactor, score: Math.round(ptsGusts) },
+      precipitation:   { value: precip,               score: Math.round(ptsPrecip) },
+      temperature:     { value: temp,                 score: Math.round(ptsTemp) },
+      waterTemperature:{ value: waterTemp,            score: Math.round(ptsWaterTemp) },
+      cloudcover:      { value: cloud,                score: Math.round(ptsCloud) },
+      geographic:      { value: null,                 score: Math.round(ptsGeo) },
+      tide:            { value: tide,                 score: Math.round(ptsTide) },
+      currents:        { value: currentSpd,           score: Math.round(ptsCurrents) },
     }
   };
 }
