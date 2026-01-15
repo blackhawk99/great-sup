@@ -4,8 +4,6 @@ import { useTranslation } from "react-i18next";
 import {
   Home,
   ChevronLeft,
-  ChevronDown,
-  ChevronUp,
   RefreshCw,
   AlertCircle,
   MapPin,
@@ -57,18 +55,8 @@ const FixedBeachView = ({
   const [error, setError] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [expandedSections, setExpandedSections] = useState({
-    scoreBreakdown: true,
-    geoProtection: true,
-    hourlyWind: true,
-    weeklyForecast: true
-  });
   const [weeklyScores, setWeeklyScores] = useState([]);
   const [conditionTrends, setConditionTrends] = useState(null);
-
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
 
   const toNumberOr = (value, fallback = 0) => {
     const number = typeof value === "number" ? value : Number(value);
@@ -864,11 +852,8 @@ const FixedBeachView = ({
 
     return (
       <div className="bg-blue-50 rounded-lg mt-4 border border-blue-200 shadow-inner">
-        <button
-          onClick={() => toggleSection('geoProtection')}
-          className="w-full p-5 flex items-center justify-between text-left hover:bg-blue-100/50 transition-colors rounded-lg"
-        >
-          <h4 className="font-medium text-lg flex items-center text-blue-800">
+        <div className="p-5">
+          <h4 className="font-medium text-lg flex items-center text-blue-800 mb-4">
             <MapPin className="h-5 w-5 mr-2 text-blue-600" />
             Geographic Protection
             <span className={`ml-2 text-sm font-normal px-2 py-0.5 rounded-full ${
@@ -881,15 +866,6 @@ const FixedBeachView = ({
               {protectionLabel}
             </span>
           </h4>
-          {expandedSections.geoProtection ? (
-            <ChevronUp className="h-5 w-5 text-blue-400" />
-          ) : (
-            <ChevronDown className="h-5 w-5 text-blue-400" />
-          )}
-        </button>
-
-        {expandedSections.geoProtection && (
-          <div className="px-5 pb-5">
             <div className="flex justify-end mb-2">
               <button
                 onClick={() => setShowDebug(!showDebug)}
@@ -989,8 +965,7 @@ const FixedBeachView = ({
             )}
           </div>
             </div>
-          </div>
-        )}
+        </div>
       </div>
     );
   };
@@ -1046,17 +1021,14 @@ const FixedBeachView = ({
 
     return (
       <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl mt-4 shadow-sm border border-blue-100">
-        <button
-          onClick={() => toggleSection('scoreBreakdown')}
-          className="w-full p-4 flex items-center justify-between text-left hover:bg-white/50 transition-colors rounded-2xl"
-        >
-          <h4 className="font-semibold flex items-center text-gray-800">
-            <div className="p-2 bg-blue-100 rounded-lg mr-3">
-              <Info className="h-4 w-4 text-blue-600" />
-            </div>
-            {t('score.breakdown')}
-          </h4>
-          <div className="flex items-center gap-3">
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold flex items-center text-gray-800">
+              <div className="p-2 bg-blue-100 rounded-lg mr-3">
+                <Info className="h-4 w-4 text-blue-600" />
+              </div>
+              {t('score.breakdown')}
+            </h4>
             <span className={`text-lg font-bold ${
               scoreBreakdown.total.score >= 85 ? 'text-emerald-600' :
               scoreBreakdown.total.score >= 70 ? 'text-amber-600' :
@@ -1064,16 +1036,7 @@ const FixedBeachView = ({
             }`}>
               {scoreBreakdown.total.score}/100
             </span>
-            {expandedSections.scoreBreakdown ? (
-              <ChevronUp className="h-5 w-5 text-gray-400" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-gray-400" />
-            )}
           </div>
-        </button>
-
-        {expandedSections.scoreBreakdown && (
-          <div className="px-4 pb-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               <ScoreItem
                 label="Wind"
@@ -1177,8 +1140,7 @@ const FixedBeachView = ({
                 />
               </div>
             </div>
-          </div>
-        )}
+        </div>
       </div>
     );
   };
@@ -1192,32 +1154,20 @@ const FixedBeachView = ({
 
     return (
       <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl mt-4 shadow-sm border border-indigo-100">
-        <button
-          onClick={() => toggleSection('weeklyForecast')}
-          className="w-full p-4 flex items-center justify-between text-left hover:bg-white/50 transition-colors rounded-2xl"
-        >
-          <h4 className="font-semibold flex items-center text-gray-800">
-            <div className="p-2 bg-indigo-100 rounded-lg mr-3">
-              <Calendar className="h-4 w-4 text-indigo-600" />
-            </div>
-            Best Day This Week
-          </h4>
-          <div className="flex items-center gap-2">
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold flex items-center text-gray-800">
+              <div className="p-2 bg-indigo-100 rounded-lg mr-3">
+                <Calendar className="h-4 w-4 text-indigo-600" />
+              </div>
+              Best Day This Week
+            </h4>
             {bestDay && (
               <span className="text-sm font-medium text-indigo-600">
                 {bestDay.dayName} {bestDay.bestPeriod} ({bestDay.bestScore}/100)
               </span>
             )}
-            {expandedSections.weeklyForecast ? (
-              <ChevronUp className="h-5 w-5 text-gray-400" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-gray-400" />
-            )}
           </div>
-        </button>
-
-        {expandedSections.weeklyForecast && (
-          <div className="px-4 pb-4">
             <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {weeklyScores.map((day, i) => {
                 const isBest = day === bestDay;
@@ -1257,8 +1207,7 @@ const FixedBeachView = ({
                  bestDay.bestScore >= 60 ? ' Should be a solid session.' : ' Better than other days.'}
               </div>
             )}
-          </div>
-        )}
+        </div>
       </div>
     );
   };
