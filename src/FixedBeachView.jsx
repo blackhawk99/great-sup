@@ -633,7 +633,10 @@ const FixedBeachView = ({
           time: current,
           wind: weatherData.hourly.windspeed_10m?.[index] ?? 0,
           wave: marineData.hourly?.wave_height?.[index] ?? protectedWave,
-          precipitation: weatherData.hourly.precipitation?.[index] ?? 0
+          precipitation: weatherData.hourly.precipitation?.[index] ?? 0,
+          temperature: weatherData.hourly.temperature_2m?.[index] ?? avgTemp,
+          cloudcover: weatherData.hourly.cloudcover?.[index] ?? 50,
+          uvIndex: weatherData.hourly.uv_index?.[index] ?? 0
         });
       }
     });
@@ -690,6 +693,44 @@ const FixedBeachView = ({
       );
     }
 
+    // Find warmest, sunniest hour - especially useful in cooler months
+    let warmestHour = null;
+    let warmestScore = Number.NEGATIVE_INFINITY;
+
+    selectedHours.forEach((hour) => {
+      // Score combines temperature (higher is better) and cloud cover (lower is better)
+      // Temperature weighted more heavily, cloud cover inverted (100 - cloudcover)
+      const sunScore = hour.temperature * 2 + (100 - hour.cloudcover) / 2 + hour.uvIndex * 3;
+      if (sunScore > warmestScore && hour.precipitation < 0.5) {
+        warmestScore = sunScore;
+        warmestHour = hour;
+      }
+    });
+
+    if (warmestHour && selectedHours.length > 1) {
+      const warmestTime = warmestHour.time.toLocaleTimeString('el-GR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: GREEK_TIMEZONE
+      });
+      const isSunny = warmestHour.cloudcover < 30;
+      const isWarm = warmestHour.temperature >= 22;
+      const isCoolerDay = avgTemp < 22;
+
+      // Show sunny/warm recommendation, especially prominent in cooler weather
+      if (isCoolerDay || isSunny) {
+        const sunEmoji = isSunny ? '☀️' : warmestHour.cloudcover < 60 ? '🌤️' : '⛅';
+        const tempRounded = Math.round(warmestHour.temperature);
+        suggestions.unshift(
+          `${sunEmoji} Warmest at ${warmestTime} (${tempRounded}°C${isSunny ? ', sunny' : ''}) — best for ${isCoolerDay ? 'winter' : 'sun'} paddling.`
+        );
+      } else if (isWarm && isSunny) {
+        suggestions.push(
+          `☀️ Peak sunshine at ${warmestTime} — ${Math.round(warmestHour.temperature)}°C with clear skies.`
+        );
+      }
+    }
+
     if (bestHour) {
       const bestLabel = bestHour.time.toLocaleTimeString('el-GR', {
         hour: '2-digit',
@@ -739,6 +780,7 @@ const FixedBeachView = ({
       suggestions,
       windowLabel: `${timeRange.startTime} – ${timeRange.endTime}`,
       bestHour,
+      warmestHour,
       wind: protectedWind,
       wave: protectedWave,
       temperature: avgTemp,
