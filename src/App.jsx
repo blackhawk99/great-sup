@@ -60,13 +60,16 @@ const App = () => {
   };
   
   
-  // Format last updated time strings
-  const formattedUpdateTime = lastUpdated ? 
-    lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
+  // Greek timezone for consistent display
+  const GREEK_TIMEZONE = 'Europe/Athens';
+
+  // Format last updated time strings (Greek timezone)
+  const formattedUpdateTime = lastUpdated ?
+    lastUpdated.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', timeZone: GREEK_TIMEZONE }) :
     "-";
-  
+
   const formattedUpdateDate = lastUpdated ?
-    lastUpdated.toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' }) :
+    lastUpdated.toLocaleDateString('el-GR', { year: 'numeric', month: 'long', day: 'numeric', timeZone: GREEK_TIMEZONE }) :
     "-";
   
   // Use beach manager
@@ -460,11 +463,25 @@ const App = () => {
     <div className="flex flex-col min-h-screen bg-blue-50 text-gray-900">
       {/* Toast notification */}
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
-          notification.type === 'success' ? 'bg-green-100 border border-green-400 text-green-800' :
-          'bg-red-100 border border-red-400 text-red-800'
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg animate-in slide-in-from-right ${
+          notification.type === 'success'
+            ? 'bg-green-50 border border-green-200 text-green-800'
+            : 'bg-red-50 border border-red-200 text-red-800'
         }`}>
-          {notification.message}
+          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+            notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+          }`}>
+            {notification.type === 'success' ? (
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+          </div>
+          <span className="font-medium">{notification.message}</span>
         </div>
       )}
       
