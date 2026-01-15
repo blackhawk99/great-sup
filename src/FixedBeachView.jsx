@@ -15,7 +15,11 @@ import {
   Calendar,
   Info,
   LifeBuoy,
-  CheckCircle2
+  CheckCircle2,
+  Sun,
+  Sunrise,
+  Sunset,
+  Navigation
 } from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection, DatePickerModal } from "./helpers.jsx";
@@ -124,8 +128,8 @@ const FixedBeachView = ({
       tomorrow.setDate(tomorrow.getDate() + 1);
       const formattedTomorrow = tomorrow.toISOString().split('T')[0];
       
-      // API URLs - include gusts for safety warnings
-      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m,windgusts_10m&daily=precipitation_sum,windspeed_10m_max&start_date=${formattedDate}&end_date=${formattedTomorrow}&timezone=auto`;
+      // API URLs - include gusts, UV index, sunrise/sunset
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m,windgusts_10m,uv_index&daily=precipitation_sum,windspeed_10m_max,sunrise,sunset,uv_index_max&start_date=${formattedDate}&end_date=${formattedTomorrow}&timezone=auto`;
 
       // Marine API - include swell period and ocean currents
       const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,swell_wave_period,wave_direction,sea_surface_temperature,ocean_current_velocity&daily=wave_height_max,wave_direction_dominant&start_date=${formattedDate}&end_date=${formattedTomorrow}&timezone=auto`;
@@ -208,6 +212,10 @@ const FixedBeachView = ({
         avgWindDir = (avgWindDir + 360) % 360;
       }
 
+      // UV Index
+      const uvValues = selectValues(weather?.hourly?.uv_index, relevantIndices);
+      const maxUvIndex = uvValues.length ? Math.max(...uvValues) : toNumberOr(weather?.daily?.uv_index_max?.[0], 0);
+
       const hourlyWaveValues = selectValues(marine?.hourly?.wave_height, relevantIndices);
       const waveHeight = average(hourlyWaveValues, toNumberOr(marine?.daily?.wave_height_max?.[0], 0));
 
@@ -265,6 +273,8 @@ const FixedBeachView = ({
         waterTemperature: { value: avgWaterTemp, score: 0, maxPossible: 12 },
         cloudCover: { value: avgCloud, score: 0, maxPossible: 4 },
         geoProtection: { value: protectionScore, score: 0, maxPossible: 12 },
+        uvIndex: { value: maxUvIndex }, // Informational, not scored
+        windDirection: { value: avgWindDir }, // Informational, not scored
         total: { score: 0, rawScore: 0, bonus: 0, maxPossible: 100 },
         dataQuality: dataQuality // 0-100% indicating data completeness
       };
@@ -1279,15 +1289,23 @@ const FixedBeachView = ({
     ? {
         windRaw: toNumberOr(scoreBreakdown.windSpeed?.raw, 0),
         windProtected: toNumberOr(scoreBreakdown.windSpeed?.protected, 0),
+        windDirection: toNumberOr(scoreBreakdown.windDirection?.value, 0),
         waveRaw: toNumberOr(scoreBreakdown.waveHeight?.raw, 0),
         waveProtected: toNumberOr(scoreBreakdown.waveHeight?.protected, 0),
         swellProtected: toNumberOr(scoreBreakdown.swellHeight?.protected, 0),
         temperature: toNumberOr(scoreBreakdown.temperature?.value, 0),
         waterTemperature: toNumberOr(scoreBreakdown.waterTemperature?.value, null),
         precipitation: toNumberOr(scoreBreakdown.precipitation?.value, 0),
-        cloudCover: toNumberOr(scoreBreakdown.cloudCover?.value, 0)
+        cloudCover: toNumberOr(scoreBreakdown.cloudCover?.value, 0),
+        uvIndex: toNumberOr(scoreBreakdown.uvIndex?.value, 0)
       }
     : null;
+
+  // Get sunrise/sunset from weather data
+  const sunTimes = weatherData?.daily ? {
+    sunrise: weatherData.daily.sunrise?.[0],
+    sunset: weatherData.daily.sunset?.[0]
+  } : null;
 
   return (
     <>
@@ -1670,6 +1688,69 @@ const FixedBeachView = ({
                           </div>
                         </div>
                       </div>
+
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                        <Sun className={`h-6 w-6 mr-3 ${
+                          breakdownMetrics.uvIndex >= 8 ? 'text-red-500' :
+                          breakdownMetrics.uvIndex >= 6 ? 'text-orange-500' :
+                          breakdownMetrics.uvIndex >= 3 ? 'text-yellow-500' : 'text-green-500'
+                        }`} />
+                        <div className="flex-grow">
+                          <div className="text-sm text-gray-500">UV Index</div>
+                          <div className={`text-lg font-medium ${
+                            breakdownMetrics.uvIndex >= 8 ? 'text-red-600' :
+                            breakdownMetrics.uvIndex >= 6 ? 'text-orange-600' :
+                            breakdownMetrics.uvIndex >= 3 ? 'text-yellow-600' : 'text-green-600'
+                          }`}>
+                            {breakdownMetrics.uvIndex.toFixed(1)}
+                            <span className="text-xs ml-1">
+                              {breakdownMetrics.uvIndex >= 11 ? '(Extreme)' :
+                               breakdownMetrics.uvIndex >= 8 ? '(Very High)' :
+                               breakdownMetrics.uvIndex >= 6 ? '(High)' :
+                               breakdownMetrics.uvIndex >= 3 ? '(Moderate)' : '(Low)'}
+                            </span>
+                          </div>
+                          {breakdownMetrics.uvIndex >= 6 && (
+                            <div className="text-xs text-orange-600">
+                              {breakdownMetrics.uvIndex >= 8 ? 'SPF 50+, hat & rash vest!' : 'Sunscreen every 2 hours'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {sunTimes && (
+                        <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm col-span-2">
+                          <div className="flex items-center justify-around w-full">
+                            <div className="flex items-center">
+                              <Sunrise className="h-5 w-5 mr-2 text-orange-400" />
+                              <div>
+                                <div className="text-xs text-gray-500">Sunrise</div>
+                                <div className="text-sm font-medium">
+                                  {sunTimes.sunrise ? new Date(sunTimes.sunrise).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center">
+                              <Navigation
+                                className="h-8 w-8 text-blue-500 mx-4"
+                                style={{ transform: `rotate(${breakdownMetrics.windDirection}deg)` }}
+                              />
+                              <div className="text-xs text-gray-500">
+                                Wind from {getCardinalDirection(breakdownMetrics.windDirection)}
+                              </div>
+                            </div>
+                            <div className="flex items-center">
+                              <Sunset className="h-5 w-5 mr-2 text-orange-500" />
+                              <div>
+                                <div className="text-xs text-gray-500">Sunset</div>
+                                <div className="text-sm font-medium">
+                                  {sunTimes.sunset ? new Date(sunTimes.sunset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="col-span-2 rounded-lg border border-dashed border-blue-200 p-4 text-sm text-gray-500">
