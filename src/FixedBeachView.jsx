@@ -240,6 +240,11 @@ const FixedBeachView = ({
       const precipValues = selectValues(weather?.hourly?.precipitation, relevantIndices);
       const windDirValues = selectValues(weather?.hourly?.winddirection_10m, relevantIndices);
 
+      // Track data quality - count available vs expected data points
+      const expectedDataPoints = relevantIndices.length * 7; // 7 metrics per hour
+      const availableDataPoints = tempValues.length + windValues.length + cloudValues.length +
+        precipValues.length + windDirValues.length;
+
       const avgTemp = average(tempValues, toNumberOr(weather?.hourly?.temperature_2m?.[0], 0));
       const avgWind = average(windValues, 0);
       const avgCloud = average(cloudValues, 0);
@@ -263,6 +268,12 @@ const FixedBeachView = ({
 
       const swellValues = selectValues(marine?.hourly?.swell_wave_height, relevantIndices);
       const avgSwellHeight = average(swellValues, toNumberOr(marine?.daily?.wave_height_max?.[0], 0));
+
+      // Add marine data to quality calculation
+      const marineDataPoints = hourlyWaveValues.length + swellValues.length;
+      const totalAvailable = availableDataPoints + marineDataPoints;
+      const totalExpected = expectedDataPoints + relevantIndices.length * 2; // +2 for wave & swell
+      const dataQuality = Math.round((totalAvailable / totalExpected) * 100);
 
       const waveDirection = toNumberOr(marine?.daily?.wave_direction_dominant?.[0], avgWindDir);
       const protection = await calculateGeographicProtection(
@@ -291,7 +302,8 @@ const FixedBeachView = ({
         temperature: { value: avgTemp, score: 0, maxPossible: 10 },
         cloudCover: { value: avgCloud, score: 0, maxPossible: 5 },
         geoProtection: { value: protectionScore, score: 0, maxPossible: 10 },
-        total: { score: 0, rawScore: 0, bonus: 0, maxPossible: 100 }
+        total: { score: 0, rawScore: 0, bonus: 0, maxPossible: 100 },
+        dataQuality: dataQuality // 0-100% indicating data completeness
       };
       
       // Calculate individual scores
@@ -1423,8 +1435,19 @@ const FixedBeachView = ({
                 <p className="mt-2 text-lg font-medium text-gray-700">
                   Score: {paddleScore}/100
                 </p>
-                <div className="mt-1 text-xs text-gray-500">
-                  Using real-time weather data
+                <div className="mt-1 text-xs text-gray-500 flex items-center justify-center gap-2">
+                  <span>Data quality:</span>
+                  <span className={`font-medium ${
+                    scoreBreakdown?.dataQuality >= 90 ? 'text-green-600' :
+                    scoreBreakdown?.dataQuality >= 70 ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
+                    {scoreBreakdown?.dataQuality ?? 100}%
+                  </span>
+                  {scoreBreakdown?.dataQuality < 70 && (
+                    <span className="text-red-500" title="Some weather data is missing - score may be less accurate">
+                      ⚠️
+                    </span>
+                  )}
                 </div>
               </div>
               

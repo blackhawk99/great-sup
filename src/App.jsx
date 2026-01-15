@@ -1225,9 +1225,12 @@ const App = () => {
             © 2025 Paddleboard Weather Advisor | Ladi Thalassa
           </p>
           <div className="flex items-center mt-2 sm:mt-0 text-xs">
+            <span className="text-blue-400 border-r border-blue-600 pr-3 mr-3" title="Scoring algorithm version">
+              v1.3 · Jan 15, 2026
+            </span>
             <span className="text-blue-300 border-r border-blue-600 pr-3 mr-3">
               {lastUpdated ? (
-                <>Last updated: {formattedUpdateDate} {formattedUpdateTime} </>
+                <>Data: {formattedUpdateDate} {formattedUpdateTime} </>
               ) : (
                 <>No updates yet</>
               )}

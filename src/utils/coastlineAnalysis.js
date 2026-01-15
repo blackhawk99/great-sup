@@ -210,29 +210,37 @@ export function checkIslandProtection(beachPoint, windDirection, waveDirection) 
     }
   }
   
-  // Calculate wind protection from islands
+  // Calculate wind and wave protection from islands
+  // KEY DIFFERENCE: Waves diffract (bend) around obstacles, so narrow islands
+  // provide much less wave protection than wind protection
   let windIslandProtection = 0;
   let waveIslandProtection = 0;
-  
+
   for (const shield of shieldedDirections) {
-    // Wind protection
+    // Wind protection - wind is blocked locally by obstacles
     const windShieldExposure = calculateDirectionalExposure(windDirection, shield.direction);
     if (windShieldExposure <= shield.width / 2) {
       const directionalFactor = 1 - (windShieldExposure / (shield.width / 2));
       windIslandProtection += shield.strength * directionalFactor;
     }
-    
-    // Wave protection
+
+    // Wave protection - waves diffract around obstacles
+    // Narrow obstacles (small angular width) provide much less protection
+    // Waves need ~60° of blockage for significant protection
     const waveShieldExposure = calculateDirectionalExposure(waveDirection, shield.direction);
     if (waveShieldExposure <= shield.width / 2) {
       const directionalFactor = 1 - (waveShieldExposure / (shield.width / 2));
-      waveIslandProtection += shield.strength * directionalFactor;
+      // Apply diffraction penalty: narrow obstacles let waves wrap around
+      // angularWidth < 30° = very little wave protection
+      // angularWidth > 60° = good wave protection
+      const diffractionFactor = Math.min(1, shield.width / 60);
+      waveIslandProtection += shield.strength * directionalFactor * diffractionFactor;
     }
   }
-  
-  // Cap at 0.8 (80% protection)
+
+  // Cap protection (waves can never be fully blocked by islands due to diffraction)
   windIslandProtection = Math.min(0.8, windIslandProtection);
-  waveIslandProtection = Math.min(0.8, waveIslandProtection);
+  waveIslandProtection = Math.min(0.6, waveIslandProtection); // Lower cap for waves
   
   return {
     windIslandProtection,
@@ -414,23 +422,30 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     // Consider up to 5 closest segments
 for (const segment of relevantSegments.slice(0, 5)) {
   const segmentAngle = segment.angle;
-  
-  // Calculate wind protection
+
+  // Calculate wind protection - direct blockage
   const windExposure = calculateDirectionalExposure(windDirection, segmentAngle);
   const windProtection = Math.min(1.0, 1 - Math.cos(windExposure * Math.PI / 180));
-  
-  // Calculate wave protection
+
+  // Calculate wave protection - affected by diffraction
+  // Waves bend around headlands, so protection is reduced unless in an enclosed bay
   const waveExposure = calculateDirectionalExposure(waveDirection, segmentAngle);
-  const waveProtection = Math.min(1.0, 1 - Math.cos(waveExposure * Math.PI / 180));
-      
+  const baseWaveProtection = Math.min(1.0, 1 - Math.cos(waveExposure * Math.PI / 180));
+  // Reduce wave protection for exposed coastlines (not enclosed bays)
+  // Enclosure provides the real wave protection, not individual segments
+  const waveProtection = baseWaveProtection * 0.7; // 30% reduction for diffraction
+
       // Keep the best protection values
       if (windProtection > bestWindProtection) bestWindProtection = windProtection;
       if (waveProtection > bestWaveProtection) bestWaveProtection = waveProtection;
     }
     
 // Calculate total protection
+// Wind: combination of direct blockage and enclosure
 const totalWindProtection = Math.min(1.0, bestWindProtection * (0.5 + 0.5 * enclosureScore));
-const totalWaveProtection = Math.min(1.0, bestWaveProtection * (0.5 + 0.5 * enclosureScore));
+// Waves: enclosure matters much more due to diffraction - waves wrap around obstacles
+// Only enclosed bays provide significant wave protection
+const totalWaveProtection = Math.min(1.0, bestWaveProtection * (0.3 + 0.7 * enclosureScore));
     
     // Compute final protection score
     const protectionScore = (
