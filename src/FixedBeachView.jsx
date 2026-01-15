@@ -330,6 +330,7 @@ const FixedBeachView = ({
     const protectedSwell = scoreBreakdown.swellHeight?.protected ?? null;
     const precipitation = scoreBreakdown.precipitation?.value ?? 0;
     const avgTemp = scoreBreakdown.temperature?.value ?? null;
+    const waterTemp = scoreBreakdown.waterTemperature?.value ?? null;
 
     if (
       protectedWind === null ||
@@ -435,6 +436,10 @@ const FixedBeachView = ({
       suggestions.push("Pack extra hydration and reapply sunscreen every hour.");
     }
 
+    if (waterTemp !== null && waterTemp < 15) {
+      suggestions.push("Cold water — wear a wetsuit to prevent hypothermia if you fall in.");
+    }
+
     if (precipitation >= 1) {
       suggestions.push("Expect showers — stash dry gear and keep electronics in a dry bag.");
     }
@@ -455,6 +460,7 @@ const FixedBeachView = ({
       wind: protectedWind,
       wave: protectedWave,
       temperature: avgTemp,
+      waterTemperature: waterTemp,
       swell: protectedSwell
     };
   };
@@ -1087,6 +1093,7 @@ const FixedBeachView = ({
         waveProtected: toNumberOr(scoreBreakdown.waveHeight?.protected, 0),
         swellProtected: toNumberOr(scoreBreakdown.swellHeight?.protected, 0),
         temperature: toNumberOr(scoreBreakdown.temperature?.value, 0),
+        waterTemperature: toNumberOr(scoreBreakdown.waterTemperature?.value, null),
         precipitation: toNumberOr(scoreBreakdown.precipitation?.value, 0),
         cloudCover: toNumberOr(scoreBreakdown.cloudCover?.value, 0)
       }
@@ -1421,9 +1428,9 @@ const FixedBeachView = ({
                       </div>
 
                       <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                        <Thermometer className="h-6 w-6 mr-3 text-blue-600" />
+                        <Thermometer className="h-6 w-6 mr-3 text-orange-500" />
                         <div className="flex-grow">
-                          <div className="text-sm text-gray-500">Temperature</div>
+                          <div className="text-sm text-gray-500">Air Temp</div>
                           <div className={`text-lg font-medium ${
                             breakdownMetrics.temperature >= 22 && breakdownMetrics.temperature <= 30
                               ? 'text-green-600'
@@ -1433,6 +1440,29 @@ const FixedBeachView = ({
                           }`}>
                             {Math.round(breakdownMetrics.temperature)}°C
                           </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
+                        <Waves className="h-6 w-6 mr-3 text-cyan-500" />
+                        <div className="flex-grow">
+                          <div className="text-sm text-gray-500">Water Temp</div>
+                          <div className={`text-lg font-medium ${
+                            breakdownMetrics.waterTemperature !== null
+                              ? breakdownMetrics.waterTemperature >= 18 && breakdownMetrics.waterTemperature <= 26
+                                ? 'text-green-600'
+                                : breakdownMetrics.waterTemperature >= 15
+                                  ? 'text-yellow-600'
+                                  : 'text-blue-600'
+                              : 'text-gray-400'
+                          }`}>
+                            {breakdownMetrics.waterTemperature !== null
+                              ? `${Math.round(breakdownMetrics.waterTemperature)}°C`
+                              : 'N/A'}
+                          </div>
+                          {breakdownMetrics.waterTemperature !== null && breakdownMetrics.waterTemperature < 15 && (
+                            <div className="text-xs text-blue-600">Wetsuit recommended</div>
+                          )}
                         </div>
                       </div>
 
@@ -1480,18 +1510,26 @@ const FixedBeachView = ({
 
                   <p className="mt-4 text-sm leading-relaxed text-blue-50">{readiness.message}</p>
 
-                  <div className="mt-6 grid grid-cols-3 gap-3 text-sm">
+                  <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                     <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
-                      <div className="text-xs uppercase text-blue-100">Wind (protected)</div>
+                      <div className="text-xs uppercase text-blue-100">Wind</div>
                       <div className="text-lg font-semibold">{Math.round(readiness.wind)} km/h</div>
                     </div>
                     <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
-                      <div className="text-xs uppercase text-blue-100">Wave height</div>
+                      <div className="text-xs uppercase text-blue-100">Waves</div>
                       <div className="text-lg font-semibold">{readiness.wave.toFixed(2)} m</div>
                     </div>
                     <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
                       <div className="text-xs uppercase text-blue-100">Air temp</div>
                       <div className="text-lg font-semibold">{Math.round(readiness.temperature)}°C</div>
+                    </div>
+                    <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
+                      <div className="text-xs uppercase text-blue-100">Water temp</div>
+                      <div className="text-lg font-semibold">
+                        {readiness.waterTemperature !== null
+                          ? `${Math.round(readiness.waterTemperature)}°C`
+                          : 'N/A'}
+                      </div>
                     </div>
                   </div>
 
