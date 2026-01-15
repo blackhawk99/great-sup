@@ -14,7 +14,8 @@ import {
   Clock,
   Calendar,
   Info,
-  LifeBuoy
+  LifeBuoy,
+  CheckCircle2
 } from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection, DatePickerModal } from "./helpers.jsx";
