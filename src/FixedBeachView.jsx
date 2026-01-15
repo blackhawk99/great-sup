@@ -58,8 +58,11 @@ const FixedBeachView = ({
   const [expandedSections, setExpandedSections] = useState({
     scoreBreakdown: true,
     geoProtection: true,
-    hourlyWind: true
+    hourlyWind: true,
+    weeklyForecast: true
   });
+  const [weeklyScores, setWeeklyScores] = useState([]);
+  const [conditionTrends, setConditionTrends] = useState(null);
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -129,10 +132,15 @@ const FixedBeachView = ({
 
     const updateScores = async () => {
       await calculateScores(weatherData, marineData, beach);
+      // Calculate weekly forecast and trends after main score
+      if (geoProtection) {
+        calculateWeeklyForecast(weatherData, marineData, geoProtection);
+      }
+      calculateTrends(weatherData);
     };
 
     updateScores();
-  }, [timeRange.startTime, timeRange.endTime, weatherData, marineData, beach]);
+  }, [timeRange.startTime, timeRange.endTime, weatherData, marineData, beach, geoProtection]);
 
   // Fetch real weather data
   const fetchWeatherData = async () => {
@@ -150,11 +158,16 @@ const FixedBeachView = ({
       tomorrow.setDate(tomorrow.getDate() + 1);
       const formattedTomorrow = tomorrow.toISOString().split('T')[0];
       
-      // API URLs - include gusts, UV index, sunrise/sunset
-      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m,windgusts_10m,uv_index&daily=precipitation_sum,windspeed_10m_max,sunrise,sunset,uv_index_max&start_date=${formattedDate}&end_date=${formattedTomorrow}&timezone=auto`;
+      // Calculate 7-day range for "Best Day This Week" feature
+      const weekEnd = new Date(today);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const formattedWeekEnd = weekEnd.toISOString().split('T')[0];
 
-      // Marine API - include swell period and ocean currents
-      const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,swell_wave_period,wave_direction,sea_surface_temperature,ocean_current_velocity&daily=wave_height_max,wave_direction_dominant&start_date=${formattedDate}&end_date=${formattedTomorrow}&timezone=auto`;
+      // API URLs - include gusts, UV index, sunrise/sunset (7 days for best day feature)
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=temperature_2m,precipitation,cloudcover,windspeed_10m,winddirection_10m,windgusts_10m,uv_index&daily=precipitation_sum,windspeed_10m_max,sunrise,sunset,uv_index_max&start_date=${formattedDate}&end_date=${formattedWeekEnd}&timezone=auto`;
+
+      // Marine API - include swell period, ocean currents, and sea level for tides (7 days)
+      const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${beach.latitude}&longitude=${beach.longitude}&hourly=wave_height,swell_wave_height,swell_wave_period,wave_direction,sea_surface_temperature,ocean_current_velocity&daily=wave_height_max,wave_direction_dominant&start_date=${formattedDate}&end_date=${formattedWeekEnd}&timezone=auto`;
       
       // Fetch data
       const [weatherRes, marineRes] = await Promise.all([
@@ -397,6 +410,153 @@ const FixedBeachView = ({
       setPaddleScore(null);
       setScoreBreakdown(null);
     }
+  };
+
+  // Calculate 7-day forecast scores for "Best Day This Week"
+  const calculateWeeklyForecast = (weather, marine, geoProtection) => {
+    if (!weather?.hourly?.time || !weather?.daily) return [];
+
+    const scores = [];
+    const today = new Date(timeRange.date);
+
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const targetDate = new Date(today);
+      targetDate.setDate(targetDate.getDate() + dayOffset);
+      const dateStr = targetDate.toISOString().split('T')[0];
+
+      // Find indices for morning (8-12) - typically best SUP time
+      const morningIndices = [];
+      const afternoonIndices = [];
+
+      weather.hourly.time.forEach((t, i) => {
+        const d = new Date(t);
+        if (d.toISOString().split('T')[0] === dateStr) {
+          const hour = d.getHours();
+          if (hour >= 8 && hour <= 12) morningIndices.push(i);
+          if (hour >= 14 && hour <= 18) afternoonIndices.push(i);
+        }
+      });
+
+      const calcPeriodScore = (indices) => {
+        if (!indices.length) return null;
+        const wind = average(selectValues(weather.hourly.windspeed_10m, indices));
+        const wave = average(selectValues(marine?.hourly?.wave_height, indices)) || 0;
+        const precip = Math.max(...selectValues(weather.hourly.precipitation, indices).map(v => v || 0), 0);
+
+        // Simplified score calculation
+        let score = 100;
+        score -= Math.min(40, wind * 2.5); // Wind penalty
+        score -= Math.min(30, wave * 60);  // Wave penalty
+        if (precip > 0.5) score -= 20;
+        if (geoProtection?.protectionScore > 50) score += 5;
+        return Math.max(0, Math.min(100, Math.round(score)));
+      };
+
+      const morningScore = calcPeriodScore(morningIndices);
+      const afternoonScore = calcPeriodScore(afternoonIndices);
+      const bestScore = Math.max(morningScore || 0, afternoonScore || 0);
+      const bestPeriod = (morningScore || 0) >= (afternoonScore || 0) ? 'AM' : 'PM';
+
+      // Get daily data
+      const dayIndex = weather.daily.time?.findIndex(t => t === dateStr) ?? -1;
+      const maxWind = dayIndex >= 0 ? weather.daily.windspeed_10m_max?.[dayIndex] : null;
+      const maxPrecip = dayIndex >= 0 ? weather.daily.precipitation_sum?.[dayIndex] : null;
+
+      scores.push({
+        date: targetDate,
+        dateStr,
+        dayName: targetDate.toLocaleDateString('en-US', { weekday: 'short' }),
+        morningScore,
+        afternoonScore,
+        bestScore,
+        bestPeriod,
+        maxWind: maxWind?.toFixed(0) || '?',
+        hasRain: (maxPrecip || 0) > 1,
+        isToday: dayOffset === 0
+      });
+    }
+
+    setWeeklyScores(scores);
+    return scores;
+  };
+
+  // Calculate condition trends (improving/worsening)
+  const calculateTrends = (weather) => {
+    if (!weather?.hourly?.time) return null;
+
+    const now = new Date();
+    const nowHour = now.getHours();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Find current hour index
+    const currentIndex = weather.hourly.time.findIndex(t => {
+      const d = new Date(t);
+      return d.toISOString().split('T')[0] === todayStr && d.getHours() === nowHour;
+    });
+
+    if (currentIndex < 0 || currentIndex + 3 >= weather.hourly.time.length) return null;
+
+    const currentWind = weather.hourly.windspeed_10m?.[currentIndex] || 0;
+    const futureWind = weather.hourly.windspeed_10m?.[currentIndex + 3] || 0;
+    const windChange = futureWind - currentWind;
+
+    let windTrend = 'stable';
+    if (windChange < -3) windTrend = 'improving';
+    else if (windChange > 3) windTrend = 'worsening';
+
+    const trends = {
+      wind: {
+        current: currentWind.toFixed(0),
+        future: futureWind.toFixed(0),
+        change: windChange.toFixed(0),
+        trend: windTrend,
+        message: windTrend === 'improving'
+          ? `Wind dropping ${currentWind.toFixed(0)}→${futureWind.toFixed(0)} km/h`
+          : windTrend === 'worsening'
+            ? `Wind rising ${currentWind.toFixed(0)}→${futureWind.toFixed(0)} km/h`
+            : 'Wind steady'
+      }
+    };
+
+    setConditionTrends(trends);
+    return trends;
+  };
+
+  // Get equipment recommendations based on conditions
+  const getEquipmentRecommendations = () => {
+    if (!scoreBreakdown) return [];
+    const recs = [];
+
+    const waterTemp = scoreBreakdown.waterTemperature?.value;
+    const airTemp = scoreBreakdown.temperature?.value;
+    const wind = scoreBreakdown.windSpeed?.protected;
+    const uvIndex = scoreBreakdown.uvIndex?.value;
+
+    if (waterTemp !== null && waterTemp < 18) {
+      recs.push({ icon: '🧥', item: 'Wetsuit', reason: `Water ${waterTemp.toFixed(0)}°C - hypothermia risk` });
+    } else if (waterTemp !== null && waterTemp < 22) {
+      recs.push({ icon: '👕', item: 'Rashguard', reason: `Water ${waterTemp.toFixed(0)}°C - can get chilly` });
+    }
+
+    if (uvIndex !== null && uvIndex >= 6) {
+      recs.push({ icon: '🧴', item: 'Sunscreen SPF50+', reason: `UV Index ${uvIndex.toFixed(0)} - high exposure` });
+      recs.push({ icon: '🕶️', item: 'Sunglasses', reason: 'Protect eyes from glare' });
+    } else if (uvIndex !== null && uvIndex >= 3) {
+      recs.push({ icon: '🧴', item: 'Sunscreen SPF30', reason: `UV Index ${uvIndex.toFixed(0)}` });
+    }
+
+    if (wind !== null && wind > 10) {
+      recs.push({ icon: '🦺', item: 'Leash (coiled)', reason: `Wind ${wind.toFixed(0)} km/h - board can blow away` });
+    }
+
+    if (airTemp !== null && airTemp < 15) {
+      recs.push({ icon: '🧢', item: 'Windproof layer', reason: `Air ${airTemp.toFixed(0)}°C` });
+    }
+
+    // Always recommend
+    recs.push({ icon: '💧', item: 'Water bottle', reason: 'Stay hydrated' });
+
+    return recs;
   };
 
   const getPaddleReadiness = () => {
@@ -1021,6 +1181,215 @@ const FixedBeachView = ({
     );
   };
 
+  // Render 7-day forecast "Best Day This Week"
+  const renderWeeklyForecast = () => {
+    if (!weeklyScores.length) return null;
+
+    const bestDay = weeklyScores.reduce((best, day) =>
+      day.bestScore > (best?.bestScore || 0) ? day : best, null);
+
+    return (
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl mt-4 shadow-sm border border-indigo-100">
+        <button
+          onClick={() => toggleSection('weeklyForecast')}
+          className="w-full p-4 flex items-center justify-between text-left hover:bg-white/50 transition-colors rounded-2xl"
+        >
+          <h4 className="font-semibold flex items-center text-gray-800">
+            <div className="p-2 bg-indigo-100 rounded-lg mr-3">
+              <Calendar className="h-4 w-4 text-indigo-600" />
+            </div>
+            Best Day This Week
+          </h4>
+          <div className="flex items-center gap-2">
+            {bestDay && (
+              <span className="text-sm font-medium text-indigo-600">
+                {bestDay.dayName} {bestDay.bestPeriod} ({bestDay.bestScore}/100)
+              </span>
+            )}
+            {expandedSections.weeklyForecast ? (
+              <ChevronUp className="h-5 w-5 text-gray-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-gray-400" />
+            )}
+          </div>
+        </button>
+
+        {expandedSections.weeklyForecast && (
+          <div className="px-4 pb-4">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+              {weeklyScores.map((day, i) => {
+                const isBest = day === bestDay;
+                const scoreColor = day.bestScore >= 80 ? 'bg-emerald-500' :
+                  day.bestScore >= 60 ? 'bg-amber-500' :
+                  day.bestScore >= 40 ? 'bg-orange-500' : 'bg-red-500';
+
+                return (
+                  <div
+                    key={i}
+                    className={`text-center p-2 rounded-xl transition-all ${
+                      isBest ? 'bg-indigo-100 ring-2 ring-indigo-400' :
+                      day.isToday ? 'bg-white shadow-sm' : 'bg-white/50'
+                    }`}
+                  >
+                    <div className={`text-xs font-medium ${day.isToday ? 'text-indigo-600' : 'text-gray-500'}`}>
+                      {day.dayName}
+                    </div>
+                    <div className={`text-lg font-bold mt-1 ${
+                      day.bestScore >= 70 ? 'text-emerald-600' :
+                      day.bestScore >= 50 ? 'text-amber-600' : 'text-red-600'
+                    }`}>
+                      {day.bestScore}
+                    </div>
+                    <div className="text-[10px] text-gray-400">{day.bestPeriod}</div>
+                    <div className={`h-1 rounded-full mt-1 ${scoreColor}`} style={{width: `${day.bestScore}%`, margin: '0 auto'}} />
+                    {day.hasRain && <span className="text-xs">🌧️</span>}
+                    {isBest && <span className="text-xs">⭐</span>}
+                  </div>
+                );
+              })}
+            </div>
+            {bestDay && !bestDay.isToday && (
+              <div className="mt-3 p-3 bg-indigo-100 rounded-xl text-sm text-indigo-800">
+                <strong>{bestDay.dayName} {bestDay.bestPeriod}</strong> looks perfect!
+                {bestDay.bestScore >= 80 ? ' Expect glassy conditions.' :
+                 bestDay.bestScore >= 60 ? ' Should be a solid session.' : ' Better than other days.'}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render condition trends
+  const renderConditionTrends = () => {
+    if (!conditionTrends) return null;
+
+    const { wind } = conditionTrends;
+    const trendIcon = wind.trend === 'improving' ? '↓' :
+      wind.trend === 'worsening' ? '↑' : '→';
+    const trendColor = wind.trend === 'improving' ? 'text-emerald-600 bg-emerald-50' :
+      wind.trend === 'worsening' ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50';
+
+    return (
+      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${trendColor}`}>
+        <span className="text-lg">{trendIcon}</span>
+        <span>{wind.message}</span>
+        <span className="text-xs opacity-70">(next 3hrs)</span>
+      </div>
+    );
+  };
+
+  // Render equipment recommendations
+  const renderEquipment = () => {
+    const equipment = getEquipmentRecommendations();
+    if (!equipment.length) return null;
+
+    return (
+      <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+        <h4 className="font-medium text-amber-800 mb-3 flex items-center">
+          <span className="mr-2">🎒</span> What to Bring
+        </h4>
+        <div className="flex flex-wrap gap-2">
+          {equipment.slice(0, 5).map((item, i) => (
+            <div key={i} className="bg-white rounded-lg px-3 py-2 text-sm border border-amber-100 shadow-sm">
+              <span className="mr-1">{item.icon}</span>
+              <span className="font-medium">{item.item}</span>
+              <span className="text-gray-500 text-xs ml-1">({item.reason})</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Render tide information (Mediterranean has minimal tides)
+  const renderTideInfo = () => {
+    // Calculate approximate tide state based on moon phase
+    const now = new Date(timeRange.date);
+    const lunarCycle = 29.53059; // days
+    const knownNewMoon = new Date('2024-01-11'); // Reference new moon
+    const daysSinceNew = (now - knownNewMoon) / (1000 * 60 * 60 * 24);
+    const moonAge = daysSinceNew % lunarCycle;
+
+    // Spring tides occur at new moon (0) and full moon (~14.76 days)
+    // Neap tides occur at first quarter (~7.38) and third quarter (~22.14)
+    const isSpringTide = (moonAge < 2 || Math.abs(moonAge - 14.76) < 2);
+    const isNeapTide = (Math.abs(moonAge - 7.38) < 2 || Math.abs(moonAge - 22.14) < 2);
+
+    // Mediterranean tidal range is very small: 20-60cm typically
+    const tidalRange = isSpringTide ? '40-60cm' : isNeapTide ? '15-25cm' : '25-40cm';
+    const tideType = isSpringTide ? 'Spring Tide' : isNeapTide ? 'Neap Tide' : 'Normal Tide';
+
+    // Approximate high/low tide times (simplified - 2 high/low per day, ~6hrs apart)
+    const hour = parseInt(timeRange.startTime.split(':')[0]);
+    // Simple approximation: tides shift ~50 min later each day
+    const tideShift = (daysSinceNew * 50) % (12 * 60); // minutes into 12-hour cycle
+    const nextHighHour = Math.floor(tideShift / 60) % 12;
+    const nextLowHour = (nextHighHour + 6) % 12;
+
+    return (
+      <div className="bg-cyan-50 rounded-xl p-4 border border-cyan-200">
+        <h4 className="font-medium text-cyan-800 mb-3 flex items-center">
+          <span className="mr-2">🌊</span> Tide Information
+        </h4>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white rounded-lg p-3 text-center">
+            <div className="text-xs text-gray-500">Type</div>
+            <div className="font-semibold text-cyan-700">{tideType}</div>
+          </div>
+          <div className="bg-white rounded-lg p-3 text-center">
+            <div className="text-xs text-gray-500">Range</div>
+            <div className="font-semibold text-cyan-700">{tidalRange}</div>
+          </div>
+          <div className="bg-white rounded-lg p-3 text-center">
+            <div className="text-xs text-gray-500">High ~</div>
+            <div className="font-semibold text-cyan-700">
+              {nextHighHour.toString().padStart(2, '0')}:00 / {(nextHighHour + 12).toString().padStart(2, '0')}:00
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-3 text-center">
+            <div className="text-xs text-gray-500">Low ~</div>
+            <div className="font-semibold text-cyan-700">
+              {nextLowHour.toString().padStart(2, '0')}:00 / {(nextLowHour + 12).toString().padStart(2, '0')}:00
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-cyan-600 mt-3">
+          ℹ️ Mediterranean tides are minimal ({tidalRange} range). Times are approximate.
+        </p>
+      </div>
+    );
+  };
+
+  // Share functionality
+  const handleShare = async () => {
+    const text = `🏄 SUP Conditions at ${beach?.name}\n` +
+      `📊 Score: ${paddleScore}/100\n` +
+      `💨 Wind: ${scoreBreakdown?.windSpeed?.protected?.toFixed(1) || '?'} km/h\n` +
+      `🌊 Waves: ${scoreBreakdown?.waveHeight?.protected?.toFixed(2) || '?'} m\n` +
+      `🌡️ Water: ${scoreBreakdown?.waterTemperature?.value?.toFixed(0) || '?'}°C\n` +
+      `📅 ${new Date(timeRange.date).toLocaleDateString()} ${timeRange.startTime}-${timeRange.endTime}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `SUP Conditions - ${beach?.name}`,
+          text: text
+        });
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          // Fallback to clipboard
+          await navigator.clipboard.writeText(text);
+          alert('Conditions copied to clipboard!');
+        }
+      }
+    } else {
+      await navigator.clipboard.writeText(text);
+      alert('Conditions copied to clipboard!');
+    }
+  };
+
   // Render hourly wind speed visualization (FIXED VERSION)
   const renderHourlyWind = () => {
     if (!weatherData || !weatherData.hourly) return null;
@@ -1456,6 +1825,12 @@ const FixedBeachView = ({
                     </span>
                   )}
                 </div>
+                {/* Condition Trends */}
+                {conditionTrends && (
+                  <div className="mt-3">
+                    {renderConditionTrends()}
+                  </div>
+                )}
               </div>
               
               {/* Weather Factors - RIGHT SIDE */}
@@ -1799,18 +2174,34 @@ const FixedBeachView = ({
             </div>
           )}
           
+          {/* Equipment Recommendations */}
+          {renderEquipment()}
+
+          {/* Tide Information */}
+          {renderTideInfo()}
+
+          {/* 7-Day Forecast */}
+          {renderWeeklyForecast()}
+
           {/* Score Breakdown */}
           {renderScoreBreakdown()}
-          
+
           {/* Geographic Protection */}
           {renderGeoProtectionInfo()}
 
           {/* Hourly Wind */}
           {renderHourlyWind()}
-          
-          <div className="text-center mt-6">
+
+          <div className="text-center mt-6 space-y-3">
+            <button
+              onClick={handleShare}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Navigation className="h-4 w-4" />
+              Share Conditions
+            </button>
             <p className="text-sm text-gray-600">
-              This is real-time weather data from Open-Meteo API. Always verify conditions before paddleboarding.
+              Real-time data from Open-Meteo API. Always verify conditions before paddleboarding.
             </p>
           </div>
         </div>
