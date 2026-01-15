@@ -782,6 +782,16 @@ const FixedBeachView = ({
       </div>
     );
 
+    // Info tooltip component
+    const InfoTip = ({ tip }) => (
+      <span className="relative group ml-1 cursor-help">
+        <Info className="h-3.5 w-3.5 text-gray-400 inline hover:text-blue-500" />
+        <span className="absolute left-0 bottom-full mb-2 w-48 p-2 text-xs text-white bg-gray-800 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+          {tip}
+        </span>
+      </span>
+    );
+
     return (
       <div className="bg-white p-5 rounded-lg mt-4 shadow-sm border">
         <h4 className="font-medium mb-4 flex items-center text-gray-800">
@@ -807,6 +817,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Wind Speed</span>
+                  <InfoTip tip="Lower wind = better stability. Under 10 km/h is ideal for SUP. 'Protected' value accounts for shoreline shelter." />
                   <span className="ml-1 text-xs text-gray-400">(20 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
@@ -837,6 +848,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Gusts</span>
+                  <InfoTip tip="Sudden wind bursts that can knock you off balance. Gusts >50% above average wind indicate unpredictable conditions." />
                   <span className="ml-1 text-xs text-gray-400">(5 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
@@ -869,6 +881,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Wave Height</span>
+                  <InfoTip tip="Flat water (<0.2m) is ideal for SUP. Larger waves make balancing harder and can cause falls." />
                   <span className="ml-1 text-xs text-gray-400">(20 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
@@ -899,6 +912,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Swell</span>
+                  <InfoTip tip="Ocean swells from distant storms. Long period (>10s) = gentle rollers. Short period (<6s) = choppy, uncomfortable." />
                   <span className="ml-1 text-xs text-gray-400">(8 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
@@ -931,6 +945,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Currents</span>
+                  <InfoTip tip="Ocean currents can push you off course or make returning difficult. Strong currents (>3 km/h) are dangerous." />
                   <span className="ml-1 text-xs text-gray-400">(10 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
@@ -961,6 +976,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Precipitation</span>
+                  <InfoTip tip="No rain is best. Heavy rain (>1.5mm/hr) reduces visibility and makes the board slippery." />
                   <span className="ml-1 text-xs text-gray-400">(5 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
@@ -984,6 +1000,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Air Temperature</span>
+                  <InfoTip tip="Comfortable range is 15-30°C. Less critical than water temp — you can always wear layers on top." />
                   <span className="ml-1 text-xs text-gray-400">(4 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
@@ -1007,6 +1024,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Water Temperature</span>
+                  <InfoTip tip="18-26°C is ideal. Below 15°C risks hypothermia if you fall in — wetsuit required!" />
                   <span className="ml-1 text-xs text-gray-400">(12 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
@@ -1036,6 +1054,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Cloud Cover</span>
+                  <InfoTip tip="Clear skies are preferred but clouds don't affect paddling much. Heavy overcast may indicate incoming weather." />
                   <span className="ml-1 text-xs text-gray-400">(4 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
@@ -1063,6 +1082,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Geographic Protection</span>
+                  <InfoTip tip="How much the coastline shelters this beach from wind and waves. Higher score = more protected bay or cove." />
                   <span className="ml-1 text-xs text-gray-400">(12 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
