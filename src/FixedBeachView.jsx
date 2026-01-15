@@ -660,9 +660,9 @@ const FixedBeachView = ({
   // Render geographic protection information
   const renderGeoProtectionInfo = () => {
     if (!geoProtection) return null;
-    
-    // Calculate the bonus points added to score from geographic protection
-    const geoBonus = Math.round((geoProtection.protectionScore / 100) * 10);
+
+    // Calculate the bonus points added to score from geographic protection (max 12 pts)
+    const geoBonus = Math.round((geoProtection.protectionScore / 100) * 12);
     const avgWindDirection = toNumberOr(
       geoProtection?.debugInfo?.windDirection ??
       geoProtection?.dominantWindDirection ??
