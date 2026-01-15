@@ -56,9 +56,9 @@ const FixedBeachView = ({
   const [showDebug, setShowDebug] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
-    scoreBreakdown: false,
-    geoProtection: false,
-    hourlyWind: false
+    scoreBreakdown: true,
+    geoProtection: true,
+    hourlyWind: true
   });
 
   const toggleSection = (section) => {
@@ -1945,9 +1945,55 @@ const FixedBeachView = ({
             </div>
           )}
 
+          {/* Daylight warning */}
+          {sunTimes?.sunrise && sunTimes?.sunset && (() => {
+            const sunriseHour = new Date(sunTimes.sunrise).getHours();
+            const sunsetHour = new Date(sunTimes.sunset).getHours();
+            const startHour = parseInt(timeRange.startTime.split(':')[0], 10);
+            const endHour = parseInt(timeRange.endTime.split(':')[0], 10);
+            const isBeforeSunrise = startHour < sunriseHour;
+            const isAfterSunset = endHour > sunsetHour;
+            const isFullyDark = startHour >= sunsetHour || endHour <= sunriseHour;
+
+            if (isFullyDark) {
+              return (
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 mb-4">
+                  <h4 className="font-bold text-purple-700 flex items-center mb-2">
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    NIGHTTIME SELECTED
+                  </h4>
+                  <p className="text-purple-700">
+                    Your selected time ({timeRange.startTime}-{timeRange.endTime}) is outside daylight hours.
+                    Sunrise is at {new Date(sunTimes.sunrise).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} and
+                    sunset at {new Date(sunTimes.sunset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                    Paddleboarding in the dark is not recommended.
+                  </p>
+                </div>
+              );
+            }
+
+            if (isBeforeSunrise || isAfterSunset) {
+              return (
+                <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 mb-4">
+                  <h4 className="font-bold text-amber-700 flex items-center mb-2">
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    PARTIAL DARKNESS
+                  </h4>
+                  <p className="text-amber-700">
+                    Part of your selected time window is outside daylight hours.
+                    Sunrise: {new Date(sunTimes.sunrise).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })},
+                    Sunset: {new Date(sunTimes.sunset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                  </p>
+                </div>
+              );
+            }
+
+            return null;
+          })()}
+
           {/* Safety alert */}
           {scoreBreakdown && scoreBreakdown.windSpeed.raw > 30 && (
-            <div className="bg-red-50 p-4 rounded-lg border border-red-200 mb-6">
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200 mb-4">
               <h4 className="font-bold text-red-700 flex items-center mb-2">
                 <AlertCircle className="h-5 w-5 mr-2" />
                 HIGH WIND ALERT
