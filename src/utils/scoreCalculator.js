@@ -98,18 +98,19 @@ export async function calculatePaddleScore(beach, hours, range) {
   const effectiveSwellSeverity = swellHeight / swellPeriodFactor; // Adjusted for period
 
   // Scoring weights (normalized to sum to 100)
-  // Wind: 30, Waves: 14, Swell: 8, Gusts: 5, Precip: 4, AirTemp: 6, WaterTemp: 8, Cloud: 3, Geo: 8, Tide: 7, Currents: 7
-  const ptsWind      = linearScore(protectedWindSpeed, 0, 20) * 30;
-  const ptsWaves     = linearScore(protectedWaveHeight, 0, 1.0) * 14;
+  // For SUP: Wind & Waves equally critical, Water temp important for safety, Air temp less so (can wear layers)
+  // Wind: 20, Waves: 20, Swell: 8, Gusts: 5, Precip: 4, AirTemp: 4, WaterTemp: 12, Cloud: 3, Geo: 8, Tide: 8, Currents: 8
+  const ptsWind      = linearScore(protectedWindSpeed, 0, 20) * 20;
+  const ptsWaves     = linearScore(protectedWaveHeight, 0, 1.0) * 20;
   const ptsSwell     = linearScore(effectiveSwellSeverity, 0, 0.5) * 8;
   const ptsGusts     = clamp(1 - gustPenalty, 0, 1) * 5;
   const ptsPrecip    = linearScore(precip, 0, 5) * 4;
-  const ptsTemp      = bellScore(temp, 18, 28) * 6;       // Air temperature
-  const ptsWaterTemp = bellScore(waterTemp, 18, 26) * 8;  // Water temperature (crucial for safety)
+  const ptsTemp      = bellScore(temp, 15, 30) * 4;       // Air temperature - wider range, can wear layers
+  const ptsWaterTemp = bellScore(waterTemp, 18, 26) * 12; // Water temperature (crucial for safety)
   const ptsCloud     = linearScore(cloud, 0, 100) * 3;
   const ptsGeo       = clamp((20 - protectedWindSpeed) / 20, 0, 1) * 8;
-  const ptsTide      = inRangeScore(tide, 0.5, 2.0) * 7;
-  const ptsCurrents  = clamp(1 - clamp(currentSpd / 1.5, 0, 1), 0, 1) * 7;
+  const ptsTide      = inRangeScore(tide, 0.5, 2.0) * 8;
+  const ptsCurrents  = clamp(1 - clamp(currentSpd / 1.5, 0, 1), 0, 1) * 8;
 
   let total = Math.round(
     ptsWind + ptsWaves + ptsSwell + ptsGusts + ptsPrecip +
