@@ -333,8 +333,15 @@ function analyzeBayGeometry(beachPoint) {
   // These provide excellent SUP protection even if longer rays reach open water
   const isMediumBay = !isDeepBay && shortRangeEnclosure > 0.55 && midRangeEnclosure > 0.4;
 
+  // Peninsula/wide bay: enclosure INCREASES with distance (e.g., Astir Beach on Vouliagmeni peninsula)
+  // Immediate area is open but surrounded by land at larger scale - provides regional wind shelter
+  const isPeninsulaBeach = !isDeepBay && !isMediumBay &&
+    longRangeEnclosure > midRangeEnclosure &&
+    midRangeEnclosure > shortRangeEnclosure &&
+    longRangeEnclosure > 0.5;
+
   // Shallow bay/cove: high enclosure short range, drops off at longer (small coves)
-  const isShallowBay = !isDeepBay && !isMediumBay && shortRangeEnclosure > 0.5 && midRangeEnclosure > 0.3;
+  const isShallowBay = !isDeepBay && !isMediumBay && !isPeninsulaBeach && shortRangeEnclosure > 0.5 && midRangeEnclosure > 0.3;
   
   // Analyze the actual pattern for more precise results
   let enclosurePattern = '';
@@ -351,6 +358,7 @@ function analyzeBayGeometry(beachPoint) {
   return {
     isDeepBay,
     isMediumBay,
+    isPeninsulaBeach,
     isShallowBay,
     shortRangeEnclosure,
     midRangeEnclosure,
@@ -412,6 +420,12 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
       // Short/medium range matters most, long range less important
       enclosureScore = Math.min(0.85, (shortEnclosure * 0.45) + (mediumEnclosure * 0.35) + (longEnclosure * 0.1) + 0.1);
       console.log("Using medium bay enclosure calculation:", enclosureScore);
+    } else if (bayGeometry.isPeninsulaBeach) {
+      // Peninsula beach - inverted pattern where long range has MORE enclosure (e.g., Astir)
+      // Regional geography provides wind shelter even though immediate area is open
+      // Weight long range highly since that's where the protection comes from
+      enclosureScore = Math.min(0.75, (shortEnclosure * 0.15) + (mediumEnclosure * 0.35) + (longEnclosure * 0.4) + 0.05);
+      console.log("Using peninsula beach enclosure calculation:", enclosureScore);
     } else if (bayGeometry.isShallowBay) {
       // Shallow bay/cove - medium protection
       enclosureScore = (shortEnclosure * 0.5) + (mediumEnclosure * 0.3) + (longEnclosure * 0.2);
@@ -483,11 +497,12 @@ return {
       ),
       isDeepBay: bayGeometry.isDeepBay,
       isMediumBay: bayGeometry.isMediumBay,
+      isPeninsulaBeach: bayGeometry.isPeninsulaBeach,
       debugInfo: {
         shortEnclosure,
         mediumEnclosure,
         longEnclosure,
-        bayType: bayGeometry.isDeepBay ? 'deep' : bayGeometry.isMediumBay ? 'medium' : bayGeometry.isShallowBay ? 'shallow' : 'exposed'
+        bayType: bayGeometry.isDeepBay ? 'deep' : bayGeometry.isMediumBay ? 'medium' : bayGeometry.isPeninsulaBeach ? 'peninsula' : bayGeometry.isShallowBay ? 'shallow' : 'exposed'
       }
     };
   } catch (error) {
