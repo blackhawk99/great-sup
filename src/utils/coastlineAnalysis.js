@@ -349,7 +349,13 @@ function analyzeBayGeometry(beachPoint) {
 
   // Shallow bay/cove: high enclosure short range, drops off at longer (small coves)
   const isShallowBay = !isDeepBay && !isMediumBay && !isPeninsulaBeach && !isWideBay && shortRangeEnclosure > 0.5 && midRangeEnclosure > 0.3;
-  
+
+  // Moderate coast: decent protection at multiple ranges but doesn't fit specific bay patterns
+  // Catches beaches with some shelter that would otherwise be marked "exposed"
+  const isModerateCoast = !isDeepBay && !isMediumBay && !isPeninsulaBeach && !isWideBay && !isShallowBay &&
+    ((shortRangeEnclosure > 0.3 && midRangeEnclosure > 0.3) ||
+     (shortRangeEnclosure + midRangeEnclosure + longRangeEnclosure) / 3 > 0.35);
+
   // Analyze the actual pattern for more precise results
   let enclosurePattern = '';
   if (enclosureCurve[0] > 0.8 && enclosureCurve[1] > 0.7 && enclosureCurve[2] > 0.6) {
@@ -368,6 +374,7 @@ function analyzeBayGeometry(beachPoint) {
     isPeninsulaBeach,
     isWideBay,
     isShallowBay,
+    isModerateCoast,
     shortRangeEnclosure,
     midRangeEnclosure,
     longRangeEnclosure,
@@ -443,6 +450,11 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
       // Shallow bay/cove - medium protection
       enclosureScore = (shortEnclosure * 0.5) + (mediumEnclosure * 0.3) + (longEnclosure * 0.2);
       console.log("Using shallow bay enclosure calculation:", enclosureScore);
+    } else if (bayGeometry.isModerateCoast) {
+      // Moderate coast - some protection but not a defined bay shape
+      // Better than fully exposed, give a small bonus
+      enclosureScore = Math.min(0.55, (shortEnclosure * 0.4) + (mediumEnclosure * 0.35) + (longEnclosure * 0.25) + 0.05);
+      console.log("Using moderate coast enclosure calculation:", enclosureScore);
     } else {
       // Regular coastline - exposed
       enclosureScore = (shortEnclosure * 0.6) + (mediumEnclosure * 0.3) + (longEnclosure * 0.1);
@@ -512,11 +524,12 @@ return {
       isMediumBay: bayGeometry.isMediumBay,
       isPeninsulaBeach: bayGeometry.isPeninsulaBeach,
       isWideBay: bayGeometry.isWideBay,
+      isModerateCoast: bayGeometry.isModerateCoast,
       debugInfo: {
         shortEnclosure,
         mediumEnclosure,
         longEnclosure,
-        bayType: bayGeometry.isDeepBay ? 'deep' : bayGeometry.isMediumBay ? 'medium' : bayGeometry.isPeninsulaBeach ? 'peninsula' : bayGeometry.isWideBay ? 'wide' : bayGeometry.isShallowBay ? 'shallow' : 'exposed'
+        bayType: bayGeometry.isDeepBay ? 'deep' : bayGeometry.isMediumBay ? 'medium' : bayGeometry.isPeninsulaBeach ? 'peninsula' : bayGeometry.isWideBay ? 'wide' : bayGeometry.isShallowBay ? 'shallow' : bayGeometry.isModerateCoast ? 'moderate' : 'exposed'
       }
     };
   } catch (error) {
