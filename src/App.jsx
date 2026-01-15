@@ -1226,7 +1226,7 @@ const App = () => {
           </p>
           <div className="flex items-center mt-2 sm:mt-0 text-xs">
             <span className="text-blue-400 border-r border-blue-600 pr-3 mr-3" title="Scoring algorithm version">
-              v1.1 · Jan 15, 2026
+              v1.2 · Jan 15, 2026
             </span>
             <span className="text-blue-300 border-r border-blue-600 pr-3 mr-3">
               {lastUpdated ? (

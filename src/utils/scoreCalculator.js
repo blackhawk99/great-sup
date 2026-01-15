@@ -7,10 +7,12 @@ import { calculateGeographicProtection } from './coastlineAnalysis';
  */
 const WORST_CASE_DEFAULTS = {
   windSpeed: 25,        // Strong wind (dangerous) - km/h
+  windGusts: 40,        // Strong gusts - km/h
   windDirection: 0,
   waveHeight: 2.0,      // Rough seas - meters
   waveDirection: 0,
   swellHeight: 1.5,     // Significant swell - meters
+  swellPeriod: 4,       // Short period = choppy (worst case) - seconds
   precipitation: 5,     // Heavy rain - mm/hr
   temperature: 10,      // Cold (hypothermia risk) - °C
   cloudcover: 100,      // Overcast - %
@@ -50,10 +52,12 @@ export async function calculatePaddleScore(beach, hours, range) {
 
   // Averages (missing data now uses worst-case, not 0)
   const windSpeed   = avg('windSpeed');
+  const windGusts   = avg('windGusts');
   const windDir     = avg('windDirection');
   const waveHeight  = avg('waveHeight');
   const waveDir     = avg('waveDirection');
   const swellHeight = avg('swellHeight');
+  const swellPeriod = avg('swellPeriod');
   const precip      = avg('precipitation');
   const temp        = avg('temperature');
   const cloud       = avg('cloudcover');
@@ -70,33 +74,58 @@ export async function calculatePaddleScore(beach, hours, range) {
   const protectedWindSpeed = windSpeed * windProtectionFactor;
   const protectedWaveHeight = waveHeight * waveProtectionFactor;
 
+  // Calculate gust factor (how much gusts exceed average wind)
+  // Gust factor > 1.5 means unpredictable, gusty conditions
+  const gustFactor = windSpeed > 0 ? windGusts / windSpeed : 1;
+  const gustPenalty = gustFactor > 1.5 ? (gustFactor - 1.5) * 0.3 : 0; // Penalty for gusty conditions
+
+  // Calculate swell score considering both height and period
+  // Long period swells (>10s) are gentle rollers, short period (<6s) are choppy
+  const swellPeriodFactor = swellPeriodScore(swellPeriod);
+  const effectiveSwellSeverity = swellHeight / swellPeriodFactor; // Adjusted for period
+
   // Scoring weights (normalized to sum to 100)
-  // Wind: 35, Waves: 17, Swell: 9, Precip: 4, Temp: 9, Cloud: 4, Geo: 9, Tide: 9, Currents: 4
-  const ptsWind   = linearScore(protectedWindSpeed, 0, 20) * 35;
-  const ptsWaves  = linearScore(protectedWaveHeight, 0, 1.0) * 17;
-  const ptsSwell  = linearScore(swellHeight, 0, 0.5) * 9;
-  const ptsPrecip = linearScore(precip, 0, 5) * 4;  // Extended range to 5mm/hr
-  const ptsTemp   = bellScore(temp, 18, 28) * 9;    // Bell curve: ideal 18-28°C
-  const ptsCloud  = linearScore(cloud, 0, 100) * 4; // Fixed: clear skies = high score
+  // Wind: 32, Waves: 15, Swell: 9, Gusts: 6, Precip: 4, Temp: 9, Cloud: 4, Geo: 9, Tide: 8, Currents: 4
+  const ptsWind   = linearScore(protectedWindSpeed, 0, 20) * 32;
+  const ptsWaves  = linearScore(protectedWaveHeight, 0, 1.0) * 15;
+  const ptsSwell  = linearScore(effectiveSwellSeverity, 0, 0.5) * 9;
+  const ptsGusts  = clamp(1 - gustPenalty, 0, 1) * 6;  // New: gust penalty
+  const ptsPrecip = linearScore(precip, 0, 5) * 4;
+  const ptsTemp   = bellScore(temp, 18, 28) * 9;
+  const ptsCloud  = linearScore(cloud, 0, 100) * 4;
   const ptsGeo    = clamp((20 - protectedWindSpeed) / 20, 0, 1) * 9;
-  const ptsTide   = inRangeScore(tide, 0.5, 2.0) * 9;
+  const ptsTide   = inRangeScore(tide, 0.5, 2.0) * 8;
   const ptsCurrents = clamp(1 - clamp(currentSpd / 1.5, 0, 1), 0, 1) * 4;
 
   const total = Math.round(
-    ptsWind + ptsWaves + ptsSwell + ptsPrecip +
+    ptsWind + ptsWaves + ptsSwell + ptsGusts + ptsPrecip +
     ptsTemp + ptsCloud + ptsGeo + ptsTide + ptsCurrents
   );
 
   // Calculate data quality (0-100%)
   const dataQuality = Math.round(100 * (1 - missingDataCount / totalFields));
 
+  // Generate warnings for dangerous conditions
+  const warnings = [];
+  if (gustFactor > 1.8) {
+    warnings.push(`Strong gusts: ${Math.round(windGusts)} km/h (${Math.round(gustFactor * 100 - 100)}% above average)`);
+  }
+  if (swellPeriod < 5 && swellHeight > 0.3) {
+    warnings.push(`Choppy swell: ${swellHeight.toFixed(1)}m at ${swellPeriod.toFixed(0)}s period`);
+  }
+  if (currentSpd > 1.0) {
+    warnings.push(`Strong currents: ${currentSpd.toFixed(1)} m/s`);
+  }
+
   return {
     totalScore: total,
     dataQuality,
+    warnings,
     breakdown: {
       wind:         { value: protectedWindSpeed, score: Math.round(ptsWind) },
       waves:        { value: protectedWaveHeight, score: Math.round(ptsWaves) },
-      swell:        { value: swellHeight,          score: Math.round(ptsSwell) },
+      swell:        { value: swellHeight, period: swellPeriod, score: Math.round(ptsSwell) },
+      gusts:        { value: windGusts, factor: gustFactor, score: Math.round(ptsGusts) },
       precipitation:{ value: precip,               score: Math.round(ptsPrecip) },
       temperature:  { value: temp,                 score: Math.round(ptsTemp) },
       cloudcover:   { value: cloud,                score: Math.round(ptsCloud) },
@@ -146,4 +175,19 @@ function inRangeScore(val, low, high) {
   // above high: taper off linearly
   if (high === 0) return 0;
   return clamp((high * 2 - val) / high, 0, 1);
+}
+
+/**
+ * Score swell period - longer periods are gentler, shorter are choppier.
+ * Returns a factor to divide swell height by:
+ * - Period > 12s: factor 2.0 (very gentle, halves effective severity)
+ * - Period 8-12s: factor 1.5 (moderate)
+ * - Period 6-8s:  factor 1.0 (no adjustment)
+ * - Period < 6s:  factor 0.7 (choppy, increases effective severity)
+ */
+function swellPeriodScore(period) {
+  if (period >= 12) return 2.0;   // Long period = very gentle swells
+  if (period >= 8)  return 1.5;   // Medium-long period
+  if (period >= 6)  return 1.0;   // Normal
+  return 0.7;                     // Short period = choppy, uncomfortable
 }
