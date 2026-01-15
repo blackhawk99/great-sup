@@ -16,7 +16,12 @@ export const useBeachManager = () => {
   });
   const [mapUrl, setMapUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
+  // Place search state
+  const [placeSearch, setPlaceSearch] = useState("");
+  const [placeResults, setPlaceResults] = useState([]);
+  const [searchingPlaces, setSearchingPlaces] = useState(false);
+
   // Load saved beaches from localStorage on component mount
   useEffect(() => {
     try {
@@ -252,7 +257,95 @@ export const useBeachManager = () => {
       throw error;
     }
   };
-  
+
+  // Search for places using Nominatim API (OpenStreetMap)
+  const searchPlaces = async (query) => {
+    if (!query || query.length < 3) {
+      setPlaceResults([]);
+      return;
+    }
+
+    setSearchingPlaces(true);
+    try {
+      // Search with viewbox for Greece region, but allow worldwide results
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        `q=${encodeURIComponent(query + " beach")}&` +
+        `format=json&` +
+        `limit=8&` +
+        `addressdetails=1&` +
+        `extratags=1`
+      );
+
+      if (!response.ok) {
+        throw new Error("Search failed");
+      }
+
+      const data = await response.json();
+
+      // Filter and format results
+      const results = data
+        .filter(place => {
+          // Prefer beaches, bays, coastlines
+          const type = place.type?.toLowerCase() || "";
+          const cls = place.class?.toLowerCase() || "";
+          return (
+            type.includes("beach") ||
+            type.includes("bay") ||
+            type.includes("water") ||
+            type.includes("coastline") ||
+            cls.includes("natural") ||
+            cls.includes("leisure") ||
+            place.display_name.toLowerCase().includes("beach") ||
+            place.display_name.toLowerCase().includes("bay")
+          );
+        })
+        .map(place => ({
+          id: place.place_id,
+          name: place.display_name.split(",")[0],
+          fullName: place.display_name,
+          latitude: parseFloat(place.lat),
+          longitude: parseFloat(place.lon),
+          type: place.type,
+          country: place.address?.country || "",
+        }));
+
+      // If no beach-specific results, show all results
+      setPlaceResults(results.length > 0 ? results : data.slice(0, 6).map(place => ({
+        id: place.place_id,
+        name: place.display_name.split(",")[0],
+        fullName: place.display_name,
+        latitude: parseFloat(place.lat),
+        longitude: parseFloat(place.lon),
+        type: place.type,
+        country: place.address?.country || "",
+      })));
+    } catch (error) {
+      console.error("Place search error:", error);
+      setPlaceResults([]);
+    } finally {
+      setSearchingPlaces(false);
+    }
+  };
+
+  // Select a place from search results
+  const selectPlace = (place) => {
+    setNewBeach({
+      name: place.name,
+      latitude: place.latitude.toString(),
+      longitude: place.longitude.toString(),
+      googleMapsUrl: `https://www.google.com/maps?q=${place.latitude},${place.longitude}`,
+    });
+    setPlaceSearch("");
+    setPlaceResults([]);
+  };
+
+  // Clear place search
+  const clearPlaceSearch = () => {
+    setPlaceSearch("");
+    setPlaceResults([]);
+  };
+
   return {
     beaches,
     homeBeach,
@@ -268,6 +361,14 @@ export const useBeachManager = () => {
     setNewBeach,
     mapUrl,
     setMapUrl,
-    loading
+    loading,
+    // Place search
+    placeSearch,
+    setPlaceSearch,
+    placeResults,
+    searchingPlaces,
+    searchPlaces,
+    selectPlace,
+    clearPlaceSearch
   };
 };

@@ -18,7 +18,8 @@ import {
   Sun,
   Moon,
   Link as LinkIcon,
-  Eye
+  Eye,
+  Search
 } from "lucide-react";
 import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
@@ -69,10 +70,10 @@ const App = () => {
     "-";
   
   // Use beach manager
-  const { 
-    beaches, 
-    homeBeach, 
-    setHomeBeach, 
+  const {
+    beaches,
+    homeBeach,
+    setHomeBeach,
     addBeach,
     addSuggestedBeach,
     deleteBeach,
@@ -84,7 +85,15 @@ const App = () => {
     mapUrl,
     setMapUrl,
     handleExtractCoordinates,
-    loading: beachLoading
+    loading: beachLoading,
+    // Place search
+    placeSearch,
+    setPlaceSearch,
+    placeResults,
+    searchingPlaces,
+    searchPlaces,
+    selectPlace,
+    clearPlaceSearch
   } = useBeachManager();
   
   // Toast notification
@@ -1004,20 +1013,60 @@ const App = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-center rounded-2xl border border-dashed border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 text-center">
-                  <div className="space-y-3 max-w-md">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm text-blue-600">
-                      <Map className="h-5 w-5" />
+                <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Search className="h-5 w-5 text-blue-600" />
+                      <p className="text-base font-semibold text-blue-900">Search by name</p>
                     </div>
-                    <p className="text-base font-semibold text-blue-900">Tap to add from your phone</p>
-                    <p className="text-sm text-gray-600">Works on iPhone: paste a Maps link, confirm the preview, and save. The layout stays thumb-friendly.</p>
-                    <button
-                      onClick={handleFindNearest}
-                      className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-                      disabled={locating}
-                    >
-                      {locating ? 'Finding nearest location...' : 'Use my current location'}
-                    </button>
+                    <p className="text-sm text-gray-600">Type a beach name to search worldwide. We'll find coordinates for you.</p>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={placeSearch}
+                        onChange={(e) => {
+                          setPlaceSearch(e.target.value);
+                          searchPlaces(e.target.value);
+                        }}
+                        placeholder="e.g., Bondi Beach, Malibu..."
+                        className="w-full rounded-lg border px-3 py-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      />
+                      {searchingPlaces && (
+                        <div className="absolute right-3 top-3">
+                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+                        </div>
+                      )}
+
+                      {placeResults.length > 0 && (
+                        <div className="absolute z-20 mt-1 w-full rounded-lg border bg-white shadow-lg max-h-64 overflow-y-auto">
+                          {placeResults.map((place) => (
+                            <button
+                              key={place.id}
+                              onClick={() => selectPlace(place)}
+                              className="w-full px-3 py-2 text-left hover:bg-blue-50 border-b last:border-b-0 transition-colors"
+                            >
+                              <div className="font-medium text-gray-800">{place.name}</div>
+                              <div className="text-xs text-gray-500 truncate">{place.fullName}</div>
+                              <div className="text-xs text-blue-600">
+                                {place.latitude.toFixed(4)}, {place.longitude.toFixed(4)}
+                                {place.country && ` • ${place.country}`}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t">
+                      <button
+                        onClick={handleFindNearest}
+                        className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                        disabled={locating}
+                      >
+                        {locating ? 'Finding nearest location...' : 'Or use my current location'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
