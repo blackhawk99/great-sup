@@ -1634,22 +1634,24 @@ const FixedBeachView = ({
             </label>
             <select
               value={timeRange.startTime}
-              onChange={(e) => onTimeRangeChange?.('startTime', e.target.value)}
+              onChange={(e) => {
+                const newStart = e.target.value;
+                const newStartHour = parseInt(newStart.split(':')[0], 10);
+                const endHour = parseInt(timeRange.endTime.split(':')[0], 10);
+                onTimeRangeChange?.('startTime', newStart);
+                // Auto-adjust end time if start >= end
+                if (newStartHour >= endHour) {
+                  const newEndHour = Math.min(newStartHour + 2, 23);
+                  onTimeRangeChange?.('endTime', `${String(newEndHour).padStart(2, '0')}:00`);
+                }
+              }}
               className="w-full p-2 border rounded appearance-none bg-white text-lg"
             >
-              {Array.from({ length: 24 }, (_, i) => {
-                const hourLabel = `${String(i).padStart(2, '0')}:00`;
-                const endHour = parseInt(timeRange.endTime.split(':')[0], 10);
-                return (
-                  <option
-                    key={i}
-                    value={hourLabel}
-                    disabled={i > endHour}
-                  >
-                    {hourLabel}
-                  </option>
-                );
-              })}
+              {Array.from({ length: 24 }, (_, i) => (
+                <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
+                  {`${String(i).padStart(2, '0')}:00`}
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -1658,22 +1660,24 @@ const FixedBeachView = ({
             </label>
             <select
               value={timeRange.endTime}
-              onChange={(e) => onTimeRangeChange?.('endTime', e.target.value)}
+              onChange={(e) => {
+                const newEnd = e.target.value;
+                const newEndHour = parseInt(newEnd.split(':')[0], 10);
+                const startHour = parseInt(timeRange.startTime.split(':')[0], 10);
+                onTimeRangeChange?.('endTime', newEnd);
+                // Auto-adjust start time if end <= start
+                if (newEndHour <= startHour) {
+                  const newStartHour = Math.max(newEndHour - 2, 0);
+                  onTimeRangeChange?.('startTime', `${String(newStartHour).padStart(2, '0')}:00`);
+                }
+              }}
               className="w-full p-2 border rounded appearance-none bg-white text-lg"
             >
-              {Array.from({ length: 24 }, (_, i) => {
-                const hourLabel = `${String(i).padStart(2, '0')}:00`;
-                const startHour = parseInt(timeRange.startTime.split(':')[0], 10);
-                return (
-                  <option
-                    key={i}
-                    value={hourLabel}
-                    disabled={i < startHour}
-                  >
-                    {hourLabel}
-                  </option>
-                );
-              })}
+              {Array.from({ length: 24 }, (_, i) => (
+                <option key={i} value={`${String(i).padStart(2, '0')}:00`}>
+                  {`${String(i).padStart(2, '0')}:00`}
+                </option>
+              ))}
             </select>
           </div>
         </div>
