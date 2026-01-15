@@ -239,70 +239,70 @@ const FixedBeachView = ({
       const protectedWaveHeight = waveHeight * (1 - waveProtectionFactor * 0.9);
       const protectedSwellHeight = avgSwellHeight * (1 - waveProtectionFactor * 0.85);
 
-      // Initialize score breakdown
+      // Initialize score breakdown (weights sum to 100)
       const breakdown = {
-        windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 30 },
-        waveHeight: { raw: waveHeight, protected: protectedWaveHeight, score: 0, maxPossible: 14 },
-        swellHeight: { raw: avgSwellHeight, protected: protectedSwellHeight, score: 0, maxPossible: 8 },
-        precipitation: { value: maxPrecip, score: 0, maxPossible: 4 },
-        temperature: { value: avgTemp, score: 0, maxPossible: 6 },
-        waterTemperature: { value: avgWaterTemp, score: 0, maxPossible: 8 },
-        cloudCover: { value: avgCloud, score: 0, maxPossible: 3 },
-        geoProtection: { value: protectionScore, score: 0, maxPossible: 8 },
+        windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 37 },
+        waveHeight: { raw: waveHeight, protected: protectedWaveHeight, score: 0, maxPossible: 17 },
+        swellHeight: { raw: avgSwellHeight, protected: protectedSwellHeight, score: 0, maxPossible: 10 },
+        precipitation: { value: maxPrecip, score: 0, maxPossible: 5 },
+        temperature: { value: avgTemp, score: 0, maxPossible: 8 },
+        waterTemperature: { value: avgWaterTemp, score: 0, maxPossible: 10 },
+        cloudCover: { value: avgCloud, score: 0, maxPossible: 4 },
+        geoProtection: { value: protectionScore, score: 0, maxPossible: 9 },
         total: { score: 0, rawScore: 0, bonus: 0, maxPossible: 100 },
         dataQuality: dataQuality // 0-100% indicating data completeness
       };
       
-      // Calculate individual scores
+      // Calculate individual scores (weights sum to 100)
       let totalScore = 0;
 
-      // Wind speed score (0-30 points)
-      breakdown.windSpeed.score = Math.max(0, 30 - protectedWindSpeed * (30 / 20));
+      // Wind speed score (0-37 points)
+      breakdown.windSpeed.score = Math.max(0, 37 - protectedWindSpeed * (37 / 20));
       totalScore += breakdown.windSpeed.score;
 
-      // Wave height score (0-14 points)
-      breakdown.waveHeight.score = protectedWaveHeight < 0.2 ? 14 :
-                                  Math.max(0, 14 - (protectedWaveHeight - 0.2) * (14 / 0.4));
+      // Wave height score (0-17 points)
+      breakdown.waveHeight.score = protectedWaveHeight < 0.2 ? 17 :
+                                  Math.max(0, 17 - (protectedWaveHeight - 0.2) * (17 / 0.4));
       totalScore += breakdown.waveHeight.score;
 
-      // Swell height score (0-8 points)
-      breakdown.swellHeight.score = protectedSwellHeight < 0.3 ? 8 :
-                                   Math.max(0, 8 - (protectedSwellHeight - 0.3) * (8 / 0.3));
+      // Swell height score (0-10 points)
+      breakdown.swellHeight.score = protectedSwellHeight < 0.3 ? 10 :
+                                   Math.max(0, 10 - (protectedSwellHeight - 0.3) * (10 / 0.3));
       totalScore += breakdown.swellHeight.score;
 
-      // Precipitation score (0-4 points)
-      breakdown.precipitation.score = maxPrecip < 1 ? 4 : 0;
+      // Precipitation score (0-5 points)
+      breakdown.precipitation.score = maxPrecip < 1 ? 5 : 0;
       totalScore += breakdown.precipitation.score;
 
-      // Air temperature score (0-6 points) - bell curve 22-32°C ideal
+      // Air temperature score (0-8 points) - bell curve 22-32°C ideal
       if (avgTemp >= 22 && avgTemp <= 32) {
-        breakdown.temperature.score = 6;
+        breakdown.temperature.score = 8;
       } else if (avgTemp < 22) {
-        breakdown.temperature.score = Math.max(0, 6 - (22 - avgTemp) * 0.6);
+        breakdown.temperature.score = Math.max(0, 8 - (22 - avgTemp) * 0.8);
       } else {
-        breakdown.temperature.score = Math.max(0, 6 - (avgTemp - 32) * 0.6);
+        breakdown.temperature.score = Math.max(0, 8 - (avgTemp - 32) * 0.8);
       }
       totalScore += breakdown.temperature.score;
 
-      // Water temperature score (0-8 points) - bell curve 18-26°C ideal for paddleboarding
+      // Water temperature score (0-10 points) - bell curve 18-26°C ideal for paddleboarding
       if (avgWaterTemp !== null) {
         if (avgWaterTemp >= 18 && avgWaterTemp <= 26) {
-          breakdown.waterTemperature.score = 8;
+          breakdown.waterTemperature.score = 10;
         } else if (avgWaterTemp < 18) {
-          breakdown.waterTemperature.score = Math.max(0, 8 - (18 - avgWaterTemp) * 0.8);
+          breakdown.waterTemperature.score = Math.max(0, 10 - (18 - avgWaterTemp));
         } else {
-          breakdown.waterTemperature.score = Math.max(0, 8 - (avgWaterTemp - 26) * 0.8);
+          breakdown.waterTemperature.score = Math.max(0, 10 - (avgWaterTemp - 26));
         }
         totalScore += breakdown.waterTemperature.score;
       }
 
-      // Cloud cover score (0-3 points)
-      breakdown.cloudCover.score = avgCloud < 40 ? 3 :
-                                  Math.max(0, 3 - (avgCloud - 40) / 20);
+      // Cloud cover score (0-4 points)
+      breakdown.cloudCover.score = avgCloud < 40 ? 4 :
+                                  Math.max(0, 4 - (avgCloud - 40) / 15);
       totalScore += breakdown.cloudCover.score;
 
-      // Geographic protection score (0-8 points)
-      breakdown.geoProtection.score = (protection.protectionScore / 100) * 8;
+      // Geographic protection score (0-9 points)
+      breakdown.geoProtection.score = (protection.protectionScore / 100) * 9;
       totalScore += breakdown.geoProtection.score;
 
       // Round scores for display
@@ -747,7 +747,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Wind Speed</span>
-                  <span className="ml-1 text-xs text-gray-400">(30 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(37 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.windSpeed.raw.toFixed(1)} km/h
@@ -777,7 +777,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Wave Height</span>
-                  <span className="ml-1 text-xs text-gray-400">(14 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(17 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.waveHeight.raw.toFixed(2)} m
@@ -834,7 +834,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Precipitation</span>
-                  <span className="ml-1 text-xs text-gray-400">(4 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(5 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.precipitation.value.toFixed(1)} mm
@@ -857,7 +857,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Air Temperature</span>
-                  <span className="ml-1 text-xs text-gray-400">(6 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(8 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.temperature.value.toFixed(1)} °C
@@ -880,7 +880,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Water Temperature</span>
-                  <span className="ml-1 text-xs text-gray-400">(8 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(10 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.waterTemperature?.value != null
@@ -909,7 +909,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Cloud Cover</span>
-                  <span className="ml-1 text-xs text-gray-400">(3 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(4 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.cloudCover.value.toFixed(0)}%
@@ -936,7 +936,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Geographic Protection</span>
-                  <span className="ml-1 text-xs text-gray-400">(8 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(9 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.geoProtection.value.toFixed(0)}/100
