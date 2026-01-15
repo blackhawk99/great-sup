@@ -17,8 +17,7 @@ import {
   Link as LinkIcon,
   Eye,
   Search,
-  Menu,
-  X
+  Star
 } from "lucide-react";
 import { Logo, LogoCompact } from "./components/Logo";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
@@ -53,7 +52,6 @@ const App = () => {
   const [locating, setLocating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("shelter");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const greekBounds = {
     latMin: 34.6,
     latMax: 41.9,
@@ -547,52 +545,7 @@ const App = () => {
               </button>
             </nav>
 
-            {/* Mobile menu button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
-            >
-              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
           </div>
-
-          {/* Mobile Navigation */}
-          {mobileMenuOpen && (
-            <nav className="md:hidden mt-4 pb-2 border-t border-white/10 pt-4 space-y-2">
-              <button
-                onClick={() => { setView("dashboard"); setMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
-                  view === "dashboard"
-                    ? "bg-white/20 text-white"
-                    : "text-white/70 hover:bg-white/10"
-                }`}
-              >
-                <Compass className="h-5 w-5" />
-                <span className="font-medium">{t('nav.home')}</span>
-              </button>
-              <button
-                onClick={() => { setView("add"); setMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
-                  view === "add"
-                    ? "bg-white/20 text-white"
-                    : "text-white/70 hover:bg-white/10"
-                }`}
-              >
-                <Plus className="h-5 w-5" />
-                <span className="font-medium">{t('nav.beaches')}</span>
-              </button>
-              <button
-                onClick={() => { toggleFAQ(); setMobileMenuOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-white/70 hover:bg-white/10 transition-all"
-              >
-                <HelpCircle className="h-5 w-5" />
-                <span className="font-medium">{t('nav.help')}</span>
-              </button>
-              <div className="px-4 py-3">
-                <LanguageSwitcher showLabel className="w-full justify-center" />
-              </div>
-            </nav>
-          )}
         </div>
       </header>
 
@@ -800,17 +753,20 @@ const App = () => {
                   {filteredBeaches.map((beach) => (
                     <div
                       key={beach.id}
-                      className={`flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
-                        beach.id === homeBeach?.id ? "border-orange-200 ring-2 ring-orange-300" : "border-gray-100"
+                      className={`relative flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+                        beach.id === homeBeach?.id ? "border-amber-300 shadow-amber-100" : "border-gray-100"
                       }`}
                     >
+                      {/* Home Beach Star Badge */}
+                      {beach.id === homeBeach?.id && (
+                        <div className="absolute -top-1 -right-1 bg-amber-400 text-white p-1.5 rounded-full shadow-md">
+                          <Star className="h-3 w-3 fill-current" />
+                        </div>
+                      )}
                       <div className="flex flex-1 flex-col p-4">
                         <div className="mb-3 flex items-start justify-between">
                           <div>
                             <h2 className="flex items-center text-lg font-semibold text-gray-800">
-                              {beach.id === homeBeach?.id && (
-                                <Home className="mr-1 h-4 w-4 text-orange-500" />
-                              )}
                               {beach.name}
                             </h2>
                             {(() => {
@@ -856,18 +812,18 @@ const App = () => {
                             disabled={beach.id === homeBeach?.id}
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold transition ${
                               beach.id === homeBeach?.id
-                                ? "bg-orange-100 text-orange-600"
-                                : "border border-blue-100 text-blue-700 hover:bg-blue-50"
+                                ? "bg-amber-100 text-amber-600"
+                                : "border border-blue-100 text-blue-700 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200"
                             }`}
                             aria-label={
                               beach.id === homeBeach?.id
-                                ? `${beach.name} is set as home`
-                                : `Set ${beach.name} as home beach`
+                                ? `${beach.name} is your favorite`
+                                : `Set ${beach.name} as favorite`
                             }
                           >
-                            <Home className="h-3 w-3" />
-                            <span className="sr-only">Set as home beach</span>
-                            <span aria-hidden>{beach.id === homeBeach?.id ? "Home" : "Pin"}</span>
+                            <Star className={`h-3 w-3 ${beach.id === homeBeach?.id ? 'fill-current' : ''}`} />
+                            <span className="sr-only">Set as favorite beach</span>
+                            <span aria-hidden>{beach.id === homeBeach?.id ? "Favorite" : "Favorite"}</span>
                           </button>
                           <a
                             href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}

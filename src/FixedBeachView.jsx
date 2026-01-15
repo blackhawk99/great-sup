@@ -20,7 +20,9 @@ import {
   Sun,
   Sunrise,
   Sunset,
-  Navigation
+  Navigation,
+  Shield,
+  Star
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
@@ -1668,234 +1670,196 @@ const FixedBeachView = ({
       {/* Weather data with score */}
       {weatherData && marineData && !loading && !error && (
         <div className="p-6">
-          {/* Score display */}
+          {/* Score display - Simplified Layout */}
           {paddleScore !== null && (
-            <div className="flex flex-col md:flex-row gap-6 mb-6">
-              {/* Score card - LEFT SIDE */}
-              <div className="md:w-1/3 bg-white rounded-lg shadow-md p-6 text-center flex flex-col justify-center relative">
-                <div
-                  className={`text-6xl mb-3 ${condition.color}`}
-                >
-                  {condition.emoji}
-                </div>
-                <h3 className="text-3xl font-bold mb-2 flex items-center justify-center">
-                  {condition.label}
-                  <div className="group relative ml-2">
-                    <div className="cursor-help">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" 
-                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" 
-                          className="text-gray-400">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                      </svg>
-                    </div>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 
-                                  absolute z-10 w-64 p-3 -left-24 bottom-8 bg-white 
-                                  border border-gray-200 rounded-lg shadow-lg text-sm text-left">
-                      {conditionDetails}
+            <div className="space-y-4 mb-6">
+              {/* Main Score Card with Protection Badge */}
+              <div className="bg-white rounded-2xl shadow-md p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`text-5xl ${condition.color}`}>{condition.emoji}</div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className={`text-2xl font-bold ${condition.color}`}>{paddleScore}/100</h3>
+                        <span className="text-lg text-gray-600">{condition.label}</span>
+                      </div>
+                      <p className="text-gray-500">{condition.message}</p>
                     </div>
                   </div>
-                </h3>
-                <p className="text-gray-600 text-lg mb-4">{condition.message}</p>
-                <div className="mt-2 bg-gray-100 rounded-full h-5 overflow-hidden">
-                  <div
-                    className={`h-full ${condition.color}`}
-                    style={{ width: `${paddleScore}%` }}
-                  ></div>
-                </div>
-                <p className="mt-2 text-lg font-medium text-gray-700">
-                  Score: {paddleScore}/100
-                </p>
-                <div className="mt-1 text-xs text-gray-500 flex items-center justify-center gap-2">
-                  <span>Data quality:</span>
-                  <span className={`font-medium ${
-                    scoreBreakdown?.dataQuality >= 90 ? 'text-green-600' :
-                    scoreBreakdown?.dataQuality >= 70 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    {scoreBreakdown?.dataQuality ?? 100}%
-                  </span>
-                  {scoreBreakdown?.dataQuality < 70 && (
-                    <span className="text-red-500" title="Some weather data is missing - score may be less accurate">
-                      ⚠️
-                    </span>
+                  {/* Protection Badge */}
+                  {geoProtection && (
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium ${
+                      geoProtection.protectionScore > 60
+                        ? 'bg-green-100 text-green-700'
+                        : geoProtection.protectionScore > 30
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-red-100 text-red-700'
+                    }`}>
+                      <Shield className="h-4 w-4" />
+                      {geoProtection.protectionScore > 60 ? 'Well Protected' :
+                       geoProtection.protectionScore > 30 ? 'Moderate' : 'Exposed'}
+                    </div>
                   )}
                 </div>
                 {/* Condition Trends */}
                 {conditionTrends && (
-                  <div className="mt-3">
+                  <div className="mt-3 pt-3 border-t">
                     {renderConditionTrends()}
                   </div>
                 )}
               </div>
-              
-              {/* Weather Factors - RIGHT SIDE */}
-              <div className="md:w-2/3">
-                <div className="grid grid-cols-2 gap-3">
-                  {breakdownMetrics ? (
-                    <>
-                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                        <Wind className="h-6 w-6 mr-3 text-blue-600" />
-                        <div className="flex-grow">
-                          <div className="text-sm text-gray-500">Wind</div>
-                          <div className={`text-lg font-medium ${
-                            breakdownMetrics.windProtected < 8
-                              ? 'text-green-600'
-                              : breakdownMetrics.windProtected < 15
-                                ? 'text-yellow-600'
-                                : 'text-red-600'
-                          }`}>
-                            {Math.round(breakdownMetrics.windRaw)} km/h
-                            <span className="text-xs ml-2 text-gray-500">
-                              (Protected: {Math.round(breakdownMetrics.windProtected)} km/h)
-                            </span>
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                        <Waves className="h-6 w-6 mr-3 text-blue-600" />
-                        <div className="flex-grow">
-                          <div className="text-sm text-gray-500">Wave Height</div>
-                          <div className={`text-lg font-medium ${
-                            breakdownMetrics.waveProtected < 0.2
-                              ? 'text-green-600'
-                              : breakdownMetrics.waveProtected < 0.4
-                                ? 'text-yellow-600'
-                                : 'text-red-600'
-                          }`}>
-                            {breakdownMetrics.waveRaw.toFixed(2)} m
-                            <span className="text-xs ml-2 text-gray-500">
-                              (Protected: {breakdownMetrics.waveProtected.toFixed(2)} m)
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                        <Thermometer className="h-6 w-6 mr-3 text-orange-500" />
-                        <div className="flex-grow">
-                          <div className="text-sm text-gray-500">Air Temp</div>
-                          <div className={`text-lg font-medium ${
-                            breakdownMetrics.temperature >= 22 && breakdownMetrics.temperature <= 30
-                              ? 'text-green-600'
-                              : breakdownMetrics.temperature >= 18
-                                ? 'text-yellow-600'
-                                : 'text-blue-600'
-                          }`}>
-                            {Math.round(breakdownMetrics.temperature)}°C
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                        <Waves className="h-6 w-6 mr-3 text-cyan-500" />
-                        <div className="flex-grow">
-                          <div className="text-sm text-gray-500">Water Temp</div>
-                          <div className={`text-lg font-medium ${
-                            breakdownMetrics.waterTemperature !== null
-                              ? breakdownMetrics.waterTemperature >= 18 && breakdownMetrics.waterTemperature <= 26
-                                ? 'text-green-600'
-                                : breakdownMetrics.waterTemperature >= 15
-                                  ? 'text-yellow-600'
-                                  : 'text-blue-600'
-                              : 'text-gray-400'
-                          }`}>
-                            {breakdownMetrics.waterTemperature !== null
-                              ? `${Math.round(breakdownMetrics.waterTemperature)}°C`
-                              : 'N/A'}
-                          </div>
-                          {breakdownMetrics.waterTemperature !== null && breakdownMetrics.waterTemperature < 15 && (
-                            <div className="text-xs text-blue-600">Wetsuit recommended</div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                        <Droplets className="h-6 w-6 mr-3 text-blue-600" />
-                        <div className="flex-grow">
-                          <div className="text-sm text-gray-500">Precipitation</div>
-                          <div className={`text-lg font-medium ${
-                            breakdownMetrics.precipitation < 1 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {breakdownMetrics.precipitation.toFixed(1)} mm
-                          </div>
-                          <div className="mt-1 text-xs text-gray-500">
-                            Cloud cover {Math.round(breakdownMetrics.cloudCover)}%
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm">
-                        <Sun className={`h-6 w-6 mr-3 ${
-                          breakdownMetrics.uvIndex >= 8 ? 'text-red-500' :
-                          breakdownMetrics.uvIndex >= 6 ? 'text-orange-500' :
-                          breakdownMetrics.uvIndex >= 3 ? 'text-yellow-500' : 'text-green-500'
-                        }`} />
-                        <div className="flex-grow">
-                          <div className="text-sm text-gray-500">UV Index</div>
-                          <div className={`text-lg font-medium ${
-                            breakdownMetrics.uvIndex >= 8 ? 'text-red-600' :
-                            breakdownMetrics.uvIndex >= 6 ? 'text-orange-600' :
-                            breakdownMetrics.uvIndex >= 3 ? 'text-yellow-600' : 'text-green-600'
-                          }`}>
-                            {breakdownMetrics.uvIndex.toFixed(1)}
-                            <span className="text-xs ml-1">
-                              {breakdownMetrics.uvIndex >= 11 ? '(Extreme)' :
-                               breakdownMetrics.uvIndex >= 8 ? '(Very High)' :
-                               breakdownMetrics.uvIndex >= 6 ? '(High)' :
-                               breakdownMetrics.uvIndex >= 3 ? '(Moderate)' : '(Low)'}
-                            </span>
-                          </div>
-                          {breakdownMetrics.uvIndex >= 6 && (
-                            <div className="text-xs text-orange-600">
-                              {breakdownMetrics.uvIndex >= 8 ? 'SPF 50+, hat & rash vest!' : 'Sunscreen every 2 hours'}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {sunTimes && (
-                        <div className="bg-white rounded-lg p-3 border flex items-center shadow-sm col-span-2">
-                          <div className="flex items-center justify-around w-full">
-                            <div className="flex items-center">
-                              <Sunrise className="h-5 w-5 mr-2 text-orange-400" />
-                              <div>
-                                <div className="text-xs text-gray-500">Sunrise</div>
-                                <div className="text-sm font-medium">
-                                  {sunTimes.sunrise ? new Date(sunTimes.sunrise).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center">
-                              <Navigation
-                                className="h-8 w-8 text-blue-500 mx-4"
-                                style={{ transform: `rotate(${breakdownMetrics.windDirection}deg)` }}
-                              />
-                              <div className="text-xs text-gray-500">
-                                Wind from {getCardinalDirection(breakdownMetrics.windDirection)}
-                              </div>
-                            </div>
-                            <div className="flex items-center">
-                              <Sunset className="h-5 w-5 mr-2 text-orange-500" />
-                              <div>
-                                <div className="text-xs text-gray-500">Sunset</div>
-                                <div className="text-sm font-medium">
-                                  {sunTimes.sunset ? new Date(sunTimes.sunset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="col-span-2 rounded-lg border border-dashed border-blue-200 p-4 text-sm text-gray-500">
-                      Forecast metrics will appear once weather data loads.
+              {/* Key Metrics - Wind, Waves, Water Temp (Prominent) */}
+              {breakdownMetrics && (
+                <div className="grid grid-cols-3 gap-3">
+                  {/* Wind */}
+                  <div className={`bg-white rounded-xl p-4 shadow-sm border-l-4 ${
+                    breakdownMetrics.windProtected < 8 ? 'border-green-500' :
+                    breakdownMetrics.windProtected < 15 ? 'border-yellow-500' : 'border-red-500'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Wind className="h-5 w-5 text-blue-600" />
+                      <span className="text-sm font-medium text-gray-600">Wind</span>
                     </div>
-                  )}
+                    <div className={`text-2xl font-bold ${
+                      breakdownMetrics.windProtected < 8 ? 'text-green-600' :
+                      breakdownMetrics.windProtected < 15 ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      {Math.round(breakdownMetrics.windProtected)} km/h
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {breakdownMetrics.windProtected < 8 ? 'Light' :
+                       breakdownMetrics.windProtected < 15 ? 'Moderate' : 'Strong'}
+                    </div>
+                  </div>
+
+                  {/* Waves */}
+                  <div className={`bg-white rounded-xl p-4 shadow-sm border-l-4 ${
+                    breakdownMetrics.waveProtected < 0.2 ? 'border-green-500' :
+                    breakdownMetrics.waveProtected < 0.4 ? 'border-yellow-500' : 'border-red-500'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Waves className="h-5 w-5 text-blue-600" />
+                      <span className="text-sm font-medium text-gray-600">Waves</span>
+                    </div>
+                    <div className={`text-2xl font-bold ${
+                      breakdownMetrics.waveProtected < 0.2 ? 'text-green-600' :
+                      breakdownMetrics.waveProtected < 0.4 ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      {breakdownMetrics.waveProtected.toFixed(1)} m
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {breakdownMetrics.waveProtected < 0.2 ? 'Calm' :
+                       breakdownMetrics.waveProtected < 0.4 ? 'Light chop' : 'Choppy'}
+                    </div>
+                  </div>
+
+                  {/* Water Temp */}
+                  <div className={`bg-white rounded-xl p-4 shadow-sm border-l-4 ${
+                    breakdownMetrics.waterTemperature !== null
+                      ? breakdownMetrics.waterTemperature >= 18 && breakdownMetrics.waterTemperature <= 26
+                        ? 'border-green-500'
+                        : breakdownMetrics.waterTemperature >= 15
+                          ? 'border-yellow-500'
+                          : 'border-blue-500'
+                      : 'border-gray-300'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Thermometer className="h-5 w-5 text-cyan-500" />
+                      <span className="text-sm font-medium text-gray-600">Water</span>
+                    </div>
+                    <div className={`text-2xl font-bold ${
+                      breakdownMetrics.waterTemperature !== null
+                        ? breakdownMetrics.waterTemperature >= 18 && breakdownMetrics.waterTemperature <= 26
+                          ? 'text-green-600'
+                          : breakdownMetrics.waterTemperature >= 15
+                            ? 'text-yellow-600'
+                            : 'text-blue-600'
+                        : 'text-gray-400'
+                    }`}>
+                      {breakdownMetrics.waterTemperature !== null
+                        ? `${Math.round(breakdownMetrics.waterTemperature)}°C`
+                        : 'N/A'}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {breakdownMetrics.waterTemperature !== null
+                        ? breakdownMetrics.waterTemperature >= 22 ? 'Warm' :
+                          breakdownMetrics.waterTemperature >= 18 ? 'Comfortable' :
+                          breakdownMetrics.waterTemperature >= 15 ? 'Cool - wetsuit' : 'Cold!'
+                        : 'Unknown'}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Secondary Metrics - Compact Row */}
+              {breakdownMetrics && (
+                <div className="bg-white rounded-xl shadow-sm p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-4 text-sm">
+                    {/* Air Temp */}
+                    <div className="flex items-center gap-2">
+                      <Thermometer className="h-4 w-4 text-orange-500" />
+                      <span className="text-gray-500">Air:</span>
+                      <span className="font-medium">{Math.round(breakdownMetrics.temperature)}°C</span>
+                    </div>
+
+                    {/* UV */}
+                    <div className="flex items-center gap-2">
+                      <Sun className={`h-4 w-4 ${
+                        breakdownMetrics.uvIndex >= 8 ? 'text-red-500' :
+                        breakdownMetrics.uvIndex >= 6 ? 'text-orange-500' : 'text-yellow-500'
+                      }`} />
+                      <span className="text-gray-500">UV:</span>
+                      <span className={`font-medium ${
+                        breakdownMetrics.uvIndex >= 8 ? 'text-red-600' :
+                        breakdownMetrics.uvIndex >= 6 ? 'text-orange-600' : 'text-gray-700'
+                      }`}>
+                        {breakdownMetrics.uvIndex.toFixed(0)}
+                        {breakdownMetrics.uvIndex >= 6 && <span className="text-xs ml-1">(High)</span>}
+                      </span>
+                    </div>
+
+                    {/* Rain */}
+                    <div className="flex items-center gap-2">
+                      <Droplets className="h-4 w-4 text-blue-500" />
+                      <span className="text-gray-500">Rain:</span>
+                      <span className={`font-medium ${
+                        breakdownMetrics.precipitation < 1 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {breakdownMetrics.precipitation < 0.1 ? 'None' : `${breakdownMetrics.precipitation.toFixed(1)}mm`}
+                      </span>
+                    </div>
+
+                    {/* Wind Direction */}
+                    <div className="flex items-center gap-2">
+                      <Navigation
+                        className="h-4 w-4 text-blue-500"
+                        style={{ transform: `rotate(${breakdownMetrics.windDirection}deg)` }}
+                      />
+                      <span className="text-gray-500">From:</span>
+                      <span className="font-medium">{getCardinalDirection(breakdownMetrics.windDirection)}</span>
+                    </div>
+
+                    {/* Sunrise/Sunset */}
+                    {sunTimes && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          <Sunrise className="h-4 w-4 text-orange-400" />
+                          <span className="text-gray-600">
+                            {sunTimes.sunrise ? new Date(sunTimes.sunrise).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Sunset className="h-4 w-4 text-orange-500" />
+                          <span className="text-gray-600">
+                            {sunTimes.sunset ? new Date(sunTimes.sunset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
