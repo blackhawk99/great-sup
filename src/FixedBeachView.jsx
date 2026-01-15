@@ -240,29 +240,30 @@ const FixedBeachView = ({
       const protectedSwellHeight = avgSwellHeight * (1 - waveProtectionFactor * 0.85);
 
       // Initialize score breakdown (weights sum to 100)
+      // For SUP: wind & waves equally critical, water temp important for safety, air temp less so (can wear layers)
       const breakdown = {
-        windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 37 },
-        waveHeight: { raw: waveHeight, protected: protectedWaveHeight, score: 0, maxPossible: 17 },
+        windSpeed: { raw: avgWind, protected: protectedWindSpeed, score: 0, maxPossible: 25 },
+        waveHeight: { raw: waveHeight, protected: protectedWaveHeight, score: 0, maxPossible: 25 },
         swellHeight: { raw: avgSwellHeight, protected: protectedSwellHeight, score: 0, maxPossible: 10 },
         precipitation: { value: maxPrecip, score: 0, maxPossible: 5 },
-        temperature: { value: avgTemp, score: 0, maxPossible: 8 },
-        waterTemperature: { value: avgWaterTemp, score: 0, maxPossible: 10 },
-        cloudCover: { value: avgCloud, score: 0, maxPossible: 4 },
-        geoProtection: { value: protectionScore, score: 0, maxPossible: 9 },
+        temperature: { value: avgTemp, score: 0, maxPossible: 5 },
+        waterTemperature: { value: avgWaterTemp, score: 0, maxPossible: 15 },
+        cloudCover: { value: avgCloud, score: 0, maxPossible: 5 },
+        geoProtection: { value: protectionScore, score: 0, maxPossible: 10 },
         total: { score: 0, rawScore: 0, bonus: 0, maxPossible: 100 },
         dataQuality: dataQuality // 0-100% indicating data completeness
       };
-      
+
       // Calculate individual scores (weights sum to 100)
       let totalScore = 0;
 
-      // Wind speed score (0-37 points)
-      breakdown.windSpeed.score = Math.max(0, 37 - protectedWindSpeed * (37 / 20));
+      // Wind speed score (0-25 points) - critical for SUP stability
+      breakdown.windSpeed.score = Math.max(0, 25 - protectedWindSpeed * (25 / 20));
       totalScore += breakdown.windSpeed.score;
 
-      // Wave height score (0-17 points)
-      breakdown.waveHeight.score = protectedWaveHeight < 0.2 ? 17 :
-                                  Math.max(0, 17 - (protectedWaveHeight - 0.2) * (17 / 0.4));
+      // Wave height score (0-25 points) - equally critical for SUP
+      breakdown.waveHeight.score = protectedWaveHeight < 0.2 ? 25 :
+                                  Math.max(0, 25 - (protectedWaveHeight - 0.2) * (25 / 0.4));
       totalScore += breakdown.waveHeight.score;
 
       // Swell height score (0-10 points)
@@ -274,35 +275,37 @@ const FixedBeachView = ({
       breakdown.precipitation.score = maxPrecip < 1 ? 5 : 0;
       totalScore += breakdown.precipitation.score;
 
-      // Air temperature score (0-8 points) - bell curve 22-32°C ideal
-      if (avgTemp >= 22 && avgTemp <= 32) {
-        breakdown.temperature.score = 8;
-      } else if (avgTemp < 22) {
-        breakdown.temperature.score = Math.max(0, 8 - (22 - avgTemp) * 0.8);
+      // Air temperature score (0-5 points) - less critical, can wear layers
+      // Wider comfort range: 15-30°C is fine for paddling with appropriate clothing
+      if (avgTemp >= 15 && avgTemp <= 30) {
+        breakdown.temperature.score = 5;
+      } else if (avgTemp < 15) {
+        breakdown.temperature.score = Math.max(0, 5 - (15 - avgTemp) * 0.5);
       } else {
-        breakdown.temperature.score = Math.max(0, 8 - (avgTemp - 32) * 0.8);
+        breakdown.temperature.score = Math.max(0, 5 - (avgTemp - 30) * 0.5);
       }
       totalScore += breakdown.temperature.score;
 
-      // Water temperature score (0-10 points) - bell curve 18-26°C ideal for paddleboarding
+      // Water temperature score (0-15 points) - important for safety if you fall in
+      // 18-26°C ideal, but can paddle in colder water with wetsuit
       if (avgWaterTemp !== null) {
         if (avgWaterTemp >= 18 && avgWaterTemp <= 26) {
-          breakdown.waterTemperature.score = 10;
+          breakdown.waterTemperature.score = 15;
         } else if (avgWaterTemp < 18) {
-          breakdown.waterTemperature.score = Math.max(0, 10 - (18 - avgWaterTemp));
+          breakdown.waterTemperature.score = Math.max(0, 15 - (18 - avgWaterTemp) * 1.5);
         } else {
-          breakdown.waterTemperature.score = Math.max(0, 10 - (avgWaterTemp - 26));
+          breakdown.waterTemperature.score = Math.max(0, 15 - (avgWaterTemp - 26) * 1.5);
         }
         totalScore += breakdown.waterTemperature.score;
       }
 
-      // Cloud cover score (0-4 points)
-      breakdown.cloudCover.score = avgCloud < 40 ? 4 :
-                                  Math.max(0, 4 - (avgCloud - 40) / 15);
+      // Cloud cover score (0-5 points)
+      breakdown.cloudCover.score = avgCloud < 50 ? 5 :
+                                  Math.max(0, 5 - (avgCloud - 50) / 10);
       totalScore += breakdown.cloudCover.score;
 
-      // Geographic protection score (0-9 points)
-      breakdown.geoProtection.score = (protection.protectionScore / 100) * 9;
+      // Geographic protection score (0-10 points)
+      breakdown.geoProtection.score = (protection.protectionScore / 100) * 10;
       totalScore += breakdown.geoProtection.score;
 
       // Round scores for display
@@ -479,22 +482,30 @@ const FixedBeachView = ({
     };
   };
   
-  // Get condition text based on score and actual conditions
+  // Get condition text based on score AND actual conditions
+  // This ensures messaging is consistent with getPaddleReadiness
   const getCondition = (score) => {
     if (!scoreBreakdown) {
       return { label: "Loading", emoji: "⏳", message: "Calculating conditions...", color: "text-gray-500" };
     }
 
     const temp = toNumberOr(scoreBreakdown.temperature?.value, 0);
+    const waterTemp = toNumberOr(scoreBreakdown.waterTemperature?.value, 20);
     const windSpeed = toNumberOr(scoreBreakdown.windSpeed?.protected, 0);
+    const waveHeight = toNumberOr(scoreBreakdown.waveHeight?.protected, 0);
     const precipitation = toNumberOr(scoreBreakdown.precipitation?.value, 0);
 
-    if (score >= 85) {
-      if (temp < 18) {
+    // Check if core paddling conditions (wind & waves) are excellent
+    const excellentWindWaves = windSpeed < 8 && waveHeight < 0.3;
+    const goodWindWaves = windSpeed < 12 && waveHeight < 0.5;
+
+    // Excellent core conditions - show positive even if score lower due to temp/geo
+    if (excellentWindWaves) {
+      if (temp < 15 || waterTemp < 15) {
         return {
           label: "Chilly but Calm",
           emoji: "🧊",
-          message: "Great conditions, but bring a wetsuit.",
+          message: "Flat water, but dress warm.",
           color: "text-blue-500"
         };
       }
@@ -506,44 +517,63 @@ const FixedBeachView = ({
           color: "text-blue-500"
         };
       }
-      if (windSpeed > 15) {
+      if (score >= 85) {
         return {
-          label: "Excellent",
+          label: "Perfect",
           emoji: "✅",
-          message: "Some wind, but well-protected location.",
+          message: "Flat like oil. Paddle on.",
           color: "text-green-500"
         };
       }
       return {
-        label: "Perfect",
-        emoji: "✅",
-        message: "Flat like oil. Paddle on.",
+        label: "Solid",
+        emoji: "👍",
+        message: "Great paddling conditions.",
         color: "text-green-500"
       };
     }
 
+    // Good core conditions
+    if (goodWindWaves) {
+      if (temp < 15 || waterTemp < 15) {
+        return {
+          label: "Cool & Manageable",
+          emoji: "🧊",
+          message: "Light chop possible, dress warm.",
+          color: "text-blue-500"
+        };
+      }
+      return {
+        label: "Good",
+        emoji: "👍",
+        message: "Nice conditions with light texture.",
+        color: "text-green-500"
+      };
+    }
+
+    // Score-based fallback for challenging conditions
     if (score >= 70) {
       return {
         label: "Okay-ish",
         emoji: "⚠️",
-        message: "Minor chop. Go early.",
+        message: "Some chop expected. Stay alert.",
         color: "text-yellow-500"
       };
     }
 
     if (score >= 50) {
       return {
-        label: "Not Great",
-        emoji: "❌",
+        label: "Challenging",
+        emoji: "⚠️",
         message: "Wind or waves make it tricky.",
         color: "text-orange-500"
       };
     }
 
     return {
-      label: "Nope",
+      label: "Not Recommended",
       emoji: "🚫",
-      message: "Not recommended.",
+      message: "Conditions too rough for SUP.",
       color: "text-red-500"
     };
   };
@@ -747,7 +777,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Wind Speed</span>
-                  <span className="ml-1 text-xs text-gray-400">(37 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(25 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.windSpeed.raw.toFixed(1)} km/h
@@ -777,7 +807,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Wave Height</span>
-                  <span className="ml-1 text-xs text-gray-400">(17 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(25 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.waveHeight.raw.toFixed(2)} m
@@ -857,7 +887,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Air Temperature</span>
-                  <span className="ml-1 text-xs text-gray-400">(8 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(5 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.temperature.value.toFixed(1)} °C
@@ -880,7 +910,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Water Temperature</span>
-                  <span className="ml-1 text-xs text-gray-400">(10 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(15 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.waterTemperature?.value != null
@@ -909,7 +939,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Cloud Cover</span>
-                  <span className="ml-1 text-xs text-gray-400">(4 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(5 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.cloudCover.value.toFixed(0)}%
@@ -936,7 +966,7 @@ const FixedBeachView = ({
               <tr>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   <span className="font-medium">Geographic Protection</span>
-                  <span className="ml-1 text-xs text-gray-400">(9 pts)</span>
+                  <span className="ml-1 text-xs text-gray-400">(10 pts)</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">
                   {scoreBreakdown.geoProtection.value.toFixed(0)}/100
