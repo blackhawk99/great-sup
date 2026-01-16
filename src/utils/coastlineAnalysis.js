@@ -784,37 +784,37 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     ]);
     const waveBlocked = intersectsLandmass(waveAngleRay, coastlineData, islandData);
 
-    // SIMPLE WIND PROTECTION LOGIC:
-    // Don't rely on seaward direction (unreliable). Just check if there's blocking land.
-    // - No land in wind direction = EXPOSED
-    // - Land at 0.5-2km = PROTECTED (island, headland blocking wind)
-    // - Land at < 0.5km = probably just beach curve = EXPOSED
-    // - Land at > 2km = too far to provide real wind shelter = EXPOSED
+    // STRICT WIND PROTECTION LOGIC:
+    // On islands, coastline curves can cause false positives at 0.5-1.5km
+    // Real protection requires land ACROSS water, typically showing as:
+    // - Island/headland at 1.5-3km that genuinely blocks the wind path
+    // Closer hits (< 1.5km) are usually just the same shoreline curving
 
     let windProtection = 0;
     if (windBlocked.intersects) {
       const dist = windBlocked.distance;
-      if (dist >= 0.5 && dist <= 2.0) {
-        // Sweet spot: land close enough to block wind, but not just the beach curve
-        windProtection = 0.8 * (1 - (dist - 0.5) / 1.5); // Decreases from 0.8 to 0 as distance increases
+      if (dist >= 1.5 && dist <= 3.0) {
+        // Land at 1.5-3km = likely real blocking (island, headland across water)
+        windProtection = 0.7 * (1 - (dist - 1.5) / 1.5);
       }
-      // dist < 0.5km or dist > 2km = exposed (no meaningful protection)
+      // dist < 1.5km = probably same shoreline curving = EXPOSED
+      // dist > 3km = too far for meaningful wind shelter = EXPOSED
     }
 
     let waveProtection = 0;
     if (waveBlocked.intersects) {
       const dist = waveBlocked.distance;
-      if (dist >= 0.5 && dist <= 2.5) {
-        // Waves need closer blocking, and diffract more
-        waveProtection = 0.6 * (1 - (dist - 0.5) / 2.0);
+      if (dist >= 1.0 && dist <= 2.5) {
+        // Waves blocked by land at 1-2.5km
+        waveProtection = 0.5 * (1 - (dist - 1.0) / 1.5);
       }
     }
 
     // Check for bay enclosure - headlands on sides providing shelter
-    // Only count hits that are SIGNIFICANT distance away (not just beach curve)
+    // Use longer rays and stricter distance threshold to avoid false positives
     let significantSeawardHits = 0;
     let seawardRays = 0;
-    const rays = generateRays(beachPoint, 36, 3.0); // 36 rays at 3km
+    const rays = generateRays(beachPoint, 36, 5.0); // 36 rays at 5km
 
     for (let i = 0; i < 36; i++) {
       const rayAngle = (i * 360) / 36;
@@ -822,8 +822,8 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
       if (angleDiff <= 90) {
         seawardRays++;
         const hit = intersectsLandmass(rays[i], coastlineData, islandData);
-        // Only count if land is at meaningful distance (headland, not just shore curve)
-        if (hit.intersects && hit.distance > 0.3) {
+        // Only count if land is at 1-4km (real headland, not just shore curve)
+        if (hit.intersects && hit.distance >= 1.0 && hit.distance <= 4.0) {
           significantSeawardHits++;
         }
       }
