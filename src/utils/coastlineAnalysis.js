@@ -718,162 +718,109 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     // Check coastline data density for this location (informational only)
     const dataDensity = checkCoastlineDataDensity(latitude, longitude, 5, coastlineData, islandData);
 
-    // Note: We proceed with calculation even with sparse data
-    // GADM data is sparse everywhere - returning 0 for low density is too aggressive
-    // We'll include the confidence info in the result for transparency
+    // =========================================================================
+    // SIMPLE DIRECTIONAL PROTECTION CHECK
+    // The key question: Is there land between the beach and the wind/waves?
+    // =========================================================================
 
-    // Advanced bay geometry analysis (pass coastline data)
-    const bayGeometry = analyzeBayGeometry(beachPoint, coastlineData, islandData);
+    // Cast a ray in the wind direction - if it hits land, we're protected from wind
+    const windRay = generateRays(beachPoint, 1, 3.0)[0]; // Single ray, 3km
+    const windAngleRay = turf.lineString([
+      beachPoint.geometry.coordinates,
+      turf.destination(beachPoint, 3, windDirection, { units: 'kilometers' }).geometry.coordinates
+    ]);
+    const windBlocked = intersectsLandmass(windAngleRay, coastlineData, islandData);
 
-    // Bay detection is now handled algorithmically - no hardcoded overrides
+    // Cast a ray in the wave direction - if it hits land, we're protected from waves
+    const waveAngleRay = turf.lineString([
+      beachPoint.geometry.coordinates,
+      turf.destination(beachPoint, 3, waveDirection, { units: 'kilometers' }).geometry.coordinates
+    ]);
+    const waveBlocked = intersectsLandmass(waveAngleRay, coastlineData, islandData);
 
-    // Find the nearest coastline segment
+    // Direct protection: is land blocking wind/waves?
+    const windProtection = windBlocked.intersects ?
+      Math.min(1.0, 1 - (windBlocked.distance / 3.0)) : 0; // Closer land = more protection
+    const waveProtection = waveBlocked.intersects ?
+      Math.min(1.0, (1 - (waveBlocked.distance / 3.0)) * 0.7) : 0; // Waves diffract, less protection
+
+    // Check for bay-like enclosure (land on multiple sides, not just behind)
+    // Only count rays in the SEAWARD semicircle (opposite to nearest coastline)
     const nearestSegment = findNearestCoastlineSegment(beachPoint, coastlineData);
-    
     if (!nearestSegment) {
       throw new Error('Could not find nearby coastline');
     }
-    
-    // Calculate coastline orientation
+
+    // Find which direction is "seaward" (perpendicular to coastline, away from land)
     const coastlineAngle = turf.bearing(
       turf.point(nearestSegment[0]),
       turf.point(nearestSegment[1])
     );
-    
-    // Calculate ray-based enclosure scores at different distances
-    // Short rays (0.7km) to detect small protected coves
-    const shortRays = generateRays(beachPoint, 36, 0.7);
-    const shortHits = shortRays.map(ray => intersectsLandmass(ray, coastlineData, islandData));
-    const shortEnclosure = shortHits.filter(hit => hit.intersects).length / shortRays.length;
+    const seawardDirection = (coastlineAngle + 90) % 360; // Perpendicular to coast
 
-    // Medium rays (1.5km) for typical bay/cove detection
-    const mediumRays = generateRays(beachPoint, 36, 1.5);
-    const mediumHits = mediumRays.map(ray => intersectsLandmass(ray, coastlineData, islandData));
-    const mediumEnclosure = mediumHits.filter(hit => hit.intersects).length / mediumRays.length;
+    // Check enclosure only in the seaward semicircle (±90° from seaward direction)
+    // This prevents counting "land behind the beach" as protection
+    let seawardHits = 0;
+    let seawardRays = 0;
+    const rays = generateRays(beachPoint, 36, 2.0); // 36 rays at 2km
 
-    // Long rays (3.0km) for broader geography
-    const longRays = generateRays(beachPoint, 36, 3.0);
-    const longHits = longRays.map(ray => intersectsLandmass(ray, coastlineData, islandData));
-    const longEnclosure = longHits.filter(hit => hit.intersects).length / longRays.length;
-    
-    // Calculate weighted enclosure score based on bay type
-    let enclosureScore;
-
-    if (bayGeometry.isDeepBay) {
-      // Deep bay - high protection (e.g., Navarino)
-      enclosureScore = Math.min(0.95, (shortEnclosure * 0.3) + (mediumEnclosure * 0.3) + (longEnclosure * 0.4) + 0.2);
-      console.log("Using deep bay enclosure calculation:", enclosureScore);
-    } else if (bayGeometry.isMediumBay) {
-      // Medium bay - good protection for SUP (e.g., Vouliagmeni, 800m-1.5km wide)
-      // Short/medium range matters most, long range less important
-      enclosureScore = Math.min(0.85, (shortEnclosure * 0.45) + (mediumEnclosure * 0.35) + (longEnclosure * 0.1) + 0.1);
-      console.log("Using medium bay enclosure calculation:", enclosureScore);
-    } else if (bayGeometry.isPeninsulaBeach) {
-      // Peninsula beach - inverted pattern where long range has MORE enclosure (e.g., Astir)
-      // Regional geography provides wind shelter even though immediate area is open
-      // Weight long range highly since that's where the protection comes from
-      enclosureScore = Math.min(0.75, (shortEnclosure * 0.15) + (mediumEnclosure * 0.35) + (longEnclosure * 0.4) + 0.05);
-      console.log("Using peninsula beach enclosure calculation:", enclosureScore);
-    } else if (bayGeometry.isWideBay) {
-      // Wide bay - moderate short but good mid/long (e.g., Kapsali with wide mouth but headlands)
-      // Weight medium/long more since that's where the actual protection is
-      enclosureScore = Math.min(0.70, (shortEnclosure * 0.2) + (mediumEnclosure * 0.4) + (longEnclosure * 0.3) + 0.05);
-      console.log("Using wide bay enclosure calculation:", enclosureScore);
-    } else if (bayGeometry.isShallowBay) {
-      // Shallow bay/cove - medium protection
-      enclosureScore = (shortEnclosure * 0.5) + (mediumEnclosure * 0.3) + (longEnclosure * 0.2);
-      console.log("Using shallow bay enclosure calculation:", enclosureScore);
-    } else if (bayGeometry.isModerateCoast) {
-      // Moderate coast - some protection but not a defined bay shape
-      // Better than fully exposed, give a small bonus
-      enclosureScore = Math.min(0.55, (shortEnclosure * 0.4) + (mediumEnclosure * 0.35) + (longEnclosure * 0.25) + 0.05);
-      console.log("Using moderate coast enclosure calculation:", enclosureScore);
-    } else {
-      // Regular coastline - exposed
-      enclosureScore = (shortEnclosure * 0.6) + (mediumEnclosure * 0.3) + (longEnclosure * 0.1);
-      console.log("Using standard enclosure calculation:", enclosureScore);
+    for (let i = 0; i < 36; i++) {
+      const rayAngle = (i * 360) / 36;
+      // Check if this ray is in the seaward semicircle
+      const angleDiff = Math.abs(((rayAngle - seawardDirection + 180) % 360) - 180);
+      if (angleDiff <= 90) {
+        seawardRays++;
+        const hit = intersectsLandmass(rays[i], coastlineData, islandData);
+        if (hit.intersects) seawardHits++;
+      }
     }
-    
-    // Find multiple relevant coastline segments
-    const relevantSegments = findRelevantCoastlineSegments(beachPoint, coastlineData);
-    
-    // Calculate protection using multiple segments
-    let bestWindProtection = 0;
-    let bestWaveProtection = 0;
-    
-    // Consider up to 5 closest segments
-for (const segment of relevantSegments.slice(0, 5)) {
-  const segmentAngle = segment.angle;
 
-  // Calculate wind protection - direct blockage
-  const windExposure = calculateDirectionalExposure(windDirection, segmentAngle);
-  const windProtection = Math.min(1.0, 1 - Math.cos(windExposure * Math.PI / 180));
+    // Bay enclosure = how much of the seaward side has land (headlands, etc)
+    const bayEnclosure = seawardRays > 0 ? seawardHits / seawardRays : 0;
 
-  // Calculate wave protection - affected by diffraction
-  // Waves bend around headlands, so protection is reduced unless in an enclosed bay
-  const waveExposure = calculateDirectionalExposure(waveDirection, segmentAngle);
-  const baseWaveProtection = Math.min(1.0, 1 - Math.cos(waveExposure * Math.PI / 180));
-  // Reduce wave protection for exposed coastlines (not enclosed bays)
-  // Enclosure provides the real wave protection, not individual segments
-  const waveProtection = baseWaveProtection * 0.7; // 30% reduction for diffraction
-
-      // Keep the best protection values
-      if (windProtection > bestWindProtection) bestWindProtection = windProtection;
-      if (waveProtection > bestWaveProtection) bestWaveProtection = waveProtection;
-    }
-    
-// Calculate total protection
-// Wind: combination of direct blockage and enclosure
-const totalWindProtection = Math.min(1.0, bestWindProtection * (0.5 + 0.5 * enclosureScore));
-// Waves: enclosure matters much more due to diffraction - waves wrap around obstacles
-// Only enclosed bays provide significant wave protection
-const totalWaveProtection = Math.min(1.0, bestWaveProtection * (0.3 + 0.7 * enclosureScore));
-    
-    // Compute final protection score
+    // Final protection score:
+    // - 40% from direct wind blockage
+    // - 30% from direct wave blockage
+    // - 30% from bay enclosure (seaward only)
     const protectionScore = (
-      0.3 * totalWindProtection +
-      0.3 * totalWaveProtection +
-      0.4 * enclosureScore
+      0.4 * windProtection +
+      0.3 * waveProtection +
+      0.3 * bayEnclosure
     ) * 100;
-    
-    // Use calculated protection score (no hardcoded overrides)
-    const finalScore = protectionScore;
-    
-return {
-  protectionScore: finalScore,
-  coastlineAngle,
-  enclosureScore,
-  windProtection: Math.min(1.0, totalWindProtection),
-  waveProtection: Math.min(1.0, totalWaveProtection),
-  bayEnclosure: enclosureScore,
-      isProtected: protectionScore > 50,
+
+    const finalScore = Math.round(protectionScore);
+
+    return {
+      protectionScore: finalScore,
+      coastlineAngle,
+      enclosureScore: bayEnclosure,
+      windProtection,
+      waveProtection,
+      bayEnclosure,
+      isProtected: finalScore > 50,
       dataConfidence: dataDensity.confidence,
-      isLowConfidence: false,
-      description: generateProtectionDescription(
-        enclosureScore,
-        coastlineAngle,
-        totalWindProtection,
-        totalWaveProtection
-      ),
-      isDeepBay: bayGeometry.isDeepBay,
-      isMediumBay: bayGeometry.isMediumBay,
-      isPeninsulaBeach: bayGeometry.isPeninsulaBeach,
-      isWideBay: bayGeometry.isWideBay,
-      isModerateCoast: bayGeometry.isModerateCoast,
+      isLowConfidence: dataDensity.isLowConfidence,
       usingTiles,
+      windBlocked: windBlocked.intersects,
+      waveBlocked: waveBlocked.intersects,
+      description: generateSimpleProtectionDescription(windProtection, waveProtection, bayEnclosure, windDirection),
       debugInfo: {
-        shortEnclosure,
-        mediumEnclosure,
-        longEnclosure,
-        dataDensity: dataDensity.density,
-        nearbySegments: dataDensity.nearbySegments,
+        windDirection,
+        waveDirection,
+        windBlocked: windBlocked.intersects,
+        windBlockDistance: windBlocked.distance,
+        waveBlocked: waveBlocked.intersects,
+        waveBlockDistance: waveBlocked.distance,
+        seawardDirection,
+        bayEnclosure,
+        seawardHits,
+        seawardRays,
         usingTiles,
-        bayType: bayGeometry.isDeepBay ? 'deep' : bayGeometry.isMediumBay ? 'medium' : bayGeometry.isPeninsulaBeach ? 'peninsula' : bayGeometry.isWideBay ? 'wide' : bayGeometry.isShallowBay ? 'shallow' : bayGeometry.isModerateCoast ? 'moderate' : 'exposed'
+        dataDensity: dataDensity.density
       }
     };
   } catch (error) {
     console.error("Error in coastline analysis:", error);
-    // Return WORST-CASE values as fallback (assume fully exposed for safety)
     return {
       protectionScore: 0,
       coastlineAngle: 0,
@@ -883,8 +830,21 @@ return {
       bayEnclosure: 0,
       isProtected: false,
       analysisError: true,
-      description: "Could not analyze coastline protection. Assuming fully exposed conditions for safety."
+      description: "Could not analyze coastline protection. Assuming exposed for safety."
     };
+  }
+}
+
+// Generate simple, accurate protection description
+function generateSimpleProtectionDescription(windProt, waveProt, bayEnc, windDir) {
+  const dir = getCardinalDirection(windDir);
+
+  if (windProt > 0.6 && waveProt > 0.4) {
+    return `Well protected from ${dir} winds and waves by nearby land.`;
+  } else if (windProt > 0.3 || bayEnc > 0.4) {
+    return `Partial protection from ${dir} winds. Some shelter from surrounding geography.`;
+  } else {
+    return `Exposed to ${dir} winds. Open water in the wind direction.`;
   }
 }
 
