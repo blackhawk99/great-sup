@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","properties":{"tile":"41.0_24.0","coastlineCount":1,"islandCount":0},"features":[{"type":"Feature","properties":{"name":"MacedoniaandThrace_Coast_0","region":"MacedoniaandThrace"},"geometry":{"type":"LineString","coordinates":[[24.0122,41.4644],[24.0169,41.4534],[24.0398,41.4501],[24.0667,41.4651],[24.0565,41.4822],[24.0626,41.4966]]}}]}

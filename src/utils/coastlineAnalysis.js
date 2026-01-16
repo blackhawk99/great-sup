@@ -3,16 +3,132 @@ import * as turf from '@turf/turf';
 import { greeceCoastlines } from '../data/greece-coastlines';
 import { greeceIslands } from '../data/greece-islands';
 
+// ============================================================================
+// TILE-BASED COASTLINE LOADING
+// ============================================================================
+
+const TILE_SIZE = 0.5; // degrees - must match the tile generation script
+const TILE_CACHE = new Map(); // Cache loaded tiles in memory
+const TILE_LOADING = new Map(); // Track in-progress tile loads to avoid duplicates
+
+/**
+ * Get the tile key for a coordinate
+ */
+function getTileKey(lat, lng) {
+  const tileLat = Math.floor(lat / TILE_SIZE) * TILE_SIZE;
+  const tileLng = Math.floor(lng / TILE_SIZE) * TILE_SIZE;
+  return `${tileLat.toFixed(1)}_${tileLng.toFixed(1)}`;
+}
+
+/**
+ * Get all tile keys needed to cover an area around a point
+ */
+function getRequiredTileKeys(lat, lng, radiusKm = 5) {
+  // Convert radius to approximate degrees (1 degree ≈ 111km)
+  const radiusDeg = radiusKm / 111;
+
+  const keys = new Set();
+  // Get tiles that cover the bounding box around the point
+  for (let latOffset = -radiusDeg; latOffset <= radiusDeg; latOffset += TILE_SIZE) {
+    for (let lngOffset = -radiusDeg; lngOffset <= radiusDeg; lngOffset += TILE_SIZE) {
+      keys.add(getTileKey(lat + latOffset, lng + lngOffset));
+    }
+  }
+  return Array.from(keys);
+}
+
+/**
+ * Load a single tile from the server
+ */
+async function loadTile(tileKey) {
+  // Check cache first
+  if (TILE_CACHE.has(tileKey)) {
+    return TILE_CACHE.get(tileKey);
+  }
+
+  // Check if already loading
+  if (TILE_LOADING.has(tileKey)) {
+    return TILE_LOADING.get(tileKey);
+  }
+
+  // Start loading
+  const loadPromise = (async () => {
+    try {
+      const response = await fetch(`/coastline-tiles/tile_${tileKey}.json`);
+      if (!response.ok) {
+        console.warn(`Tile ${tileKey} not found (${response.status})`);
+        return null;
+      }
+      const data = await response.json();
+      TILE_CACHE.set(tileKey, data);
+      return data;
+    } catch (error) {
+      console.warn(`Failed to load tile ${tileKey}:`, error.message);
+      return null;
+    } finally {
+      TILE_LOADING.delete(tileKey);
+    }
+  })();
+
+  TILE_LOADING.set(tileKey, loadPromise);
+  return loadPromise;
+}
+
+/**
+ * Load all tiles needed for a location and merge into coastline/island data
+ */
+export async function loadCoastlineDataForLocation(lat, lng, radiusKm = 5) {
+  const tileKeys = getRequiredTileKeys(lat, lng, radiusKm);
+
+  // Load all required tiles in parallel
+  const tilePromises = tileKeys.map(key => loadTile(key));
+  const tiles = await Promise.all(tilePromises);
+
+  // Merge tile data
+  const coastlines = { type: 'FeatureCollection', features: [] };
+  const islands = { type: 'FeatureCollection', features: [] };
+
+  let loadedTiles = 0;
+  for (const tile of tiles) {
+    if (!tile) continue;
+    loadedTiles++;
+
+    for (const feature of tile.features) {
+      if (feature.geometry.type === 'LineString') {
+        coastlines.features.push(feature);
+      } else if (feature.geometry.type === 'Polygon') {
+        islands.features.push(feature);
+      }
+    }
+  }
+
+  return {
+    coastlines,
+    islands,
+    loadedTiles,
+    totalTiles: tileKeys.length,
+    usedTiles: loadedTiles > 0
+  };
+}
+
+// ============================================================================
+// DATA DENSITY CHECK (works with both bundled and tile data)
+// ============================================================================
+
 // Check coastline data density around a point to determine analysis confidence
 // Returns { density, confidence, isLowConfidence, nearbySegments, totalPoints }
-export function checkCoastlineDataDensity(latitude, longitude, radiusKm = 5) {
+export function checkCoastlineDataDensity(latitude, longitude, radiusKm = 5, coastlineData = null, islandData = null) {
   const point = turf.point([longitude, latitude]);
   let totalPoints = 0;
   let validSegments = 0;
   let nearbySegments = 0;
 
+  // Use provided data or fall back to bundled data
+  const coastlines = coastlineData || greeceCoastlines;
+  const islands = islandData || greeceIslands;
+
   // Check coastlines within radius
-  for (const feature of greeceCoastlines.features) {
+  for (const feature of coastlines.features) {
     if (feature.geometry.type === 'LineString') {
       const coords = feature.geometry.coordinates;
 
@@ -39,7 +155,7 @@ export function checkCoastlineDataDensity(latitude, longitude, radiusKm = 5) {
   }
 
   // Also check islands
-  for (const feature of greeceIslands.features) {
+  for (const feature of islands.features) {
     if (feature.geometry.type === 'Polygon') {
       const coords = feature.geometry.coordinates[0]; // outer ring
       for (const coord of coords) {
@@ -438,15 +554,15 @@ export function getCardinalDirection(degrees) {
 }
 
 // Advanced bay detection algorithm that measures enclosure in multiple ways
-function analyzeBayGeometry(beachPoint) {
+function analyzeBayGeometry(beachPoint, coastlineData = greeceCoastlines, islandData = greeceIslands) {
   // Multi-scale approach - test multiple ray distances
   const rayDistances = [0.5, 1.0, 2.0, 3.0, 5.0]; // kilometers
   const numRays = 36; // every 10 degrees
-  
+
   // Results for each scale
   const rayResults = rayDistances.map(distance => {
     const rays = generateRays(beachPoint, numRays, distance);
-    const hits = rays.map(ray => intersectsLandmass(ray, greeceCoastlines, greeceIslands));
+    const hits = rays.map(ray => intersectsLandmass(ray, coastlineData, islandData));
     
     // Calculate hit rate (enclosure)
     const hitCount = hits.filter(hit => hit.intersects).length;
@@ -543,8 +659,25 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     // Create a point from the coordinates
     const beachPoint = turf.point([longitude, latitude]);
 
+    // Try to load tile data for this location (with fallback to bundled data)
+    let coastlineData = greeceCoastlines;
+    let islandData = greeceIslands;
+    let usingTiles = false;
+
+    try {
+      const tileResult = await loadCoastlineDataForLocation(latitude, longitude, 5);
+      if (tileResult.usedTiles && tileResult.coastlines.features.length > 0) {
+        coastlineData = tileResult.coastlines;
+        islandData = tileResult.islands;
+        usingTiles = true;
+        console.log(`Loaded ${tileResult.loadedTiles} tiles with ${coastlineData.features.length} coastlines, ${islandData.features.length} islands`);
+      }
+    } catch (tileError) {
+      console.warn('Tile loading failed, using bundled data:', tileError.message);
+    }
+
     // Check coastline data density for this location
-    const dataDensity = checkCoastlineDataDensity(latitude, longitude, 5);
+    const dataDensity = checkCoastlineDataDensity(latitude, longitude, 5, coastlineData, islandData);
 
     // If data is too sparse, return conservative estimate with warning
     if (dataDensity.isLowConfidence) {
@@ -558,22 +691,24 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
         isProtected: false,
         dataConfidence: dataDensity.confidence,
         isLowConfidence: true,
+        usingTiles,
         description: `Insufficient coastline data for accurate analysis (${dataDensity.totalPoints} points in ${dataDensity.radiusKm}km radius). Assuming exposed conditions for safety.`,
         debugInfo: {
           dataDensity: dataDensity.density,
           nearbySegments: dataDensity.nearbySegments,
-          totalPoints: dataDensity.totalPoints
+          totalPoints: dataDensity.totalPoints,
+          usingTiles
         }
       };
     }
 
-    // Advanced bay geometry analysis
-    const bayGeometry = analyzeBayGeometry(beachPoint);
-    
+    // Advanced bay geometry analysis (pass coastline data)
+    const bayGeometry = analyzeBayGeometry(beachPoint, coastlineData, islandData);
+
     // Bay detection is now handled algorithmically - no hardcoded overrides
-    
+
     // Find the nearest coastline segment
-    const nearestSegment = findNearestCoastlineSegment(beachPoint, greeceCoastlines);
+    const nearestSegment = findNearestCoastlineSegment(beachPoint, coastlineData);
     
     if (!nearestSegment) {
       throw new Error('Could not find nearby coastline');
@@ -588,17 +723,17 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     // Calculate ray-based enclosure scores at different distances
     // Short rays (0.7km) to detect small protected coves
     const shortRays = generateRays(beachPoint, 36, 0.7);
-    const shortHits = shortRays.map(ray => intersectsLandmass(ray, greeceCoastlines, greeceIslands));
+    const shortHits = shortRays.map(ray => intersectsLandmass(ray, coastlineData, islandData));
     const shortEnclosure = shortHits.filter(hit => hit.intersects).length / shortRays.length;
-    
+
     // Medium rays (1.5km) for typical bay/cove detection
     const mediumRays = generateRays(beachPoint, 36, 1.5);
-    const mediumHits = mediumRays.map(ray => intersectsLandmass(ray, greeceCoastlines, greeceIslands));
+    const mediumHits = mediumRays.map(ray => intersectsLandmass(ray, coastlineData, islandData));
     const mediumEnclosure = mediumHits.filter(hit => hit.intersects).length / mediumRays.length;
-    
-    // Long rays (3.0km) for broader geography 
+
+    // Long rays (3.0km) for broader geography
     const longRays = generateRays(beachPoint, 36, 3.0);
-    const longHits = longRays.map(ray => intersectsLandmass(ray, greeceCoastlines, greeceIslands));
+    const longHits = longRays.map(ray => intersectsLandmass(ray, coastlineData, islandData));
     const longEnclosure = longHits.filter(hit => hit.intersects).length / longRays.length;
     
     // Calculate weighted enclosure score based on bay type
@@ -640,7 +775,7 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     }
     
     // Find multiple relevant coastline segments
-    const relevantSegments = findRelevantCoastlineSegments(beachPoint, greeceCoastlines);
+    const relevantSegments = findRelevantCoastlineSegments(beachPoint, coastlineData);
     
     // Calculate protection using multiple segments
     let bestWindProtection = 0;
@@ -705,12 +840,14 @@ return {
       isPeninsulaBeach: bayGeometry.isPeninsulaBeach,
       isWideBay: bayGeometry.isWideBay,
       isModerateCoast: bayGeometry.isModerateCoast,
+      usingTiles,
       debugInfo: {
         shortEnclosure,
         mediumEnclosure,
         longEnclosure,
         dataDensity: dataDensity.density,
         nearbySegments: dataDensity.nearbySegments,
+        usingTiles,
         bayType: bayGeometry.isDeepBay ? 'deep' : bayGeometry.isMediumBay ? 'medium' : bayGeometry.isPeninsulaBeach ? 'peninsula' : bayGeometry.isWideBay ? 'wide' : bayGeometry.isShallowBay ? 'shallow' : bayGeometry.isModerateCoast ? 'moderate' : 'exposed'
       }
     };

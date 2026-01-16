@@ -1,0 +1,796 @@
+{
+  "tileSize": 0.5,
+  "bounds": {
+    "minLat": 34.5,
+    "maxLat": 42,
+    "minLng": 19,
+    "maxLng": 30
+  },
+  "tiles": [
+    {
+      "key": "35.5_27.0",
+      "file": "tile_35.5_27.0.json",
+      "features": 5
+    },
+    {
+      "key": "35.0_27.0",
+      "file": "tile_35.0_27.0.json",
+      "features": 4
+    },
+    {
+      "key": "35.5_27.5",
+      "file": "tile_35.5_27.5.json",
+      "features": 5
+    },
+    {
+      "key": "36.0_29.5",
+      "file": "tile_36.0_29.5.json",
+      "features": 6
+    },
+    {
+      "key": "36.0_29.0",
+      "file": "tile_36.0_29.0.json",
+      "features": 2
+    },
+    {
+      "key": "35.0_26.5",
+      "file": "tile_35.0_26.5.json",
+      "features": 10
+    },
+    {
+      "key": "35.5_26.5",
+      "file": "tile_35.5_26.5.json",
+      "features": 4
+    },
+    {
+      "key": "36.0_26.5",
+      "file": "tile_36.0_26.5.json",
+      "features": 14
+    },
+    {
+      "key": "36.0_28.0",
+      "file": "tile_36.0_28.0.json",
+      "features": 2
+    },
+    {
+      "key": "36.0_27.5",
+      "file": "tile_36.0_27.5.json",
+      "features": 16
+    },
+    {
+      "key": "36.0_27.0",
+      "file": "tile_36.0_27.0.json",
+      "features": 6
+    },
+    {
+      "key": "36.5_27.5",
+      "file": "tile_36.5_27.5.json",
+      "features": 13
+    },
+    {
+      "key": "36.5_26.5",
+      "file": "tile_36.5_26.5.json",
+      "features": 14
+    },
+    {
+      "key": "37.0_26.5",
+      "file": "tile_37.0_26.5.json",
+      "features": 58
+    },
+    {
+      "key": "37.0_27.0",
+      "file": "tile_37.0_27.0.json",
+      "features": 12
+    },
+    {
+      "key": "36.5_27.0",
+      "file": "tile_36.5_27.0.json",
+      "features": 18
+    },
+    {
+      "key": "35.5_26.0",
+      "file": "tile_35.5_26.0.json",
+      "features": 6
+    },
+    {
+      "key": "36.0_26.0",
+      "file": "tile_36.0_26.0.json",
+      "features": 3
+    },
+    {
+      "key": "36.5_26.0",
+      "file": "tile_36.5_26.0.json",
+      "features": 37
+    },
+    {
+      "key": "36.5_25.5",
+      "file": "tile_36.5_25.5.json",
+      "features": 38
+    },
+    {
+      "key": "36.5_25.0",
+      "file": "tile_36.5_25.0.json",
+      "features": 31
+    },
+    {
+      "key": "37.0_26.0",
+      "file": "tile_37.0_26.0.json",
+      "features": 4
+    },
+    {
+      "key": "37.5_26.0",
+      "file": "tile_37.5_26.0.json",
+      "features": 12
+    },
+    {
+      "key": "37.5_25.5",
+      "file": "tile_37.5_25.5.json",
+      "features": 2
+    },
+    {
+      "key": "37.5_26.5",
+      "file": "tile_37.5_26.5.json",
+      "features": 14
+    },
+    {
+      "key": "37.5_27.0",
+      "file": "tile_37.5_27.0.json",
+      "features": 2
+    },
+    {
+      "key": "36.0_25.0",
+      "file": "tile_36.0_25.0.json",
+      "features": 14
+    },
+    {
+      "key": "36.5_24.5",
+      "file": "tile_36.5_24.5.json",
+      "features": 21
+    },
+    {
+      "key": "36.5_24.0",
+      "file": "tile_36.5_24.0.json",
+      "features": 7
+    },
+    {
+      "key": "36.0_25.5",
+      "file": "tile_36.0_25.5.json",
+      "features": 8
+    },
+    {
+      "key": "37.0_25.0",
+      "file": "tile_37.0_25.0.json",
+      "features": 31
+    },
+    {
+      "key": "37.0_25.5",
+      "file": "tile_37.0_25.5.json",
+      "features": 15
+    },
+    {
+      "key": "37.0_24.5",
+      "file": "tile_37.0_24.5.json",
+      "features": 14
+    },
+    {
+      "key": "37.0_24.0",
+      "file": "tile_37.0_24.0.json",
+      "features": 6
+    },
+    {
+      "key": "38.0_25.5",
+      "file": "tile_38.0_25.5.json",
+      "features": 6
+    },
+    {
+      "key": "38.5_25.5",
+      "file": "tile_38.5_25.5.json",
+      "features": 8
+    },
+    {
+      "key": "38.5_25.0",
+      "file": "tile_38.5_25.0.json",
+      "features": 2
+    },
+    {
+      "key": "37.5_24.5",
+      "file": "tile_37.5_24.5.json",
+      "features": 16
+    },
+    {
+      "key": "37.5_24.0",
+      "file": "tile_37.5_24.0.json",
+      "features": 12
+    },
+    {
+      "key": "37.5_25.0",
+      "file": "tile_37.5_25.0.json",
+      "features": 5
+    },
+    {
+      "key": "39.5_25.0",
+      "file": "tile_39.5_25.0.json",
+      "features": 11
+    },
+    {
+      "key": "39.0_25.0",
+      "file": "tile_39.0_25.0.json",
+      "features": 2
+    },
+    {
+      "key": "39.0_24.5",
+      "file": "tile_39.0_24.5.json",
+      "features": 2
+    },
+    {
+      "key": "39.5_24.5",
+      "file": "tile_39.5_24.5.json",
+      "features": 2
+    },
+    {
+      "key": "40.0_25.0",
+      "file": "tile_40.0_25.0.json",
+      "features": 6
+    },
+    {
+      "key": "38.5_26.0",
+      "file": "tile_38.5_26.0.json",
+      "features": 16
+    },
+    {
+      "key": "38.0_26.0",
+      "file": "tile_38.0_26.0.json",
+      "features": 8
+    },
+    {
+      "key": "39.0_25.5",
+      "file": "tile_39.0_25.5.json",
+      "features": 4
+    },
+    {
+      "key": "39.0_26.0",
+      "file": "tile_39.0_26.0.json",
+      "features": 10
+    },
+    {
+      "key": "39.0_26.5",
+      "file": "tile_39.0_26.5.json",
+      "features": 2
+    },
+    {
+      "key": "38.5_26.5",
+      "file": "tile_38.5_26.5.json",
+      "features": 2
+    },
+    {
+      "key": "40.0_24.0",
+      "file": "tile_40.0_24.0.json",
+      "features": 3
+    },
+    {
+      "key": "40.0_23.5",
+      "file": "tile_40.0_23.5.json",
+      "features": 16
+    },
+    {
+      "key": "35.5_23.0",
+      "file": "tile_35.5_23.0.json",
+      "features": 6
+    },
+    {
+      "key": "36.0_22.5",
+      "file": "tile_36.0_22.5.json",
+      "features": 10
+    },
+    {
+      "key": "36.0_23.0",
+      "file": "tile_36.0_23.0.json",
+      "features": 9
+    },
+    {
+      "key": "37.0_23.0",
+      "file": "tile_37.0_23.0.json",
+      "features": 25
+    },
+    {
+      "key": "36.5_23.0",
+      "file": "tile_36.5_23.0.json",
+      "features": 3
+    },
+    {
+      "key": "37.0_23.5",
+      "file": "tile_37.0_23.5.json",
+      "features": 10
+    },
+    {
+      "key": "37.5_23.0",
+      "file": "tile_37.5_23.0.json",
+      "features": 44
+    },
+    {
+      "key": "37.5_23.5",
+      "file": "tile_37.5_23.5.json",
+      "features": 24
+    },
+    {
+      "key": "38.0_23.0",
+      "file": "tile_38.0_23.0.json",
+      "features": 8
+    },
+    {
+      "key": "38.0_23.5",
+      "file": "tile_38.0_23.5.json",
+      "features": 7
+    },
+    {
+      "key": "38.0_24.0",
+      "file": "tile_38.0_24.0.json",
+      "features": 27
+    },
+    {
+      "key": "36.5_23.5",
+      "file": "tile_36.5_23.5.json",
+      "features": 2
+    },
+    {
+      "key": "34.5_26.0",
+      "file": "tile_34.5_26.0.json",
+      "features": 8
+    },
+    {
+      "key": "34.5_25.5",
+      "file": "tile_34.5_25.5.json",
+      "features": 6
+    },
+    {
+      "key": "34.5_25.0",
+      "file": "tile_34.5_25.0.json",
+      "features": 2
+    },
+    {
+      "key": "34.5_24.5",
+      "file": "tile_34.5_24.5.json",
+      "features": 2
+    },
+    {
+      "key": "35.0_24.5",
+      "file": "tile_35.0_24.5.json",
+      "features": 4
+    },
+    {
+      "key": "35.0_24.0",
+      "file": "tile_35.0_24.0.json",
+      "features": 5
+    },
+    {
+      "key": "35.0_23.5",
+      "file": "tile_35.0_23.5.json",
+      "features": 5
+    },
+    {
+      "key": "35.5_23.5",
+      "file": "tile_35.5_23.5.json",
+      "features": 8
+    },
+    {
+      "key": "35.5_24.0",
+      "file": "tile_35.5_24.0.json",
+      "features": 2
+    },
+    {
+      "key": "35.0_25.0",
+      "file": "tile_35.0_25.0.json",
+      "features": 4
+    },
+    {
+      "key": "35.0_25.5",
+      "file": "tile_35.0_25.5.json",
+      "features": 9
+    },
+    {
+      "key": "35.0_26.0",
+      "file": "tile_35.0_26.0.json",
+      "features": 12
+    },
+    {
+      "key": "34.5_24.0",
+      "file": "tile_34.5_24.0.json",
+      "features": 4
+    },
+    {
+      "key": "34.5_23.5",
+      "file": "tile_34.5_23.5.json",
+      "features": 2
+    },
+    {
+      "key": "39.0_20.5",
+      "file": "tile_39.0_20.5.json",
+      "features": 2
+    },
+    {
+      "key": "38.5_20.5",
+      "file": "tile_38.5_20.5.json",
+      "features": 33
+    },
+    {
+      "key": "39.0_20.0",
+      "file": "tile_39.0_20.0.json",
+      "features": 14
+    },
+    {
+      "key": "39.5_20.0",
+      "file": "tile_39.5_20.0.json",
+      "features": 3
+    },
+    {
+      "key": "40.0_20.0",
+      "file": "tile_40.0_20.0.json",
+      "features": 2
+    },
+    {
+      "key": "40.0_20.5",
+      "file": "tile_40.0_20.5.json",
+      "features": 2
+    },
+    {
+      "key": "40.5_20.5",
+      "file": "tile_40.5_20.5.json",
+      "features": 2
+    },
+    {
+      "key": "40.5_21.0",
+      "file": "tile_40.5_21.0.json",
+      "features": 2
+    },
+    {
+      "key": "40.5_21.5",
+      "file": "tile_40.5_21.5.json",
+      "features": 3
+    },
+    {
+      "key": "40.0_21.5",
+      "file": "tile_40.0_21.5.json",
+      "features": 4
+    },
+    {
+      "key": "40.0_22.0",
+      "file": "tile_40.0_22.0.json",
+      "features": 4
+    },
+    {
+      "key": "39.5_21.5",
+      "file": "tile_39.5_21.5.json",
+      "features": 3
+    },
+    {
+      "key": "39.5_21.0",
+      "file": "tile_39.5_21.0.json",
+      "features": 3
+    },
+    {
+      "key": "39.0_21.0",
+      "file": "tile_39.0_21.0.json",
+      "features": 7
+    },
+    {
+      "key": "39.5_22.5",
+      "file": "tile_39.5_22.5.json",
+      "features": 2
+    },
+    {
+      "key": "39.5_22.0",
+      "file": "tile_39.5_22.0.json",
+      "features": 2
+    },
+    {
+      "key": "41.0_21.5",
+      "file": "tile_41.0_21.5.json",
+      "features": 1
+    },
+    {
+      "key": "41.0_22.0",
+      "file": "tile_41.0_22.0.json",
+      "features": 1
+    },
+    {
+      "key": "41.0_22.5",
+      "file": "tile_41.0_22.5.json",
+      "features": 1
+    },
+    {
+      "key": "41.0_23.0",
+      "file": "tile_41.0_23.0.json",
+      "features": 1
+    },
+    {
+      "key": "41.0_23.5",
+      "file": "tile_41.0_23.5.json",
+      "features": 1
+    },
+    {
+      "key": "41.0_24.0",
+      "file": "tile_41.0_24.0.json",
+      "features": 1
+    },
+    {
+      "key": "41.5_24.0",
+      "file": "tile_41.5_24.0.json",
+      "features": 1
+    },
+    {
+      "key": "41.5_24.5",
+      "file": "tile_41.5_24.5.json",
+      "features": 1
+    },
+    {
+      "key": "41.0_24.5",
+      "file": "tile_41.0_24.5.json",
+      "features": 1
+    },
+    {
+      "key": "41.0_25.0",
+      "file": "tile_41.0_25.0.json",
+      "features": 1
+    },
+    {
+      "key": "41.0_25.5",
+      "file": "tile_41.0_25.5.json",
+      "features": 1
+    },
+    {
+      "key": "41.0_26.0",
+      "file": "tile_41.0_26.0.json",
+      "features": 1
+    },
+    {
+      "key": "41.5_26.0",
+      "file": "tile_41.5_26.0.json",
+      "features": 1
+    },
+    {
+      "key": "41.5_26.5",
+      "file": "tile_41.5_26.5.json",
+      "features": 1
+    },
+    {
+      "key": "41.0_26.5",
+      "file": "tile_41.0_26.5.json",
+      "features": 1
+    },
+    {
+      "key": "40.5_26.0",
+      "file": "tile_40.5_26.0.json",
+      "features": 3
+    },
+    {
+      "key": "40.5_25.5",
+      "file": "tile_40.5_25.5.json",
+      "features": 3
+    },
+    {
+      "key": "40.5_25.0",
+      "file": "tile_40.5_25.0.json",
+      "features": 1
+    },
+    {
+      "key": "40.5_24.5",
+      "file": "tile_40.5_24.5.json",
+      "features": 9
+    },
+    {
+      "key": "40.5_24.0",
+      "file": "tile_40.5_24.0.json",
+      "features": 2
+    },
+    {
+      "key": "40.5_23.5",
+      "file": "tile_40.5_23.5.json",
+      "features": 3
+    },
+    {
+      "key": "39.5_24.0",
+      "file": "tile_39.5_24.0.json",
+      "features": 3
+    },
+    {
+      "key": "39.5_23.5",
+      "file": "tile_39.5_23.5.json",
+      "features": 1
+    },
+    {
+      "key": "40.0_23.0",
+      "file": "tile_40.0_23.0.json",
+      "features": 1
+    },
+    {
+      "key": "39.5_23.0",
+      "file": "tile_39.5_23.0.json",
+      "features": 2
+    },
+    {
+      "key": "40.0_22.5",
+      "file": "tile_40.0_22.5.json",
+      "features": 1
+    },
+    {
+      "key": "40.5_22.5",
+      "file": "tile_40.5_22.5.json",
+      "features": 1
+    },
+    {
+      "key": "40.0_25.5",
+      "file": "tile_40.0_25.5.json",
+      "features": 2
+    },
+    {
+      "key": "37.0_21.0",
+      "file": "tile_37.0_21.0.json",
+      "features": 4
+    },
+    {
+      "key": "37.0_20.5",
+      "file": "tile_37.0_20.5.json",
+      "features": 2
+    },
+    {
+      "key": "37.0_22.5",
+      "file": "tile_37.0_22.5.json",
+      "features": 5
+    },
+    {
+      "key": "37.5_22.5",
+      "file": "tile_37.5_22.5.json",
+      "features": 5
+    },
+    {
+      "key": "37.0_21.5",
+      "file": "tile_37.0_21.5.json",
+      "features": 3
+    },
+    {
+      "key": "36.5_22.5",
+      "file": "tile_36.5_22.5.json",
+      "features": 3
+    },
+    {
+      "key": "36.5_21.5",
+      "file": "tile_36.5_21.5.json",
+      "features": 11
+    },
+    {
+      "key": "37.5_20.5",
+      "file": "tile_37.5_20.5.json",
+      "features": 6
+    },
+    {
+      "key": "38.0_20.0",
+      "file": "tile_38.0_20.0.json",
+      "features": 4
+    },
+    {
+      "key": "38.0_22.5",
+      "file": "tile_38.0_22.5.json",
+      "features": 18
+    },
+    {
+      "key": "39.5_19.5",
+      "file": "tile_39.5_19.5.json",
+      "features": 12
+    },
+    {
+      "key": "39.0_19.5",
+      "file": "tile_39.0_19.5.json",
+      "features": 2
+    },
+    {
+      "key": "39.5_19.0",
+      "file": "tile_39.5_19.0.json",
+      "features": 2
+    },
+    {
+      "key": "38.0_21.0",
+      "file": "tile_38.0_21.0.json",
+      "features": 46
+    },
+    {
+      "key": "38.0_20.5",
+      "file": "tile_38.0_20.5.json",
+      "features": 9
+    },
+    {
+      "key": "36.5_22.0",
+      "file": "tile_36.5_22.0.json",
+      "features": 1
+    },
+    {
+      "key": "36.0_22.0",
+      "file": "tile_36.0_22.0.json",
+      "features": 1
+    },
+    {
+      "key": "37.0_22.0",
+      "file": "tile_37.0_22.0.json",
+      "features": 1
+    },
+    {
+      "key": "37.5_21.0",
+      "file": "tile_37.5_21.0.json",
+      "features": 1
+    },
+    {
+      "key": "38.0_21.5",
+      "file": "tile_38.0_21.5.json",
+      "features": 4
+    },
+    {
+      "key": "38.0_22.0",
+      "file": "tile_38.0_22.0.json",
+      "features": 5
+    },
+    {
+      "key": "38.5_21.5",
+      "file": "tile_38.5_21.5.json",
+      "features": 3
+    },
+    {
+      "key": "38.5_22.0",
+      "file": "tile_38.5_22.0.json",
+      "features": 3
+    },
+    {
+      "key": "38.5_21.0",
+      "file": "tile_38.5_21.0.json",
+      "features": 3
+    },
+    {
+      "key": "38.0_24.5",
+      "file": "tile_38.0_24.5.json",
+      "features": 2
+    },
+    {
+      "key": "38.5_23.5",
+      "file": "tile_38.5_23.5.json",
+      "features": 3
+    },
+    {
+      "key": "38.5_23.0",
+      "file": "tile_38.5_23.0.json",
+      "features": 7
+    },
+    {
+      "key": "38.5_22.5",
+      "file": "tile_38.5_22.5.json",
+      "features": 5
+    },
+    {
+      "key": "39.0_23.0",
+      "file": "tile_39.0_23.0.json",
+      "features": 21
+    },
+    {
+      "key": "38.5_24.0",
+      "file": "tile_38.5_24.0.json",
+      "features": 18
+    },
+    {
+      "key": "38.5_24.5",
+      "file": "tile_38.5_24.5.json",
+      "features": 9
+    },
+    {
+      "key": "39.0_24.0",
+      "file": "tile_39.0_24.0.json",
+      "features": 28
+    },
+    {
+      "key": "39.0_23.5",
+      "file": "tile_39.0_23.5.json",
+      "features": 29
+    },
+    {
+      "key": "39.0_22.5",
+      "file": "tile_39.0_22.5.json",
+      "features": 1
+    }
+  ]
+}
