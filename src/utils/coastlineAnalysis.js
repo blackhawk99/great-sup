@@ -624,13 +624,15 @@ function analyzeBayGeometry(beachPoint, coastlineData = greeceCoastlines, island
   const longRangeEnclosure = rayResults[3]?.hitRate || 0;  // 3.0km
   
   // Find patterns characteristic of different bay types
+  // NOTE: Thresholds are strict to avoid false positives on islands
 
-  // Deep/protected bay: high enclosure at all scales (e.g., Navarino Bay)
-  const isDeepBay = shortRangeEnclosure > 0.65 && midRangeEnclosure > 0.55 && longRangeEnclosure > 0.45;
+  // Deep/protected bay: high enclosure at ALL scales including long range (e.g., Navarino Bay)
+  // Must have significant enclosure even at 3km to be considered truly deep
+  const isDeepBay = shortRangeEnclosure > 0.75 && midRangeEnclosure > 0.65 && longRangeEnclosure > 0.55;
 
   // Medium bay: good enclosure at short/mid range (e.g., Vouliagmeni, 800m-1.5km wide bays)
-  // These provide excellent SUP protection even if longer rays reach open water
-  const isMediumBay = !isDeepBay && shortRangeEnclosure > 0.55 && midRangeEnclosure > 0.4;
+  // Requires higher thresholds to avoid island false positives
+  const isMediumBay = !isDeepBay && shortRangeEnclosure > 0.70 && midRangeEnclosure > 0.55 && longRangeEnclosure > 0.35;
 
   // Peninsula beach: enclosure INCREASES with distance (e.g., Astir Beach on Vouliagmeni peninsula)
   // Immediate area is open but surrounded by land at larger scale - provides regional wind shelter
