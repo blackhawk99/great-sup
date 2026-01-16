@@ -5,6 +5,8 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   build: {
+    // Skip gzip size calculation to save memory
+    reportCompressedSize: false,
     // Reduce memory usage by splitting into smaller chunks
     rollupOptions: {
       output: {
@@ -14,6 +16,7 @@ export default defineConfig({
           'vendor-charts': ['recharts'],
           'vendor-turf': ['@turf/turf'],
           'vendor-i18n': ['i18next', 'react-i18next'],
+          'vendor-map': ['leaflet', 'react-leaflet'],
         },
       },
     },
@@ -21,5 +24,7 @@ export default defineConfig({
     minify: 'esbuild',
     // Disable source maps in production to save memory
     sourcemap: false,
+    // Suppress chunk size warnings
+    chunkSizeWarningLimit: 1000,
   },
 });
