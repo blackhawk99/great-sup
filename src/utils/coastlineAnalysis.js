@@ -837,15 +837,29 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
       }
     }
 
+    // OVERRIDE: If wind comes from seaward and there's no meaningful blocking,
+    // the beach is EXPOSED regardless of bay enclosure calculation
+    // (bay enclosure can be wrong due to island geometry)
+    const windExposed = windFromSeaward &&
+      (!windBlocked.intersects || windBlocked.distance < 1.5);
+
     // Final protection score:
-    // - 50% from wind blocking
-    // - 25% from wave blocking
-    // - 25% from bay enclosure
-    const protectionScore = (
-      0.5 * windProtection +
-      0.25 * waveProtection +
-      0.25 * bayEnclosure
-    ) * 100;
+    // - If wind exposed: heavily penalize, max 20% from other factors
+    // - Otherwise: normal calculation
+    let protectionScore;
+    if (windExposed) {
+      // Exposed to wind - bay enclosure doesn't help much
+      protectionScore = (
+        0.1 * waveProtection +
+        0.1 * bayEnclosure
+      ) * 100;
+    } else {
+      protectionScore = (
+        0.5 * windProtection +
+        0.25 * waveProtection +
+        0.25 * bayEnclosure
+      ) * 100;
+    }
 
     const finalScore = Math.round(protectionScore);
 
@@ -869,6 +883,7 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
         seawardDirection,
         windFromSeaward,
         waveFromSeaward,
+        windExposed,
         windBlocked: windBlocked.intersects,
         windBlockDistance: windBlocked.distance,
         waveBlocked: waveBlocked.intersects,
