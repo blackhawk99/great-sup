@@ -808,7 +808,8 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     // SMART WIND PROTECTION:
     // - In a real bay/cove (high enclosure), headlands at 0.5km+ provide real protection
     // - On straight/exposed coast (low enclosure), close hits are just shore curves
-    const isInBay = bayEnclosure > 0.35; // More than 35% of seaward rays hit land
+    // NOTE: On islands, even exposed beaches show ~40% due to island shape, need >50%
+    const isInBay = bayEnclosure > 0.50; // More than 50% of seaward rays hit land
 
     let windProtection = 0;
     if (windBlocked.intersects) {
