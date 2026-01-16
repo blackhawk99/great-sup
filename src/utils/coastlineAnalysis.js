@@ -112,6 +112,35 @@ export async function loadCoastlineDataForLocation(lat, lng, radiusKm = 5) {
 }
 
 // ============================================================================
+// FILTER INVALID COASTLINES FROM BUNDLED DATA
+// ============================================================================
+
+/**
+ * Filter out invalid coastline features (duplicate points, single points, etc.)
+ * This is used as a fallback when tiles can't be loaded
+ */
+function filterValidCoastlines(coastlines) {
+  const validFeatures = coastlines.features.filter(feature => {
+    if (feature.geometry.type !== 'LineString') return false;
+    const coords = feature.geometry.coordinates;
+
+    // Must have at least 2 points
+    if (!coords || coords.length < 2) return false;
+
+    // Check for duplicate points (all points the same)
+    const uniquePoints = new Set(coords.map(c => `${c[0]},${c[1]}`));
+    if (uniquePoints.size < 2) return false;
+
+    return true;
+  });
+
+  return {
+    type: 'FeatureCollection',
+    features: validFeatures
+  };
+}
+
+// ============================================================================
 // DATA DENSITY CHECK (works with both bundled and tile data)
 // ============================================================================
 
@@ -671,9 +700,17 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
         islandData = tileResult.islands;
         usingTiles = true;
         console.log(`Loaded ${tileResult.loadedTiles} tiles with ${coastlineData.features.length} coastlines, ${islandData.features.length} islands`);
+      } else {
+        console.log('Tiles empty or not found, using filtered bundled data');
+        // Filter invalid segments from bundled data
+        coastlineData = filterValidCoastlines(greeceCoastlines);
+        islandData = greeceIslands;
       }
     } catch (tileError) {
-      console.warn('Tile loading failed, using bundled data:', tileError.message);
+      console.warn('Tile loading failed, using filtered bundled data:', tileError.message);
+      // Filter invalid segments from bundled data
+      coastlineData = filterValidCoastlines(greeceCoastlines);
+      islandData = greeceIslands;
     }
 
     // Check coastline data density for this location
