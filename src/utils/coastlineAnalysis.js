@@ -784,37 +784,11 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     ]);
     const waveBlocked = intersectsLandmass(waveAngleRay, coastlineData, islandData);
 
-    // STRICT WIND PROTECTION LOGIC:
-    // On islands, coastline curves can cause false positives at 0.5-1.5km
-    // Real protection requires land ACROSS water, typically showing as:
-    // - Island/headland at 1.5-3km that genuinely blocks the wind path
-    // Closer hits (< 1.5km) are usually just the same shoreline curving
-
-    let windProtection = 0;
-    if (windBlocked.intersects) {
-      const dist = windBlocked.distance;
-      if (dist >= 1.5 && dist <= 3.0) {
-        // Land at 1.5-3km = likely real blocking (island, headland across water)
-        windProtection = 0.7 * (1 - (dist - 1.5) / 1.5);
-      }
-      // dist < 1.5km = probably same shoreline curving = EXPOSED
-      // dist > 3km = too far for meaningful wind shelter = EXPOSED
-    }
-
-    let waveProtection = 0;
-    if (waveBlocked.intersects) {
-      const dist = waveBlocked.distance;
-      if (dist >= 1.0 && dist <= 2.5) {
-        // Waves blocked by land at 1-2.5km
-        waveProtection = 0.5 * (1 - (dist - 1.0) / 1.5);
-      }
-    }
-
-    // Check for bay enclosure - headlands on sides providing shelter
-    // Use longer rays and stricter distance threshold to avoid false positives
+    // FIRST: Check bay enclosure (headlands on sides)
+    // This helps distinguish real coves from straight coastlines
     let significantSeawardHits = 0;
     let seawardRays = 0;
-    const rays = generateRays(beachPoint, 36, 5.0); // 36 rays at 5km
+    const rays = generateRays(beachPoint, 36, 3.0); // 36 rays at 3km
 
     for (let i = 0; i < 36; i++) {
       const rayAngle = (i * 360) / 36;
@@ -822,18 +796,48 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
       if (angleDiff <= 90) {
         seawardRays++;
         const hit = intersectsLandmass(rays[i], coastlineData, islandData);
-        // Only count if land is at 1-4km (real headland, not just shore curve)
-        if (hit.intersects && hit.distance >= 1.0 && hit.distance <= 4.0) {
+        // Count land at 0.4-3km as potential bay enclosure
+        if (hit.intersects && hit.distance >= 0.4 && hit.distance <= 3.0) {
           significantSeawardHits++;
         }
       }
     }
 
-    // Bay enclosure based on significant land features in seaward arc
     const bayEnclosure = seawardRays > 0 ? significantSeawardHits / seawardRays : 0;
 
+    // SMART WIND PROTECTION:
+    // - In a real bay/cove (high enclosure), headlands at 0.5km+ provide real protection
+    // - On straight/exposed coast (low enclosure), close hits are just shore curves
+    const isInBay = bayEnclosure > 0.35; // More than 35% of seaward rays hit land
+
+    let windProtection = 0;
+    if (windBlocked.intersects) {
+      const dist = windBlocked.distance;
+      if (isInBay) {
+        // In a bay: trust closer blocking (real headlands)
+        if (dist >= 0.4 && dist <= 2.5) {
+          windProtection = 0.8 * (1 - (dist - 0.4) / 2.1);
+        }
+      } else {
+        // Exposed coast: require farther blocking to be meaningful
+        if (dist >= 1.5 && dist <= 3.0) {
+          windProtection = 0.6 * (1 - (dist - 1.5) / 1.5);
+        }
+      }
+    }
+
+    let waveProtection = 0;
+    if (waveBlocked.intersects) {
+      const dist = waveBlocked.distance;
+      if (isInBay && dist >= 0.4 && dist <= 2.0) {
+        waveProtection = 0.6 * (1 - (dist - 0.4) / 1.6);
+      } else if (!isInBay && dist >= 1.0 && dist <= 2.5) {
+        waveProtection = 0.4 * (1 - (dist - 1.0) / 1.5);
+      }
+    }
+
     // Final protection score:
-    // - 50% from wind direction/blocking (most important for SUP)
+    // - 50% from wind blocking
     // - 25% from wave blocking
     // - 25% from bay enclosure
     const protectionScore = (
@@ -868,6 +872,7 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
         windBlockDistance: windBlocked.distance,
         waveBlocked: waveBlocked.intersects,
         waveBlockDistance: waveBlocked.distance,
+        isInBay,
         bayEnclosure,
         significantSeawardHits,
         seawardRays,
