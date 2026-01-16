@@ -20,8 +20,8 @@ export default defineConfig({
         },
       },
     },
-    // Use esbuild for minification (faster and less memory than terser)
-    minify: 'esbuild',
+    // Disable minification to reduce memory usage during build
+    minify: false,
     // Disable source maps in production to save memory
     sourcemap: false,
     // Suppress chunk size warnings
