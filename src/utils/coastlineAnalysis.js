@@ -1,11 +1,44 @@
 // src/utils/coastlineAnalysis.js
 import * as turf from '@turf/turf';
-import { greeceCoastlines } from '../data/greece-coastlines';
-import { greeceIslands } from '../data/greece-islands';
+
+// Lazy-loaded data (fetched at runtime to avoid bundling 97MB of data)
+let greeceCoastlines = null;
+let greeceIslands = null;
+let dataLoadPromise = null;
+
+// Load coastline data at runtime
+async function loadCoastlineData() {
+  if (greeceCoastlines && greeceIslands) {
+    return { greeceCoastlines, greeceIslands };
+  }
+
+  if (dataLoadPromise) {
+    return dataLoadPromise;
+  }
+
+  dataLoadPromise = Promise.all([
+    fetch('/data/greece-coastlines.json').then(r => r.json()),
+    fetch('/data/greece-islands.json').then(r => r.json())
+  ]).then(([coastlines, islands]) => {
+    greeceCoastlines = coastlines;
+    greeceIslands = islands;
+    return { greeceCoastlines, greeceIslands };
+  });
+
+  return dataLoadPromise;
+}
+
+// Ensure data is loaded before use
+async function ensureDataLoaded() {
+  if (!greeceCoastlines || !greeceIslands) {
+    await loadCoastlineData();
+  }
+}
 
 // Snap coordinates to nearest coastline point
-export function snapToCoastline(latitude, longitude, maxDistance = 2) {
+export async function snapToCoastline(latitude, longitude, maxDistance = 2) {
   try {
+    await ensureDataLoaded();
     const point = turf.point([longitude, latitude]);
     let nearestPoint = null;
     let minDistance = Infinity;
@@ -235,10 +268,11 @@ export function calculateDirectionalExposure(windDirection, coastlineAngle) {
 }
 
 // Check for island protection
-export function checkIslandProtection(beachPoint, windDirection, waveDirection) {
+export async function checkIslandProtection(beachPoint, windDirection, waveDirection) {
+  await ensureDataLoaded();
   // Calculate which directions are shielded by islands
   const shieldedDirections = [];
-  
+
   for (const feature of greeceIslands.features) {
     // For each island
     if (feature.geometry.type === 'Polygon') {
@@ -357,11 +391,12 @@ export function getCardinalDirection(degrees) {
 }
 
 // Advanced bay detection algorithm that measures enclosure in multiple ways
-function analyzeBayGeometry(beachPoint) {
+async function analyzeBayGeometry(beachPoint) {
+  await ensureDataLoaded();
   // Multi-scale approach - test multiple ray distances
   const rayDistances = [0.5, 1.0, 2.0, 3.0, 5.0]; // kilometers
   const numRays = 36; // every 10 degrees
-  
+
   // Results for each scale
   const rayResults = rayDistances.map(distance => {
     const rays = generateRays(beachPoint, numRays, distance);
@@ -459,11 +494,12 @@ function analyzeBayGeometry(beachPoint) {
 // Main analysis function with improved bay detection
 export async function analyzeBayProtection(latitude, longitude, windDirection, waveDirection) {
   try {
+    await ensureDataLoaded();
     // Create a point from the coordinates
     const beachPoint = turf.point([longitude, latitude]);
-    
+
     // Advanced bay geometry analysis
-    const bayGeometry = analyzeBayGeometry(beachPoint);
+    const bayGeometry = await analyzeBayGeometry(beachPoint);
     
     // Bay detection is now handled algorithmically - no hardcoded overrides
     
