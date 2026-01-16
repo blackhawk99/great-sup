@@ -3,6 +3,87 @@ import * as turf from '@turf/turf';
 import { greeceCoastlines } from '../data/greece-coastlines';
 import { greeceIslands } from '../data/greece-islands';
 
+// Check coastline data density around a point to determine analysis confidence
+// Returns { density, confidence, isLowConfidence, nearbySegments, totalPoints }
+export function checkCoastlineDataDensity(latitude, longitude, radiusKm = 5) {
+  const point = turf.point([longitude, latitude]);
+  let totalPoints = 0;
+  let validSegments = 0;
+  let nearbySegments = 0;
+
+  // Check coastlines within radius
+  for (const feature of greeceCoastlines.features) {
+    if (feature.geometry.type === 'LineString') {
+      const coords = feature.geometry.coordinates;
+
+      // Skip single-point or invalid segments
+      if (coords.length < 2) continue;
+      if (coords.length === 2 &&
+          coords[0][0] === coords[1][0] &&
+          coords[0][1] === coords[1][1]) continue;
+
+      validSegments++;
+
+      // Check if any point of this segment is within radius
+      let segmentNearby = false;
+      for (const coord of coords) {
+        const segPoint = turf.point(coord);
+        const distance = turf.distance(point, segPoint, { units: 'kilometers' });
+        if (distance <= radiusKm) {
+          totalPoints++;
+          segmentNearby = true;
+        }
+      }
+      if (segmentNearby) nearbySegments++;
+    }
+  }
+
+  // Also check islands
+  for (const feature of greeceIslands.features) {
+    if (feature.geometry.type === 'Polygon') {
+      const coords = feature.geometry.coordinates[0]; // outer ring
+      for (const coord of coords) {
+        const segPoint = turf.point(coord);
+        const distance = turf.distance(point, segPoint, { units: 'kilometers' });
+        if (distance <= radiusKm) {
+          totalPoints++;
+        }
+      }
+    }
+  }
+
+  // Calculate density (points per km²)
+  const areaKm2 = Math.PI * radiusKm * radiusKm;
+  const density = totalPoints / areaKm2;
+
+  // Confidence thresholds based on empirical testing
+  // Good data: > 10 points per km² in 5km radius
+  // Moderate: 3-10 points per km²
+  // Low: < 3 points per km²
+  let confidence;
+  let isLowConfidence;
+
+  if (density >= 10 && nearbySegments >= 3) {
+    confidence = 'high';
+    isLowConfidence = false;
+  } else if (density >= 3 && nearbySegments >= 1) {
+    confidence = 'moderate';
+    isLowConfidence = false;
+  } else {
+    confidence = 'low';
+    isLowConfidence = true;
+  }
+
+  return {
+    density: Math.round(density * 100) / 100,
+    confidence,
+    isLowConfidence,
+    nearbySegments,
+    totalPoints,
+    radiusKm
+  };
+}
+
 // Snap coordinates to nearest coastline point
 export function snapToCoastline(latitude, longitude, maxDistance = 2) {
   try {
@@ -461,7 +542,31 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
   try {
     // Create a point from the coordinates
     const beachPoint = turf.point([longitude, latitude]);
-    
+
+    // Check coastline data density for this location
+    const dataDensity = checkCoastlineDataDensity(latitude, longitude, 5);
+
+    // If data is too sparse, return conservative estimate with warning
+    if (dataDensity.isLowConfidence) {
+      return {
+        protectionScore: 0,
+        coastlineAngle: 0,
+        enclosureScore: 0,
+        windProtection: 0,
+        waveProtection: 0,
+        bayEnclosure: 0,
+        isProtected: false,
+        dataConfidence: dataDensity.confidence,
+        isLowConfidence: true,
+        description: `Insufficient coastline data for accurate analysis (${dataDensity.totalPoints} points in ${dataDensity.radiusKm}km radius). Assuming exposed conditions for safety.`,
+        debugInfo: {
+          dataDensity: dataDensity.density,
+          nearbySegments: dataDensity.nearbySegments,
+          totalPoints: dataDensity.totalPoints
+        }
+      };
+    }
+
     // Advanced bay geometry analysis
     const bayGeometry = analyzeBayGeometry(beachPoint);
     
@@ -587,9 +692,11 @@ return {
   waveProtection: Math.min(1.0, totalWaveProtection),
   bayEnclosure: enclosureScore,
       isProtected: protectionScore > 50,
+      dataConfidence: dataDensity.confidence,
+      isLowConfidence: false,
       description: generateProtectionDescription(
-        enclosureScore, 
-        coastlineAngle, 
+        enclosureScore,
+        coastlineAngle,
         totalWindProtection,
         totalWaveProtection
       ),
@@ -602,6 +709,8 @@ return {
         shortEnclosure,
         mediumEnclosure,
         longEnclosure,
+        dataDensity: dataDensity.density,
+        nearbySegments: dataDensity.nearbySegments,
         bayType: bayGeometry.isDeepBay ? 'deep' : bayGeometry.isMediumBay ? 'medium' : bayGeometry.isPeninsulaBeach ? 'peninsula' : bayGeometry.isWideBay ? 'wide' : bayGeometry.isShallowBay ? 'shallow' : bayGeometry.isModerateCoast ? 'moderate' : 'exposed'
       }
     };

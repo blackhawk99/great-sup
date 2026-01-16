@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   RefreshCw,
   AlertCircle,
+  AlertTriangle,
   MapPin,
   Map,
   Wind,
@@ -962,6 +963,18 @@ const FixedBeachView = ({
               {protectionLabel}
             </span>
           </h4>
+          {/* Low confidence warning */}
+          {geoProtection.isLowConfidence && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-800">Limited Data Available</p>
+                <p className="text-xs text-amber-700 mt-1">
+                  {geoProtection.description || 'Coastline data is sparse for this location. Protection score may be less accurate. Using conservative estimate for safety.'}
+                </p>
+              </div>
+            </div>
+          )}
             <div className="flex justify-end mb-2">
               <button
                 onClick={() => setShowDebug(!showDebug)}
