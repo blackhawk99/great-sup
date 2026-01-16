@@ -187,7 +187,7 @@ export const useBeachManager = () => {
       }
 
       // Snap coordinates to nearest coastline (within 2km)
-      const snapped = snapToCoastline(lat, lng, 2);
+      const snapped = await snapToCoastline(lat, lng, 2);
       if (snapped.snapped) {
         console.log(`Snapped beach from (${lat}, ${lng}) to (${snapped.latitude}, ${snapped.longitude}) - ${(snapped.distance * 1000).toFixed(0)}m adjustment`);
         lat = snapped.latitude;
@@ -242,7 +242,7 @@ export const useBeachManager = () => {
       // Snap coordinates to nearest coastline (within 2km)
       let lat = location.latitude;
       let lng = location.longitude;
-      const snapped = snapToCoastline(lat, lng, 2);
+      const snapped = await snapToCoastline(lat, lng, 2);
       if (snapped.snapped) {
         console.log(`Snapped beach from (${lat}, ${lng}) to (${snapped.latitude}, ${snapped.longitude}) - ${(snapped.distance * 1000).toFixed(0)}m adjustment`);
         lat = snapped.latitude;
@@ -279,9 +279,9 @@ export const useBeachManager = () => {
   };
 
   // Re-snap all existing beaches to coastline
-  const resnapAllBeaches = () => {
-    const updatedBeaches = beaches.map(beach => {
-      const snapped = snapToCoastline(beach.latitude, beach.longitude, 2);
+  const resnapAllBeaches = async () => {
+    const updatedBeaches = await Promise.all(beaches.map(async (beach) => {
+      const snapped = await snapToCoastline(beach.latitude, beach.longitude, 2);
       if (snapped.snapped) {
         console.log(`Re-snapped ${beach.name}: (${beach.latitude.toFixed(4)}, ${beach.longitude.toFixed(4)}) → (${snapped.latitude.toFixed(4)}, ${snapped.longitude.toFixed(4)}) - ${(snapped.distance * 1000).toFixed(0)}m`);
         return {
@@ -294,7 +294,7 @@ export const useBeachManager = () => {
         };
       }
       return beach;
-    });
+    }));
 
     const snappedCount = updatedBeaches.filter((b, i) =>
       b.latitude !== beaches[i].latitude || b.longitude !== beaches[i].longitude
