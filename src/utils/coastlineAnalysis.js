@@ -2,6 +2,8 @@
 import * as turf from '@turf/turf';
 import { greeceCoastlines } from '../data/greece-coastlines';
 import { greeceIslands } from '../data/greece-islands';
+import { getCachedProtection, setCachedProtection } from './protectionCache';
+import { adjustDirectionForSeason } from './seasonal';
 
 // Snap coordinates to nearest coastline point
 export function snapToCoastline(latitude, longitude, maxDistance = 2) {
@@ -623,9 +625,6 @@ return {
 }
 
 // Main geographic protection analysis function
-import { getCachedProtection, setCachedProtection } from './protectionCache.js';
-import { adjustDirectionForSeason } from './seasonal.js';
-
 export const calculateGeographicProtection = async (beach, windDirection, waveDirection, date = new Date()) => {
   if (!beach || !beach.latitude || !beach.longitude) {
     throw new Error('Invalid beach data for protection calculation');

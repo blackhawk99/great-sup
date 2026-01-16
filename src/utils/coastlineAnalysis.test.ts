@@ -1,4 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
+
+// Mock the large data files before importing coastlineAnalysis
+vi.mock('../data/greece-coastlines', () => ({
+  greeceCoastlines: { type: 'FeatureCollection', features: [] }
+}))
+
+vi.mock('../data/greece-islands', () => ({
+  greeceIslands: { type: 'FeatureCollection', features: [] }
+}))
+
 import {
   generateRays,
   calculateDirectionalExposure,
