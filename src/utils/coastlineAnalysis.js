@@ -734,8 +734,38 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
       turf.point(nearestSegment[0]),
       turf.point(nearestSegment[1])
     );
-    // Seaward is perpendicular to coast, pointing away from land
-    const seawardDirection = (coastlineAngle + 90) % 360;
+
+    // There are TWO perpendicular directions - we need to find which is seaward vs landward
+    // Test both directions with a short ray - the one that hits land sooner is landward
+    const perpDir1 = (coastlineAngle + 90 + 360) % 360;
+    const perpDir2 = (coastlineAngle - 90 + 360) % 360;
+
+    const testRay1 = turf.lineString([
+      beachPoint.geometry.coordinates,
+      turf.destination(beachPoint, 1, perpDir1, { units: 'kilometers' }).geometry.coordinates
+    ]);
+    const testRay2 = turf.lineString([
+      beachPoint.geometry.coordinates,
+      turf.destination(beachPoint, 1, perpDir2, { units: 'kilometers' }).geometry.coordinates
+    ]);
+
+    const hit1 = intersectsLandmass(testRay1, coastlineData, islandData);
+    const hit2 = intersectsLandmass(testRay2, coastlineData, islandData);
+
+    // Seaward = direction with NO hit or FARTHER hit (more open water)
+    // Landward = direction with closer/sooner hit (hits land quickly)
+    let seawardDirection;
+    if (!hit1.intersects && !hit2.intersects) {
+      // Neither hits land in 1km - use perpDir1 as default (both are "open")
+      seawardDirection = perpDir1;
+    } else if (!hit1.intersects) {
+      seawardDirection = perpDir1; // Dir1 is open, Dir2 hits land
+    } else if (!hit2.intersects) {
+      seawardDirection = perpDir2; // Dir2 is open, Dir1 hits land
+    } else {
+      // Both hit land - seaward is the one that hits FARTHER (more open)
+      seawardDirection = hit1.distance > hit2.distance ? perpDir1 : perpDir2;
+    }
 
     // Check if wind is coming from seaward (exposed) or landward (sheltered)
     const windFromSeaward = Math.abs(((windDirection - seawardDirection + 180) % 360) - 180) < 90;
