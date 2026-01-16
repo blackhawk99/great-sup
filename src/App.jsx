@@ -439,7 +439,7 @@ const App = () => {
     { name: "Kavouri Beach", latitude: 37.8235, longitude: 23.7761, googleMapsUrl: "https://maps.app.goo.gl/KP6MpuG6mgrv1Adm6" },
     { name: "Glyfada Beach", latitude: 37.8650, longitude: 23.7470, googleMapsUrl: "https://maps.app.goo.gl/yEXLZW5kwBArCHvb7" },
     { name: "Astir Beach", latitude: 37.8095, longitude: 23.7850, googleMapsUrl: "https://maps.app.goo.gl/6uUbtp31MQ63gGBSA" },
-    { name: "Kapsali Beach", latitude: 36.1360, longitude: 22.9980, googleMapsUrl: "https://maps.app.goo.gl/xcs6EqYy8LbzYq2y6" },
+    { name: "Kapsali Beach", latitude: 36.1383, longitude: 22.9935, googleMapsUrl: "https://maps.app.goo.gl/xcs6EqYy8LbzYq2y6" },
     // Palaiopoli Beach removed - coastline data too sparse for accurate protection calculation
     // CORRECTED Vathy Bay coordinates pointing to the inner harbor
     { name: "Vathy Bay (Sifnos)", latitude: 36.9386, longitude: 24.6750, googleMapsUrl: "https://www.google.com/maps/place/Vathy+Bay/@36.9386,24.6750,15z" },
