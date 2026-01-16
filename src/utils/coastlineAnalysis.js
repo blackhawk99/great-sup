@@ -784,28 +784,30 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     ]);
     const waveBlocked = intersectsLandmass(waveAngleRay, coastlineData, islandData);
 
-    // CRITICAL: Only count as protected if:
-    // 1. Wind/waves from LANDWARD direction (naturally sheltered), OR
-    // 2. Wind/waves from SEAWARD but blocked by land at SIGNIFICANT distance (>0.5km)
-    //    (close hits are just the curving coastline of the same beach, not real protection)
-    const MIN_BLOCKING_DISTANCE = 0.5; // km - land must be this far to count as real protection
+    // SIMPLE WIND PROTECTION LOGIC:
+    // Don't rely on seaward direction (unreliable). Just check if there's blocking land.
+    // - No land in wind direction = EXPOSED
+    // - Land at 0.5-2km = PROTECTED (island, headland blocking wind)
+    // - Land at < 0.5km = probably just beach curve = EXPOSED
+    // - Land at > 2km = too far to provide real wind shelter = EXPOSED
 
     let windProtection = 0;
-    if (!windFromSeaward) {
-      // Wind from land side = naturally protected
-      windProtection = 0.8;
-    } else if (windBlocked.intersects && windBlocked.distance > MIN_BLOCKING_DISTANCE) {
-      // Wind from sea but blocked by distant land (island, headland across water)
-      windProtection = Math.min(0.9, (1 - (windBlocked.distance / 5.0)) * 0.9);
+    if (windBlocked.intersects) {
+      const dist = windBlocked.distance;
+      if (dist >= 0.5 && dist <= 2.0) {
+        // Sweet spot: land close enough to block wind, but not just the beach curve
+        windProtection = 0.8 * (1 - (dist - 0.5) / 1.5); // Decreases from 0.8 to 0 as distance increases
+      }
+      // dist < 0.5km or dist > 2km = exposed (no meaningful protection)
     }
-    // If wind from seaward and no significant blocking = exposed (windProtection stays 0)
 
     let waveProtection = 0;
-    if (!waveFromSeaward) {
-      waveProtection = 0.7; // Land blocks waves but less than wind (some refraction)
-    } else if (waveBlocked.intersects && waveBlocked.distance > MIN_BLOCKING_DISTANCE) {
-      // Waves diffract around obstacles, so less protection than wind
-      waveProtection = Math.min(0.6, (1 - (waveBlocked.distance / 5.0)) * 0.6);
+    if (waveBlocked.intersects) {
+      const dist = waveBlocked.distance;
+      if (dist >= 0.5 && dist <= 2.5) {
+        // Waves need closer blocking, and diffract more
+        waveProtection = 0.6 * (1 - (dist - 0.5) / 2.0);
+      }
     }
 
     // Check for bay enclosure - headlands on sides providing shelter
