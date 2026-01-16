@@ -1,5 +1,7 @@
 // src/utils/coastlineAnalysis.js
 import * as turf from '@turf/turf';
+import { getCachedProtection, setCachedProtection } from './protectionCache.js';
+import { adjustDirectionForSeason } from './seasonal.js';
 
 // Lazy-loaded data (fetched at runtime to avoid bundling 97MB of data)
 let greeceCoastlines = null;
@@ -16,14 +18,36 @@ async function loadCoastlineData() {
     return dataLoadPromise;
   }
 
-  dataLoadPromise = Promise.all([
-    fetch('/data/greece-coastlines.json').then(r => r.json()),
-    fetch('/data/greece-islands.json').then(r => r.json())
-  ]).then(([coastlines, islands]) => {
-    greeceCoastlines = coastlines;
-    greeceIslands = islands;
-    return { greeceCoastlines, greeceIslands };
-  });
+  dataLoadPromise = (async () => {
+    try {
+      console.log('Loading coastline data...');
+      const [coastlinesRes, islandsRes] = await Promise.all([
+        fetch('/data/greece-coastlines.json'),
+        fetch('/data/greece-islands.json')
+      ]);
+
+      if (!coastlinesRes.ok) {
+        throw new Error(`Failed to load coastlines: ${coastlinesRes.status}`);
+      }
+      if (!islandsRes.ok) {
+        throw new Error(`Failed to load islands: ${islandsRes.status}`);
+      }
+
+      const [coastlines, islands] = await Promise.all([
+        coastlinesRes.json(),
+        islandsRes.json()
+      ]);
+
+      greeceCoastlines = coastlines;
+      greeceIslands = islands;
+      console.log('Coastline data loaded:', coastlines.features?.length, 'coastlines,', islands.features?.length, 'islands');
+      return { greeceCoastlines, greeceIslands };
+    } catch (error) {
+      console.error('Error loading coastline data:', error);
+      dataLoadPromise = null; // Reset so it can retry
+      throw error;
+    }
+  })();
 
   return dataLoadPromise;
 }
@@ -659,9 +683,6 @@ return {
 }
 
 // Main geographic protection analysis function
-import { getCachedProtection, setCachedProtection } from './protectionCache.js';
-import { adjustDirectionForSeason } from './seasonal.js';
-
 export const calculateGeographicProtection = async (beach, windDirection, waveDirection, date = new Date()) => {
   if (!beach || !beach.latitude || !beach.longitude) {
     throw new Error('Invalid beach data for protection calculation');
