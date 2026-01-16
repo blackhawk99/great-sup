@@ -837,23 +837,36 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
       }
     }
 
-    // OVERRIDE: If wind comes from seaward and there's no meaningful blocking,
-    // the beach is EXPOSED regardless of bay enclosure calculation
-    // (bay enclosure can be wrong due to island geometry)
-    const windExposed = windFromSeaward &&
+    // REAL COVE DETECTION:
+    // If BOTH wind AND waves are blocked at similar moderate distances (0.5-2km),
+    // it's likely a real cove with headlands on multiple sides.
+    // Just wind blocking alone might be shoreline curving.
+    const isRealCove = windBlocked.intersects && waveBlocked.intersects &&
+      windBlocked.distance >= 0.5 && windBlocked.distance <= 2.0 &&
+      waveBlocked.distance >= 0.5 && waveBlocked.distance <= 2.0;
+
+    // WIND EXPOSED: wind from seaward with no meaningful blocking
+    // Exception: if it's a real cove, trust the blocking
+    const windExposed = windFromSeaward && !isRealCove &&
       (!windBlocked.intersects || windBlocked.distance < 1.5);
 
-    // Final protection score:
-    // - If wind exposed: heavily penalize, max 20% from other factors
-    // - Otherwise: normal calculation
+    // Final protection score
     let protectionScore;
-    if (windExposed) {
-      // Exposed to wind - bay enclosure doesn't help much
+    if (isRealCove) {
+      // Real cove: full protection calculation
+      protectionScore = (
+        0.5 * windProtection +
+        0.25 * waveProtection +
+        0.25 * bayEnclosure
+      ) * 100;
+    } else if (windExposed) {
+      // Exposed to wind - minimal score
       protectionScore = (
         0.1 * waveProtection +
         0.1 * bayEnclosure
       ) * 100;
     } else {
+      // Partial protection (wind from land or distant blocking)
       protectionScore = (
         0.5 * windProtection +
         0.25 * waveProtection +
@@ -884,6 +897,7 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
         windFromSeaward,
         waveFromSeaward,
         windExposed,
+        isRealCove,
         windBlocked: windBlocked.intersects,
         windBlockDistance: windBlocked.distance,
         waveBlocked: waveBlocked.intersects,
