@@ -713,31 +713,12 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
       islandData = greeceIslands;
     }
 
-    // Check coastline data density for this location
+    // Check coastline data density for this location (informational only)
     const dataDensity = checkCoastlineDataDensity(latitude, longitude, 5, coastlineData, islandData);
 
-    // If data is too sparse, return conservative estimate with warning
-    if (dataDensity.isLowConfidence) {
-      return {
-        protectionScore: 0,
-        coastlineAngle: 0,
-        enclosureScore: 0,
-        windProtection: 0,
-        waveProtection: 0,
-        bayEnclosure: 0,
-        isProtected: false,
-        dataConfidence: dataDensity.confidence,
-        isLowConfidence: true,
-        usingTiles,
-        description: `Insufficient coastline data for accurate analysis (${dataDensity.totalPoints} points in ${dataDensity.radiusKm}km radius). Assuming exposed conditions for safety.`,
-        debugInfo: {
-          dataDensity: dataDensity.density,
-          nearbySegments: dataDensity.nearbySegments,
-          totalPoints: dataDensity.totalPoints,
-          usingTiles
-        }
-      };
-    }
+    // Note: We proceed with calculation even with sparse data
+    // GADM data is sparse everywhere - returning 0 for low density is too aggressive
+    // We'll include the confidence info in the result for transparency
 
     // Advanced bay geometry analysis (pass coastline data)
     const bayGeometry = analyzeBayGeometry(beachPoint, coastlineData, islandData);
