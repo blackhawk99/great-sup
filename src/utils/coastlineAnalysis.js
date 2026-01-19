@@ -719,12 +719,15 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
     const dataDensity = checkCoastlineDataDensity(latitude, longitude, 5, coastlineData, islandData);
 
     // =========================================================================
-    // DIRECTIONAL PROTECTION CHECK
-    // Key insight: On island beaches, nearby coastline hits don't mean protection.
-    // Real protection = land ACROSS THE WATER blocking wind, not same-shore curves.
+    // SIMPLIFIED ROBUST PROTECTION CHECK
+    // Key insight: Real protection = headland/island ACROSS water blocking wind
+    // False positive = same shoreline curving (common on islands)
+    //
+    // Test: Cast rays in wind direction AND at angles to the sides.
+    // If wind ray hits but side rays are OPEN → real blocking headland
+    // If ALL rays hit at similar distances → just shoreline curving
     // =========================================================================
 
-    // First, find the seaward direction (which way the beach faces the sea)
     const nearestSegment = findNearestCoastlineSegment(beachPoint, coastlineData);
     if (!nearestSegment) {
       throw new Error('Could not find nearby coastline');
@@ -735,146 +738,88 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
       turf.point(nearestSegment[1])
     );
 
-    // There are TWO perpendicular directions - we need to find which is seaward vs landward
-    // Test both directions with a short ray - the one that hits land sooner is landward
-    const perpDir1 = (coastlineAngle + 90 + 360) % 360;
-    const perpDir2 = (coastlineAngle - 90 + 360) % 360;
-
-    const testRay1 = turf.lineString([
-      beachPoint.geometry.coordinates,
-      turf.destination(beachPoint, 1, perpDir1, { units: 'kilometers' }).geometry.coordinates
-    ]);
-    const testRay2 = turf.lineString([
-      beachPoint.geometry.coordinates,
-      turf.destination(beachPoint, 1, perpDir2, { units: 'kilometers' }).geometry.coordinates
-    ]);
-
-    const hit1 = intersectsLandmass(testRay1, coastlineData, islandData);
-    const hit2 = intersectsLandmass(testRay2, coastlineData, islandData);
-
-    // Seaward = direction with NO hit or FARTHER hit (more open water)
-    // Landward = direction with closer/sooner hit (hits land quickly)
-    let seawardDirection;
-    if (!hit1.intersects && !hit2.intersects) {
-      // Neither hits land in 1km - use perpDir1 as default (both are "open")
-      seawardDirection = perpDir1;
-    } else if (!hit1.intersects) {
-      seawardDirection = perpDir1; // Dir1 is open, Dir2 hits land
-    } else if (!hit2.intersects) {
-      seawardDirection = perpDir2; // Dir2 is open, Dir1 hits land
-    } else {
-      // Both hit land - seaward is the one that hits FARTHER (more open)
-      seawardDirection = hit1.distance > hit2.distance ? perpDir1 : perpDir2;
-    }
-
-    // Check if wind is coming from seaward (exposed) or landward (sheltered)
-    const windFromSeaward = Math.abs(((windDirection - seawardDirection + 180) % 360) - 180) < 90;
-    const waveFromSeaward = Math.abs(((waveDirection - seawardDirection + 180) % 360) - 180) < 90;
-
-    // Cast rays to check for blocking land
-    const windAngleRay = turf.lineString([
+    // Cast ray in wind direction
+    const windRay = turf.lineString([
       beachPoint.geometry.coordinates,
       turf.destination(beachPoint, 5, windDirection, { units: 'kilometers' }).geometry.coordinates
     ]);
-    const windBlocked = intersectsLandmass(windAngleRay, coastlineData, islandData);
+    const windBlocked = intersectsLandmass(windRay, coastlineData, islandData);
 
-    const waveAngleRay = turf.lineString([
+    // Cast rays at ±45° from wind direction to check if it's real blocking or shore curve
+    const windLeft45 = turf.lineString([
+      beachPoint.geometry.coordinates,
+      turf.destination(beachPoint, 5, windDirection - 45, { units: 'kilometers' }).geometry.coordinates
+    ]);
+    const windRight45 = turf.lineString([
+      beachPoint.geometry.coordinates,
+      turf.destination(beachPoint, 5, windDirection + 45, { units: 'kilometers' }).geometry.coordinates
+    ]);
+    const leftBlocked = intersectsLandmass(windLeft45, coastlineData, islandData);
+    const rightBlocked = intersectsLandmass(windRight45, coastlineData, islandData);
+
+    // Cast ray in wave direction
+    const waveRay = turf.lineString([
       beachPoint.geometry.coordinates,
       turf.destination(beachPoint, 5, waveDirection, { units: 'kilometers' }).geometry.coordinates
     ]);
-    const waveBlocked = intersectsLandmass(waveAngleRay, coastlineData, islandData);
+    const waveBlocked = intersectsLandmass(waveRay, coastlineData, islandData);
 
-    // FIRST: Check bay enclosure (headlands on sides)
-    // This helps distinguish real coves from straight coastlines
-    let significantSeawardHits = 0;
-    let seawardRays = 0;
-    const rays = generateRays(beachPoint, 36, 3.0); // 36 rays at 3km
-
-    for (let i = 0; i < 36; i++) {
-      const rayAngle = (i * 360) / 36;
-      const angleDiff = Math.abs(((rayAngle - seawardDirection + 180) % 360) - 180);
-      if (angleDiff <= 90) {
-        seawardRays++;
-        const hit = intersectsLandmass(rays[i], coastlineData, islandData);
-        // Count land at 0.4-3km as potential bay enclosure
-        if (hit.intersects && hit.distance >= 0.4 && hit.distance <= 3.0) {
-          significantSeawardHits++;
-        }
-      }
-    }
-
-    const bayEnclosure = seawardRays > 0 ? significantSeawardHits / seawardRays : 0;
-
-    // SMART WIND PROTECTION:
-    // - In a real bay/cove (high enclosure), headlands at 0.5km+ provide real protection
-    // - On straight/exposed coast (low enclosure), close hits are just shore curves
-    // NOTE: On islands, even exposed beaches show ~40% due to island shape, need >50%
-    const isInBay = bayEnclosure > 0.50; // More than 50% of seaward rays hit land
-
+    // DETERMINE IF WIND BLOCKING IS REAL:
+    // Real headland: wind ray hits at 0.5-3km, but at least one side ray is OPEN (no hit or >3km)
+    // Shore curve: all rays hit at similar close distances
+    let isRealWindBlock = false;
     let windProtection = 0;
-    if (windBlocked.intersects) {
-      const dist = windBlocked.distance;
-      if (isInBay) {
-        // In a bay: trust closer blocking (real headlands)
-        if (dist >= 0.4 && dist <= 2.5) {
-          windProtection = 0.8 * (1 - (dist - 0.4) / 2.1);
-        }
-      } else {
-        // Exposed coast: require farther blocking to be meaningful
-        if (dist >= 1.5 && dist <= 3.0) {
-          windProtection = 0.6 * (1 - (dist - 1.5) / 1.5);
-        }
+
+    if (windBlocked.intersects && windBlocked.distance >= 0.5 && windBlocked.distance <= 3.0) {
+      // Wind ray hits at reasonable distance - check if sides are open
+      const leftOpen = !leftBlocked.intersects || leftBlocked.distance > 3.0;
+      const rightOpen = !rightBlocked.intersects || rightBlocked.distance > 3.0;
+
+      if (leftOpen || rightOpen) {
+        // At least one side is open → real headland blocking wind
+        isRealWindBlock = true;
+        windProtection = 0.8 * (1 - (windBlocked.distance - 0.5) / 2.5);
       }
+      // If both sides also blocked at similar distance → probably shore curve, no protection
     }
 
+    // Wave protection (simpler - waves come from one direction)
     let waveProtection = 0;
-    if (waveBlocked.intersects) {
-      const dist = waveBlocked.distance;
-      if (isInBay && dist >= 0.4 && dist <= 2.0) {
-        waveProtection = 0.6 * (1 - (dist - 0.4) / 1.6);
-      } else if (!isInBay && dist >= 1.0 && dist <= 2.5) {
-        waveProtection = 0.4 * (1 - (dist - 1.0) / 1.5);
-      }
+    if (waveBlocked.intersects && waveBlocked.distance >= 0.5 && waveBlocked.distance <= 3.0) {
+      waveProtection = 0.5 * (1 - (waveBlocked.distance - 0.5) / 2.5);
     }
 
-    // REAL COVE DETECTION:
-    // If BOTH wind AND waves are blocked at similar moderate distances (0.5-2km),
-    // it's likely a real cove with headlands on multiple sides.
-    // Just wind blocking alone might be shoreline curving.
-    const isRealCove = windBlocked.intersects && waveBlocked.intersects &&
-      windBlocked.distance >= 0.5 && windBlocked.distance <= 2.0 &&
-      waveBlocked.distance >= 0.5 && waveBlocked.distance <= 2.0;
+    // Check for bay enclosure (headlands on SIDES of beach, perpendicular to coastline)
+    const perpDir1 = (coastlineAngle + 90 + 360) % 360;
+    const perpDir2 = (coastlineAngle - 90 + 360) % 360;
 
-    // WIND EXPOSED: wind from seaward with no meaningful blocking
-    // Exception: if it's a real cove, trust the blocking
-    const windExposed = windFromSeaward && !isRealCove &&
-      (!windBlocked.intersects || windBlocked.distance < 1.5);
+    // Cast rays along the coastline directions (where headlands would be)
+    const alongCoast1 = turf.lineString([
+      beachPoint.geometry.coordinates,
+      turf.destination(beachPoint, 2, coastlineAngle, { units: 'kilometers' }).geometry.coordinates
+    ]);
+    const alongCoast2 = turf.lineString([
+      beachPoint.geometry.coordinates,
+      turf.destination(beachPoint, 2, (coastlineAngle + 180) % 360, { units: 'kilometers' }).geometry.coordinates
+    ]);
+    const headland1 = intersectsLandmass(alongCoast1, coastlineData, islandData);
+    const headland2 = intersectsLandmass(alongCoast2, coastlineData, islandData);
+
+    // Bay enclosure: headlands on both sides at 0.3-2km
+    const hasHeadlands =
+      headland1.intersects && headland1.distance >= 0.3 && headland1.distance <= 2.0 &&
+      headland2.intersects && headland2.distance >= 0.3 && headland2.distance <= 2.0;
+
+    const bayEnclosure = hasHeadlands ? 0.7 : 0;
 
     // Final protection score
-    let protectionScore;
-    if (isRealCove) {
-      // Real cove: full protection calculation
-      protectionScore = (
-        0.5 * windProtection +
-        0.25 * waveProtection +
-        0.25 * bayEnclosure
-      ) * 100;
-    } else if (windExposed) {
-      // Exposed to wind - minimal score
-      protectionScore = (
-        0.1 * waveProtection +
-        0.1 * bayEnclosure
-      ) * 100;
-    } else {
-      // Partial protection (wind from land or distant blocking)
-      protectionScore = (
-        0.5 * windProtection +
-        0.25 * waveProtection +
-        0.25 * bayEnclosure
-      ) * 100;
-    }
+    const protectionScore = Math.round((
+      0.5 * windProtection +
+      0.3 * waveProtection +
+      0.2 * bayEnclosure
+    ) * 100);
 
-    const finalScore = Math.round(protectionScore);
+    const finalScore = protectionScore;
 
     return {
       protectionScore: finalScore,
@@ -893,19 +838,16 @@ export async function analyzeBayProtection(latitude, longitude, windDirection, w
       debugInfo: {
         windDirection,
         waveDirection,
-        seawardDirection,
-        windFromSeaward,
-        waveFromSeaward,
-        windExposed,
-        isRealCove,
+        coastlineAngle,
         windBlocked: windBlocked.intersects,
         windBlockDistance: windBlocked.distance,
+        leftSideOpen: !leftBlocked.intersects || leftBlocked.distance > 3.0,
+        rightSideOpen: !rightBlocked.intersects || rightBlocked.distance > 3.0,
+        isRealWindBlock,
         waveBlocked: waveBlocked.intersects,
         waveBlockDistance: waveBlocked.distance,
-        isInBay,
+        hasHeadlands,
         bayEnclosure,
-        significantSeawardHits,
-        seawardRays,
         usingTiles,
         dataDensity: dataDensity.density
       }
