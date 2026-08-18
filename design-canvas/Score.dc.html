@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #93c5fd; text-decoration: none; }
+    a:hover { color: #bfdbfe; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+<div style="width: 390px; height: 880px; overflow: hidden; background: #020617; color: #f1f5f9; display: flex; flex-direction: column">
+
+  <div style="display: flex; align-items: center; gap: 10px; padding: 0 12px 0 8px; height: 56px; border-bottom: 1px solid #1e293b; flex-shrink: 0">
+    <div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+    </div>
+    <div style="font-size: 16px; font-weight: 600; color: #f1f5f9; flex-grow: 1">How this score was built</div>
+  </div>
+
+  <div style="flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: 16px 16px 0 16px">
+
+    <div style="display: flex; align-items: flex-end; gap: 12px; flex-shrink: 0">
+      <div style="display: flex; align-items: baseline; gap: 4px">
+        <span style="font-size: 46px; font-weight: 700; line-height: 46px; color: #4ade80; font-variant-numeric: tabular-nums">93</span>
+        <span style="font-size: 16px; font-weight: 600; color: #64748b">/100</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; padding-bottom: 3px">
+        <span style="font-size: 14px; font-weight: 600; color: #f1f5f9">Vlikhos Bay</span>
+        <span style="font-size: 11px; color: #94a3b8; font-variant-numeric: tabular-nums">Monday 18 August, 08:00</span>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: flex-start; gap: 10px; background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 12px 14px; flex-shrink: 0">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style="flex-shrink: 0; margin-top: 1px"><path d="M20 6 9 17l-5-5"></path></svg>
+      <span style="font-size: 12px; line-height: 18px; color: #cbd5e1">Almost nothing is dragging this down. Wind costs 3 points, everything else is within a point of ideal. The seven points you are missing are spread thin.</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0">
+      <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #64748b; flex-grow: 1">HEAVIEST FACTORS FIRST</span>
+      <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: #64748b">
+        <span style="width: 8px; height: 8px; border-radius: 2px; background: #4ade80"></span>earned
+        <span style="width: 8px; height: 8px; border-radius: 2px; background: #334155; margin-left: 4px"></span>lost
+      </span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; flex-shrink: 0">
+      <sc-for list="{{ factors }}" as="f" hint-placeholder-count="11">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #1e293b">
+          <div style="display: flex; flex-direction: column; gap: 2px; width: 108px; flex-shrink: 0">
+            <span style="font-size: 13px; font-weight: 600; color: #e2e8f0">{{ f.name }}</span>
+            <span style="font-size: 10px; color: #64748b; font-variant-numeric: tabular-nums">{{ f.value }}</span>
+          </div>
+          <div style="flex-grow: 1; display: flex; align-items: center">
+            <div style="{{ f.trackStyle }}">
+              <div style="{{ f.fillStyle }}"></div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px; width: 52px; flex-shrink: 0">
+            <span style="font-size: 13px; font-weight: 700; color: #f1f5f9; font-variant-numeric: tabular-nums">{{ f.earned }}</span>
+            <span style="{{ f.lostStyle }}">{{ f.lost }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 12px 14px; flex-shrink: 0">
+      <span style="width: 8px; height: 8px; border-radius: 999px; background: #4ade80; flex-shrink: 0"></span>
+      <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+        <span style="font-size: 12px; font-weight: 600; color: #e2e8f0">Data quality 96%</span>
+        <span style="font-size: 11px; color: #64748b">Tide and currents are modelled, not measured at this bay.</span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":390,"height":880}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const rows = [
+      { name: 'Wind',        value: '2 km/h in the bay',  weight: 30, earned: 27 },
+      { name: 'Waves',       value: '0.08 m',             weight: 14, earned: 13 },
+      { name: 'Shelter',     value: '92% enclosed',       weight: 8,  earned: 7 },
+      { name: 'Water temp',  value: '26°C',          weight: 8,  earned: 7 },
+      { name: 'Swell',       value: '0.2 m at 7 s',       weight: 8,  earned: 7 },
+      { name: 'Tide',        value: '1.2 m',              weight: 7,  earned: 7 },
+      { name: 'Currents',    value: '0.1 m/s',            weight: 7,  earned: 7 },
+      { name: 'Air temp',    value: '26°C',          weight: 6,  earned: 6 },
+      { name: 'Gusts',       value: '18 km/h peak',       weight: 5,  earned: 5 },
+      { name: 'Rain',        value: '0 mm',               weight: 4,  earned: 4 },
+      { name: 'Cloud',       value: '8% cover',           weight: 3,  earned: 3 }
+    ];
+    const MAX = 138;
+    return {
+      factors: rows.map((r) => {
+        const lost = r.weight - r.earned;
+        return {
+          name: r.name,
+          value: r.value,
+          earned: r.earned + '/' + r.weight,
+          lost: lost > 0 ? '−' + lost : 'full',
+          lostStyle: 'font-size: 10px; font-variant-numeric: tabular-nums; color: '
+            + (lost > 0 ? '#f87171' : '#475569') + ';',
+          trackStyle: 'width: ' + Math.round(MAX * r.weight / 30) + 'px; height: 8px;'
+            + ' border-radius: 999px; background: #334155; overflow: hidden;',
+          fillStyle: 'width: ' + Math.round(100 * r.earned / r.weight) + '%; height: 100%;'
+            + ' border-radius: 999px; background: #4ade80;'
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

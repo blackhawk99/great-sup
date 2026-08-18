@@ -1,0 +1,76 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "title": "Today — ranked",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844
+    },
+    {
+      "file": "Spot.dc.html",
+      "title": "Spot — find the window",
+      "x": 460,
+      "y": 0,
+      "w": 390,
+      "h": 940
+    },
+    {
+      "file": "Score.dc.html",
+      "title": "Why this score (dark)",
+      "x": 920,
+      "y": 0,
+      "w": 390,
+      "h": 880
+    },
+    {
+      "file": "Desktop.dc.html",
+      "title": "Desktop — scrub to re-rank",
+      "x": 0,
+      "y": 1060,
+      "w": 1280,
+      "h": 860
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-thesis",
+      "x": 0,
+      "y": -268,
+      "w": 390,
+      "text": "THE BET\n\nRight now the app answers “how is this one beach?” — one spot, one tap at a time. Seven saved spots means seven taps to find out where to go.\n\nSo score every spot up front and rank them. The dashboard becomes the answer, not the index.\n\nWatch what that surfaces: the meltemi is up, so Sifnos and Paros — the bays you'd normally drive to — sink to the bottom and Hydra wins. Tapping through one by one, you'd never notice.\n\nSwitch Today / Tomorrow and the order changes. That reordering is the product."
+    },
+    {
+      "id": "note-window",
+      "x": 460,
+      "y": -268,
+      "w": 390,
+      "text": "THE SECOND BET\n\nToday you pick a date, a start hour and an end hour, then press Update Forecast. You are running the search by hand.\n\nThe hourly data is already fetched. Let it find the window: “Go between 06:00 and 12:00.” The strip is the whole day at a glance — tap any hour to scrub the readout and the four tiles.\n\nAlso gone: the emoji. 🌊 🚣 ✅ 🚫 carried the score in the current build. A number in a coloured ring is more precise, survives scaling, and renders the same on every device."
+    },
+    {
+      "id": "note-score",
+      "x": 920,
+      "y": -268,
+      "w": 390,
+      "text": "THE SCORING TABLE\n\nThe current Factor / Value / Points table is eleven rows of figures with no shape. Nothing in it tells you that wind is 30% of the score and cloud cover is 3%.\n\nSame numbers, encoded as length: the track width IS the weight, the fill is what you earned. Wind's bar runs ten times longer than cloud's because it matters ten times more. You can see where the seven missing points went without reading a figure.\n\nDark, because this is the screen you open at 6am."
+    },
+    {
+      "id": "note-kept",
+      "x": 1360,
+      "y": 0,
+      "w": 330,
+      "text": "WHAT I DIDN'T TOUCH\n\nThe palette, type and components are lifted straight from the repo: blue-600 #2563eb primary, orange-500 for the home spot, the slate dark ramp, Tailwind's 4px spacing and 8/12/16px radii, system-ui, lucide icons at 2px stroke.\n\nThe thresholds are yours too — the 85 / 70 / 50 score tiers from FixedBeachView, and the eleven weights in scoreCalculator.js (wind 30, waves 14, swell 8, water 8 …).\n\nI changed how the app decides what to show you. Not what it believes."
+    },
+    {
+      "id": "note-desktop",
+      "x": 1360,
+      "y": 1060,
+      "w": 330,
+      "text": "DESKTOP\n\nSame ranked list on the left. The extra space buys one thing a phone can't hold: the strip along the bottom.\n\nScrub an hour in the chart and every spot re-ranks at that hour. At 08:00 Hydra leads; drag to 16:00 and the whole board turns orange.\n\nIt answers “where should I be at four this afternoon?” in one gesture — a question the current app cannot ask at all."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}
