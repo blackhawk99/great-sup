@@ -30,7 +30,34 @@ const WORST_CASE_DEFAULTS = {
  * @returns { totalScore, breakdown: { wind, waves, swell, precipitation,
  *   temperature, cloudcover, geographic, tide, currents }, dataQuality }
  */
-export async function calculatePaddleScore(beach, hours, range) {
+/**
+ * How many of the 100 points each factor can contribute.
+ *
+ * Exported so the score breakdown can show each factor's share as a
+ * proportional bar rather than restating these numbers by hand.
+ */
+export const FACTOR_WEIGHTS = {
+  wind: 30,
+  waves: 14,
+  swell: 8,
+  gusts: 5,
+  precipitation: 4,
+  temperature: 6,
+  waterTemperature: 8,
+  cloudcover: 3,
+  geographic: 8,
+  tide: 7,
+  currents: 7
+};
+
+/**
+ * Average a slice of hourly conditions, substituting worst-case values for
+ * missing fields so gaps never read as good conditions.
+ *
+ * Split out of calculatePaddleScore so a whole day can be scored against a
+ * single geographic-protection analysis - see scoreHourlySeries.
+ */
+export function averageConditions(hours, range) {
   const slice = hours.slice(range.startIndex, range.endIndex + 1);
   const n     = slice.length;
 
@@ -77,8 +104,24 @@ export async function calculatePaddleScore(beach, hours, range) {
     return code !== null && code !== undefined && code >= 95 && code <= 99;
   }).length;
 
-  // Geographic protection analysis
-  const geoProtection = await calculateGeographicProtection(beach, windDir, waveDir);
+  return {
+    windSpeed, windGusts, windDir, waveHeight, waveDir, swellHeight, swellPeriod,
+    precip, temp, waterTemp, cloud, tide, currentSpd,
+    hasThunderstorm, thunderstormHours, missingDataCount, totalFields
+  };
+}
+
+/**
+ * The scoring maths itself: pure, synchronous, and cheap. Takes the averaged
+ * conditions plus an already-computed geographic protection result.
+ */
+export function scoreAveragedConditions(averaged, geoProtection) {
+  const {
+    windSpeed, windGusts, waveHeight, swellHeight, swellPeriod,
+    precip, temp, waterTemp, cloud, tide, currentSpd,
+    hasThunderstorm, thunderstormHours, missingDataCount, totalFields
+  } = averaged;
+
 
   // Apply protection ratios to get effective wind/wave values
   // Protection of 0.8 means 80% reduction, so effective = raw * (1 - 0.8)
@@ -99,17 +142,17 @@ export async function calculatePaddleScore(beach, hours, range) {
 
   // Scoring weights (normalized to sum to 100)
   // Wind: 30, Waves: 14, Swell: 8, Gusts: 5, Precip: 4, AirTemp: 6, WaterTemp: 8, Cloud: 3, Geo: 8, Tide: 7, Currents: 7
-  const ptsWind      = linearScore(protectedWindSpeed, 0, 20) * 30;
-  const ptsWaves     = linearScore(protectedWaveHeight, 0, 1.0) * 14;
-  const ptsSwell     = linearScore(effectiveSwellSeverity, 0, 0.5) * 8;
-  const ptsGusts     = clamp(1 - gustPenalty, 0, 1) * 5;
-  const ptsPrecip    = linearScore(precip, 0, 5) * 4;
-  const ptsTemp      = bellScore(temp, 18, 28) * 6;       // Air temperature
-  const ptsWaterTemp = bellScore(waterTemp, 18, 26) * 8;  // Water temperature (crucial for safety)
-  const ptsCloud     = linearScore(cloud, 0, 100) * 3;
-  const ptsGeo       = clamp((20 - protectedWindSpeed) / 20, 0, 1) * 8;
-  const ptsTide      = inRangeScore(tide, 0.5, 2.0) * 7;
-  const ptsCurrents  = clamp(1 - clamp(currentSpd / 1.5, 0, 1), 0, 1) * 7;
+  const ptsWind      = linearScore(protectedWindSpeed, 0, 20) * FACTOR_WEIGHTS.wind;
+  const ptsWaves     = linearScore(protectedWaveHeight, 0, 1.0) * FACTOR_WEIGHTS.waves;
+  const ptsSwell     = linearScore(effectiveSwellSeverity, 0, 0.5) * FACTOR_WEIGHTS.swell;
+  const ptsGusts     = clamp(1 - gustPenalty, 0, 1) * FACTOR_WEIGHTS.gusts;
+  const ptsPrecip    = linearScore(precip, 0, 5) * FACTOR_WEIGHTS.precipitation;
+  const ptsTemp      = bellScore(temp, 18, 28) * FACTOR_WEIGHTS.temperature;       // Air temperature
+  const ptsWaterTemp = bellScore(waterTemp, 18, 26) * FACTOR_WEIGHTS.waterTemperature;  // Water temperature (crucial for safety)
+  const ptsCloud     = linearScore(cloud, 0, 100) * FACTOR_WEIGHTS.cloudcover;
+  const ptsGeo       = clamp((20 - protectedWindSpeed) / 20, 0, 1) * FACTOR_WEIGHTS.geographic;
+  const ptsTide      = inRangeScore(tide, 0.5, 2.0) * FACTOR_WEIGHTS.tide;
+  const ptsCurrents  = clamp(1 - clamp(currentSpd / 1.5, 0, 1), 0, 1) * FACTOR_WEIGHTS.currents;
 
   let total = Math.round(
     ptsWind + ptsWaves + ptsSwell + ptsGusts + ptsPrecip +
@@ -165,6 +208,23 @@ export async function calculatePaddleScore(beach, hours, range) {
       currents:        { value: currentSpd,           score: Math.round(ptsCurrents) },
     }
   };
+}
+
+
+/**
+ * Calculate a 0-100 paddleability score.
+ *
+ * @param beach  { latitude, longitude, shoreBearing }
+ * @param hours  Array of hourly-condition objects from fetchPaddleConditions
+ * @param range  { startIndex, endIndex } slice into hours
+ * @returns { totalScore, breakdown, dataQuality, warnings, hasThunderstorm }
+ */
+export async function calculatePaddleScore(beach, hours, range) {
+  const averaged = averageConditions(hours, range);
+  const geoProtection = await calculateGeographicProtection(
+    beach, averaged.windDir, averaged.waveDir
+  );
+  return scoreAveragedConditions(averaged, geoProtection);
 }
 
 // Helpers

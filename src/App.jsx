@@ -5,26 +5,24 @@ import {
   MapPin,
   Smartphone,
   Plus,
-  Trash2,
   HelpCircle,
   Image as ImageIcon,
-  Navigation,
-  Compass,
   LifeBuoy,
   ListChecks,
   Waves,
   Sparkles,
   Sunrise,
   Sun,
-  Moon,
-  Link as LinkIcon,
-  Eye
+  Moon
 } from "lucide-react";
 import { useBeachManager } from "./BeachManager";
 import FixedBeachView from "./FixedBeachView";
 import { ErrorBoundary, DeleteConfirmationModal } from "./helpers.jsx";
 import FAQ from "./FAQ"; // Import the new FAQ component
 import { useTheme } from "./utils/themeContext.jsx";
+import { useRankedDay } from "./useRankedDay.js";
+import BestSpotCard from "./components/BestSpotCard.jsx";
+import SpotRow from "./components/SpotRow.jsx";
 
 const RECENT_SEARCH_KEY = "sup-recent-searches";
 
@@ -49,7 +47,9 @@ const App = () => {
   const [showFAQ, setShowFAQ] = useState(false); // New state for FAQ visibility
   const [locating, setLocating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] = useState("shelter");
+  const [sortOption, setSortOption] = useState("score");
+  const [dayOffset, setDayOffset] = useState(0);
+  const [highlightedBeachId, setHighlightedBeachId] = useState(null);
   const { theme, resolvedTheme, setTheme } = useTheme();
   const greekBounds = {
     latMin: 34.6,
@@ -99,21 +99,6 @@ const App = () => {
     },
   };
 
-  const getShelterScore = (beach) => {
-    if (typeof beach.protectionScore === "number") {
-      return beach.protectionScore;
-    }
-    if (typeof beach.bayEnclosure === "number") {
-      return Math.round(beach.bayEnclosure * 100);
-    }
-    return null;
-  };
-
-  const shelteredCount = beaches.filter((beach) => {
-    const score = getShelterScore(beach);
-    return typeof score === "number" && score >= 60;
-  }).length;
-
   const rememberSearchTerm = (term) => {
     const value = term.trim();
     if (!value) return;
@@ -128,30 +113,44 @@ const App = () => {
     setShowSearchSuggestions(true);
   };
 
-  const sortedBeaches = useMemo(() => {
-    const beachesCopy = [...beaches];
+  // The day we are planning for. Everything on the dashboard is scored
+  // against this date, so switching it re-ranks the whole list.
+  const dayISO = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + dayOffset);
+    return date.toISOString().split("T")[0];
+  }, [dayOffset]);
+
+  const {
+    entries: rankedEntries,
+    loading: rankingLoading,
+    lastUpdated: rankedUpdatedAt
+  } = useRankedDay(beaches, dayISO);
+
+  const visibleEntries = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    const matches = query
+      ? rankedEntries.filter(({ beach }) =>
+          beach.name.toLowerCase().includes(query) ||
+          `${beach.latitude.toFixed(2)},${beach.longitude.toFixed(2)}`.includes(query))
+      : rankedEntries;
 
     switch (sortOption) {
       case "alpha":
-        return beachesCopy.sort((a, b) => a.name.localeCompare(b.name));
+        return [...matches].sort((a, b) => a.beach.name.localeCompare(b.beach.name));
       case "recent":
-        return beachesCopy.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      case "shelter":
+        return [...matches].sort((a, b) => (b.beach.createdAt || 0) - (a.beach.createdAt || 0));
+      case "score":
       default:
-        return beachesCopy.sort((a, b) => {
-          const shelterA = getShelterScore(a);
-          const shelterB = getShelterScore(b);
-
-          if (typeof shelterA === "number" && typeof shelterB === "number") {
-            return shelterB - shelterA;
-          }
-
-          if (typeof shelterA === "number") return -1;
-          if (typeof shelterB === "number") return 1;
-          return a.name.localeCompare(b.name);
-        });
+        return matches;
     }
-  }, [beaches, sortOption]);
+  }, [rankedEntries, searchTerm, sortOption]);
+
+  // The card at the top follows your selection, defaulting to the day's best.
+  const heroEntry = useMemo(() => {
+    if (!rankedEntries.length) return null;
+    return rankedEntries.find(({ beach }) => beach.id === highlightedBeachId) ?? rankedEntries[0];
+  }, [rankedEntries, highlightedBeachId]);
 
   const searchSuggestions = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -184,19 +183,15 @@ const App = () => {
     }
   };
 
-  const filteredBeaches = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return sortedBeaches;
-    }
-
-    const query = searchTerm.toLowerCase();
-    return sortedBeaches.filter((beach) =>
-      beach.name.toLowerCase().includes(query) ||
-      `${beach.latitude.toFixed(2)},${beach.longitude.toFixed(2)}`.includes(query)
-    );
-  }, [sortedBeaches, searchTerm]);
-
   const hasBeaches = beaches.length > 0;
+
+  const headerSubtitle = useMemo(() => {
+    const dayName = new Date(`${dayISO}T12:00:00`).toLocaleDateString(undefined, {
+      weekday: "long", day: "numeric", month: "long"
+    });
+    const spots = beaches.length === 1 ? "1 spot" : `${beaches.length} spots`;
+    return `${dayName} · ${spots}`;
+  }, [dayISO, beaches.length]);
 
   const knowledgeCards = [
     {
@@ -254,6 +249,10 @@ const App = () => {
     }
   }, [recentSearches]);
   
+  useEffect(() => {
+    if (rankedUpdatedAt) setLastUpdated(rankedUpdatedAt);
+  }, [rankedUpdatedAt]);
+
   // Function to update the last updated timestamp
   const handleDataUpdate = () => {
     setLastUpdated(new Date());
@@ -476,16 +475,26 @@ const App = () => {
       <FAQ isOpen={showFAQ} onClose={() => setShowFAQ(false)} />
       
       {/* Header */}
-      <header className="bg-blue-600 text-white p-4 shadow-md dark:bg-slate-900">
-        <div className="container mx-auto flex justify-between items-center">
-          <h1
-            className="text-2xl font-bold flex items-center cursor-pointer hover:text-blue-100 transition-colors"
+      <header className="bg-blue-600 text-white shadow-md dark:bg-slate-900">
+        <div className="container mx-auto flex items-center gap-3 px-4 py-2.5">
+          <button
+            type="button"
             onClick={() => setView("dashboard")}
+            className="flex min-w-0 flex-grow items-center gap-2.5 text-left"
+            aria-label="Go to dashboard"
           >
-            <div className="mr-2 text-3xl">🌊</div>
-            Paddleboard Weather Advisor
-          </h1>
-          <nav className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
+            <Waves className="h-6 w-6 flex-shrink-0" aria-hidden />
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-[15px] font-bold leading-tight sm:text-lg">
+                <span className="sm:hidden">Paddleboard</span>
+                <span className="hidden sm:inline">Paddleboard Weather Advisor</span>
+              </span>
+              <span className="truncate text-[11px] leading-tight text-blue-100">
+                {headerSubtitle}
+              </span>
+            </span>
+          </button>
+          <nav className="flex flex-shrink-0 items-center gap-2">
             <button
               onClick={toggleFAQ}
               className="p-2 rounded-full hover:bg-blue-700 transition"
@@ -540,17 +549,17 @@ const App = () => {
             </div>
             <button
               onClick={() => setView("dashboard")}
-              className={`px-3 py-1 rounded-lg ${
+              className={`hidden rounded-lg px-3 py-1.5 text-sm transition-colors duration-200 md:block ${
                 view === "dashboard" ? "bg-blue-800" : "hover:bg-blue-700"
-              } transition-colors duration-200`}
+              }`}
             >
               Dashboard
             </button>
             <button
               onClick={() => setView("add")}
-              className={`px-3 py-1 rounded-lg ${
+              className={`hidden rounded-lg px-3 py-1.5 text-sm transition-colors duration-200 md:block ${
                 view === "add" ? "bg-blue-800" : "hover:bg-blue-700"
-              } transition-colors duration-200`}
+              }`}
             >
               Add Beach
             </button>
@@ -559,135 +568,44 @@ const App = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-grow container mx-auto p-4">
+      <main className="flex-grow container mx-auto p-4 pb-28 md:pb-4">
         {view === "dashboard" && (
           <div className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-3">
-              <div className="relative overflow-hidden lg:col-span-2 rounded-2xl bg-gradient-to-r from-blue-700 via-sky-600 to-cyan-500 p-6 text-white shadow-xl">
-                <div
-                  className="pointer-events-none absolute inset-0 opacity-30"
-                  style={{
-                    backgroundImage:
-                      "url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1600&q=80')",
-                    backgroundSize: "cover",
-                    backgroundPosition: "center"
+            <div className="flex gap-1 rounded-[10px] bg-blue-100 p-[3px] dark:bg-slate-800" role="tablist" aria-label="Forecast day">
+              {[
+                { offset: 0, label: "Today" },
+                { offset: 1, label: "Tomorrow" }
+              ].map((option) => (
+                <button
+                  key={option.offset}
+                  type="button"
+                  role="tab"
+                  aria-selected={dayOffset === option.offset}
+                  onClick={() => {
+                    setDayOffset(option.offset);
+                    setHighlightedBeachId(null);
                   }}
-                />
-                <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div className="flex items-center text-sm uppercase tracking-widest text-blue-100">
-                      <Compass className="mr-2 h-4 w-4" /> Paddleboard planner
-                    </div>
-                    <h2 className="mt-2 text-3xl font-bold">Plan your next paddle</h2>
-                    <p className="mt-2 max-w-xl text-blue-100">
-                      Review real-time wind, swell and shelter analysis to pick the calmest launch window and keep a log of your favourite SUP spots.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    {homeBeach && (
-                      <button
-                        onClick={() => handleBeachSelect(homeBeach)}
-                        className="rounded-lg bg-white/20 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/30"
-                      >
-                        Check {homeBeach.name}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setView("add")}
-                      className="rounded-lg bg-white/90 px-4 py-2 text-sm font-semibold text-blue-700 shadow hover:bg-white"
-                    >
-                      <Plus className="mr-1 inline h-4 w-4" /> Add new spot
-                    </button>
-                    <button
-                      onClick={handleFindNearest}
-                      disabled={locating}
-                      className={`rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold transition ${
-                        locating
-                          ? 'cursor-not-allowed bg-white/10 text-blue-100'
-                          : 'text-white hover:bg-white/20'
-                      }`}
-                    >
-                      {locating ? 'Locating…' : 'Find calm bay nearby'}
-                    </button>
-                  </div>
-                </div>
-                <div className="relative mt-6 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl bg-white/15 px-4 py-3 text-sm">
-                    <p className="text-blue-100">Saved spots</p>
-                    <p className="text-2xl font-semibold">{beaches.length}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/15 px-4 py-3 text-sm">
-                    <p className="text-blue-100">Sheltered bays</p>
-                    <p className="text-2xl font-semibold">{shelteredCount}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/15 px-4 py-3 text-sm">
-                    <p className="text-blue-100">Last forecast</p>
-                    <p className="text-2xl font-semibold">{lastUpdated ? formattedUpdateTime : "–"}</p>
-                    {lastUpdated && (
-                      <p className="text-xs text-blue-100">{formattedUpdateDate}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="flex items-center gap-3 rounded-xl bg-white/15 p-3 text-sm text-blue-50 backdrop-blur">
-                    <Smartphone className="h-5 w-5" />
-                    <div>
-                      <p className="font-semibold">Built for iPhone</p>
-                      <p className="text-blue-100">Sticky actions and thumb-friendly controls on small screens.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 rounded-xl bg-white/15 p-3 text-sm text-blue-50 backdrop-blur">
-                    <Navigation className="h-5 w-5" />
-                    <div>
-                      <p className="font-semibold">Any Greek beach works</p>
-                      <p className="text-blue-100">Paste coordinates or a Maps link—Aegean, Ionian, Crete and more.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <h3 className="flex items-center text-lg font-semibold text-gray-800 dark:text-slate-100">
-                  <LifeBuoy className="mr-2 h-5 w-5 text-blue-500" /> Session snapshot
-                </h3>
-                <dl className="mt-4 space-y-3 text-sm text-gray-600 dark:text-slate-300">
-                  <div className="flex items-center justify-between">
-                    <dt className="font-medium text-gray-500 dark:text-slate-400">Home launch</dt>
-                    <dd className="font-semibold text-gray-900 dark:text-slate-100">
-                      {homeBeach ? homeBeach.name : "Not set"}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <dt className="font-medium text-gray-500 dark:text-slate-400">Gear checklist</dt>
-                    <dd className="font-semibold text-gray-900 dark:text-slate-100">Tap inside a forecast</dd>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <dt className="font-medium text-gray-500 dark:text-slate-400">Forecast window</dt>
-                    <dd className="font-semibold text-gray-900 dark:text-slate-100">
-                      {timeRange.startTime} – {timeRange.endTime}
-                    </dd>
-                  </div>
-                </dl>
-                {homeBeach ? (
-                  <div className="mt-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
-                    <p className="font-semibold">Ready for {homeBeach.name}?</p>
-                    <p className="text-xs text-blue-600 dark:text-blue-300">
-                      {homeBeach.latitude.toFixed(2)}, {homeBeach.longitude.toFixed(2)}
-                    </p>
-                    <button
-                      onClick={() => handleBeachSelect(homeBeach)}
-                      className="mt-3 inline-flex items-center rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700"
-                    >
-                      Open latest forecast
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-slate-700 dark:text-slate-300">
-                    Set any beach as "home" from its forecast page to pin it here for quick access.
-                  </div>
-                )}
-              </div>
+                  className={`h-9 flex-1 rounded-lg text-[13px] font-semibold transition ${
+                    dayOffset === option.offset
+                      ? "bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-200"
+                      : "text-blue-700/70 hover:text-blue-700 dark:text-slate-300 dark:hover:text-slate-100"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
+
+            {hasBeaches && heroEntry && (
+              <BestSpotCard
+                beach={heroEntry.beach}
+                summary={heroEntry.summary}
+                isTopRanked={heroEntry.beach.id === rankedEntries[0]?.beach.id}
+                dayLabel={dayOffset === 0 ? "today" : "tomorrow"}
+                loading={rankingLoading}
+                onOpen={handleBeachSelect}
+              />
+            )}
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative flex-1">
@@ -708,7 +626,7 @@ const App = () => {
                 />
                 <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-blue-400 dark:text-blue-200">
                   {hasBeaches
-                    ? `${filteredBeaches.length}/${beaches.length}`
+                    ? `${visibleEntries.length}/${beaches.length}`
                     : 'No spots yet'}
                 </span>
                 {showSearchSuggestions && searchSuggestions.length > 0 && (
@@ -757,7 +675,7 @@ const App = () => {
                   onChange={(event) => setSortOption(event.target.value)}
                   className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-500"
                 >
-                  <option value="shelter">Shelter strength</option>
+                  <option value="score">Today's score</option>
                   <option value="alpha">Alphabetical</option>
                   <option value="recent">Recently added</option>
                 </select>
@@ -765,10 +683,9 @@ const App = () => {
             </div>
 
             {hasBeaches ? (
-              filteredBeaches.length === 0 ? (
+              visibleEntries.length === 0 ? (
                 <div className="rounded-2xl border bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600 dark:bg-slate-700">🔍</div>
-                  <h3 className="mt-4 text-xl font-semibold text-gray-800 dark:text-slate-100">No matches found</h3>
+                  <h3 className="text-xl font-semibold text-gray-800 dark:text-slate-100">No matches found</h3>
                   <p className="mt-2 text-sm text-gray-600 dark:text-slate-300">
                     Try a different beach name, adjust your spelling, or clear the search to see all saved launches.
                   </p>
@@ -780,120 +697,29 @@ const App = () => {
                   </button>
                 </div>
               ) : (
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredBeaches.map((beach) => (
-                    <div
-                      key={beach.id}
-                      className={`flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900 ${
-                        beach.id === homeBeach?.id ? "border-orange-200 ring-2 ring-orange-300" : "border-gray-100 dark:border-slate-700"
-                      }`}
-                    >
-                      <div className="flex flex-1 flex-col p-4">
-                        <div className="mb-3 flex items-start justify-between">
-                          <div>
-                            <h2 className="flex items-center text-lg font-semibold text-gray-800 dark:text-slate-100">
-                              {beach.id === homeBeach?.id && (
-                                <Home className="mr-1 h-4 w-4 text-orange-500" />
-                              )}
-                              {beach.name}
-                            </h2>
-                            {(() => {
-                              const shelter = getShelterScore(beach);
-                              if (typeof shelter !== "number") return null;
-                              const comfortLevel = shelter >= 75 ? "bg-green-50 text-green-600" : shelter >= 60 ? "bg-yellow-50 text-yellow-600" : "bg-red-50 text-red-600";
-                              return (
-                                <span className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${comfortLevel}`}>
-                                  Shelter {Math.round(shelter)}%
-                                </span>
-                              );
-                            })()}
-                          </div>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleDeleteBeach(beach.id);
-                            }}
-                            className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-red-500 dark:hover:bg-slate-800"
-                            aria-label={`Delete ${beach.name}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <p className="flex items-center text-sm text-gray-500 dark:text-slate-400">
-                          <MapPin className="mr-1 h-3 w-3 text-gray-400 dark:text-slate-500" />
-                          {beach.latitude.toFixed(4)}, {beach.longitude.toFixed(4)}
-                        </p>
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                          <button
-                            type="button"
-                            onClick={() => handleBeachSelect(beach)}
-                            className="inline-flex items-center gap-1 rounded-full border border-blue-100 px-2 py-1 font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-slate-700 dark:text-blue-200 dark:hover:bg-slate-800"
-                            aria-label={`Open details for ${beach.name}`}
-                          >
-                            <Eye className="h-3 w-3" />
-                            <span className="sr-only">Open details</span>
-                            <span aria-hidden>View</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSetHomeBeach(beach)}
-                            disabled={beach.id === homeBeach?.id}
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold transition ${
-                              beach.id === homeBeach?.id
-                                ? "bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-200"
-                                : "border border-blue-100 text-blue-700 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-200 dark:hover:bg-slate-800"
-                            }`}
-                            aria-label={
-                              beach.id === homeBeach?.id
-                                ? `${beach.name} is set as home`
-                                : `Set ${beach.name} as home beach`
-                            }
-                          >
-                            <Home className="h-3 w-3" />
-                            <span className="sr-only">Set as home beach</span>
-                            <span aria-hidden>{beach.id === homeBeach?.id ? "Home" : "Pin"}</span>
-                          </button>
-                          <a
-                            href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-full border border-blue-100 px-2 py-1 font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-slate-700 dark:text-blue-200 dark:hover:bg-slate-800"
-                            aria-label={`Open ${beach.name} in Google Maps`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <LinkIcon className="h-3 w-3" />
-                            <span className="sr-only">Open in Maps</span>
-                            <span aria-hidden>Maps</span>
-                          </a>
-                        </div>
-                        <div className="mt-auto flex items-center justify-between pt-4">
-                          <a
-                            href={beach.googleMapsUrl || `https://www.google.com/maps?q=${beach.latitude},${beach.longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-200"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <Map className="mr-1 inline h-3 w-3" /> View on Maps
-                          </a>
-                          <button
-                            onClick={() => handleBeachSelect(beach)}
-                            className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                          >
-                            Check conditions
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                <div className="flex flex-col gap-2">
+                  {visibleEntries.map((entry, index) => (
+                    <SpotRow
+                      key={entry.beach.id}
+                      rank={index + 1}
+                      beach={entry.beach}
+                      summary={entry.summary}
+                      status={entry.status}
+                      isHome={entry.beach.id === homeBeach?.id}
+                      isSelected={entry.beach.id === heroEntry?.beach.id}
+                      isDark={resolvedTheme === "dark"}
+                      onSelect={(beach) => setHighlightedBeachId(beach.id)}
+                      onOpen={handleBeachSelect}
+                      onDelete={handleDeleteBeach}
+                    />
                   ))}
                 </div>
               )
             ) : (
               <div className="rounded-2xl border bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600 dark:bg-slate-700">🏝️</div>
-                <h2 className="mt-4 text-2xl font-bold text-gray-800 dark:text-slate-100">No beaches saved yet</h2>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">No beaches saved yet</h2>
                 <p className="mt-2 text-gray-600 dark:text-slate-300">
-                  Add your favourite paddleboarding launches to unlock personalised forecasts and checklists.
+                  Add your favourite paddleboarding launches and they will be scored and ranked here every day.
                 </p>
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
                   <button
