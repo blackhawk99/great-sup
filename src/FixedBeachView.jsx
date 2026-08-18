@@ -11,14 +11,20 @@ import {
   Thermometer,
   Droplets,
   Waves,
-  Clock,
   Calendar,
   Info,
-  LifeBuoy,
-  CheckCircle2
+  Sunrise
 } from "lucide-react";
 import { calculateGeographicProtection } from "./utils/coastlineAnalysis";
 import { getCardinalDirection, DatePickerModal } from "./helpers.jsx";
+
+import { fetchPaddleConditions } from "./WeatherService";
+import { scoreHourlySeries, findBestWindow, findPeakHour } from "./utils/dayPlan.js";
+import { getTier, tierInk, formatHour, formatWindow } from "./utils/conditionTiers.js";
+import ScoreRing from "./components/ScoreRing.jsx";
+import HourStrip from "./components/HourStrip.jsx";
+import FactorBars from "./components/FactorBars.jsx";
+import { useTheme } from "./utils/themeContext.jsx";
 
 const FixedBeachView = ({ 
   beach, 
@@ -38,6 +44,10 @@ const FixedBeachView = ({
   const [error, setError] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [daySeries, setDaySeries] = useState(null);
+  const [selectedHour, setSelectedHour] = useState(null);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   const toNumberOr = (value, fallback = 0) => {
     const number = typeof value === "number" ? value : Number(value);
@@ -95,6 +105,40 @@ const FixedBeachView = ({
       fetchWeatherData();
     }
   }, [beach?.id, timeRange.date]);
+
+  // The day scored hour by hour, using the same scoring as the dashboard so a
+  // spot cannot read one score in the list and another when you open it.
+  useEffect(() => {
+    if (!beach) return undefined;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const hours = await fetchPaddleConditions({
+          latitude: beach.latitude,
+          longitude: beach.longitude,
+          startDate: timeRange.date,
+          endDate: timeRange.date
+        });
+        const { hourly, protection } = await scoreHourlySeries(beach, hours);
+        if (cancelled) return;
+        const peak = findPeakHour(hourly);
+        setDaySeries({ hourly, protection, window: findBestWindow(hourly), peak });
+        setSelectedHour((current) =>
+          current !== null && hourly.some((entry) => entry.hour === current)
+            ? current
+            : peak?.hour ?? null
+        );
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Could not build the hourly outlook", err);
+          setDaySeries(null);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [beach?.id, beach?.latitude, beach?.longitude, timeRange.date]);
 
   useEffect(() => {
     if (!weatherData || !marineData || !beach) {
@@ -219,7 +263,9 @@ const FixedBeachView = ({
       const marineDataPoints = hourlyWaveValues.length + swellValues.length;
       const totalAvailable = availableDataPoints + marineDataPoints;
       const totalExpected = expectedDataPoints + relevantIndices.length * 2; // +2 for wave & swell
-      const dataQuality = Math.round((totalAvailable / totalExpected) * 100);
+      // Available points can exceed expected when the API returns extra
+      // entries, which used to surface as "Data quality 105%".
+      const dataQuality = Math.min(100, Math.round((totalAvailable / totalExpected) * 100));
 
       const waveDirection = toNumberOr(marine?.daily?.wave_direction_dominant?.[0], avgWindDir);
       const protection = await calculateGeographicProtection(
@@ -334,152 +380,6 @@ const FixedBeachView = ({
     }
   };
 
-  const getPaddleReadiness = () => {
-    if (!scoreBreakdown || !weatherData || !marineData) {
-      return null;
-    }
-
-    const protectedWind = scoreBreakdown.windSpeed?.protected ?? null;
-    const protectedWave = scoreBreakdown.waveHeight?.protected ?? null;
-    const protectedSwell = scoreBreakdown.swellHeight?.protected ?? null;
-    const precipitation = scoreBreakdown.precipitation?.value ?? 0;
-    const avgTemp = scoreBreakdown.temperature?.value ?? null;
-    const waterTemp = scoreBreakdown.waterTemperature?.value ?? null;
-
-    if (
-      protectedWind === null ||
-      protectedWave === null ||
-      protectedSwell === null ||
-      avgTemp === null
-    ) {
-      return null;
-    }
-
-    let skillLevel = "Beginner friendly";
-    let badgeClass = "bg-white/20 text-white border border-white/30";
-    let headline = "Glassy session ahead";
-    let message = "Expect calm water – ideal for easy cruises.";
-    let emoji = "🛶";
-
-    if (protectedWind > 12 || protectedWave > 0.5) {
-      skillLevel = "Advanced paddlers only";
-      badgeClass = "bg-red-500/30 text-white border border-white/40";
-      headline = "Challenging conditions";
-      message = "Plan a backup route and stay close to shore.";
-      emoji = "⚠️";
-    } else if (protectedWind > 8 || protectedWave > 0.35) {
-      skillLevel = "Intermediate focus";
-      badgeClass = "bg-yellow-400/30 text-white border border-white/40";
-      headline = "Manageable but watch the bumps";
-      message = "Expect some texture on the water – warm up with crosswind drills.";
-      emoji = "🌊";
-    }
-
-    if (paddleScore >= 90) {
-      headline = "Mirror-flat window";
-      message = "Perfect for distance paddles or SUP yoga sessions.";
-      emoji = "✨";
-    } else if (paddleScore >= 75 && protectedWind <= 10) {
-      headline = "Solid session";
-      message = "Plenty of glide with just a hint of breeze.";
-      emoji = "👍";
-    }
-
-    const startHour = parseInt(timeRange.startTime.split(":")[0], 10);
-    const endHour = parseInt(timeRange.endTime.split(":")[0], 10);
-    const targetDate = new Date(timeRange.date);
-
-    const selectedHours = [];
-
-    weatherData.hourly.time.forEach((timeString, index) => {
-      const current = new Date(timeString);
-      if (
-        current.getFullYear() === targetDate.getFullYear() &&
-        current.getMonth() === targetDate.getMonth() &&
-        current.getDate() === targetDate.getDate() &&
-        current.getHours() >= startHour &&
-        current.getHours() <= endHour
-      ) {
-        selectedHours.push({
-          index,
-          time: current,
-          wind: weatherData.hourly.windspeed_10m?.[index] ?? 0,
-          wave: marineData.hourly?.wave_height?.[index] ?? protectedWave,
-          precipitation: weatherData.hourly.precipitation?.[index] ?? 0
-        });
-      }
-    });
-
-    let bestHour = null;
-    let bestComposite = Number.POSITIVE_INFINITY;
-
-    selectedHours.forEach((hour) => {
-      const composite = hour.wind + hour.wave * 12 + hour.precipitation * 6;
-      if (composite < bestComposite) {
-        bestComposite = composite;
-        bestHour = hour;
-      }
-    });
-
-    const suggestions = [];
-
-    if (bestHour) {
-      const bestLabel = bestHour.time.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      const waveText = Number.isFinite(bestHour.wave)
-        ? bestHour.wave.toFixed(1)
-        : '0.0';
-      suggestions.push(
-        `Sweet spot around ${bestLabel} — wind near ${Math.round(bestHour.wind)} km/h and waves about ${waveText} m.`
-      );
-    }
-
-    if (protectedWave < 0.25 && protectedWind < 9) {
-      suggestions.push("Great chance to work on technique drills or SUP yoga poses.");
-    }
-
-    if (protectedWind >= 10) {
-      suggestions.push("Plan your route with an easy downwind finish or hug the coastline on the way back.");
-    }
-
-    if (avgTemp <= 20) {
-      suggestions.push("Layer with a light wetsuit top or thermal rash vest.");
-    } else if (avgTemp >= 28) {
-      suggestions.push("Pack extra hydration and reapply sunscreen every hour.");
-    }
-
-    if (waterTemp !== null && waterTemp < 15) {
-      suggestions.push("Cold water — wear a wetsuit to prevent hypothermia if you fall in.");
-    }
-
-    if (precipitation >= 1) {
-      suggestions.push("Expect showers — stash dry gear and keep electronics in a dry bag.");
-    }
-
-    if (!suggestions.length) {
-      suggestions.push("Quick safety recap, leash on, and enjoy the glide!");
-    }
-
-    return {
-      icon: emoji,
-      skillLevel,
-      badgeClass,
-      headline,
-      message,
-      suggestions,
-      windowLabel: `${timeRange.startTime} – ${timeRange.endTime}`,
-      bestHour,
-      wind: protectedWind,
-      wave: protectedWave,
-      temperature: avgTemp,
-      waterTemperature: waterTemp,
-      swell: protectedSwell
-    };
-  };
-  
-  // Get condition text based on score and actual conditions
   const getCondition = (score) => {
     if (!scoreBreakdown) {
       return { label: "Loading", emoji: "⏳", message: "Calculating conditions...", color: "text-gray-500" };
@@ -548,46 +448,6 @@ const FixedBeachView = ({
     };
   };
 
-  // Generate condition details tooltip content
-  const getConditionDetails = () => {
-    if (!scoreBreakdown) return "";
-
-    const temp = toNumberOr(scoreBreakdown.temperature?.value, 0);
-    const windSpeed = toNumberOr(scoreBreakdown.windSpeed?.protected, 0);
-    const precipitation = toNumberOr(scoreBreakdown.precipitation?.value, 0);
-    const cloudCover = toNumberOr(scoreBreakdown.cloudCover?.value, 0);
-    
-    // Create array of condition notes
-    const notes = [];
-    
-    if (temp < 16) {
-      notes.push("Water will be quite cold");
-    } else if (temp < 20) {
-      notes.push("Water will be cool");
-    }
-    
-    if (precipitation > 0 && precipitation < 1) {
-      notes.push("Light rain possible");
-    }
-    
-    if (cloudCover > 60) {
-      notes.push("Mostly cloudy");
-    }
-    
-    if (windSpeed > 10 && windSpeed < 20) {
-      notes.push("Some wind, but manageable");
-    }
-    
-    // Join with bullet points if we have notes
-    if (notes.length > 0) {
-      return notes.join(" • ");
-    }
-    
-    // Default message if no specific notes
-    return paddleScore >= 80 ? "Great overall conditions" : "Check individual factors";
-  };
-  
-  // Render geographic protection information
   const renderGeoProtectionInfo = () => {
     if (!geoProtection) return null;
     
@@ -710,437 +570,53 @@ const FixedBeachView = ({
   };
   
   // Render score breakdown
-  const renderScoreBreakdown = () => {
-    if (!scoreBreakdown) return null;
+  const headlineScore = daySeries?.peak?.score ?? paddleScore;
+  const headlineTier = Number.isFinite(headlineScore) ? getTier(headlineScore) : null;
+  const bestWindowText = formatWindow(daySeries?.window);
+  const selectedEntry =
+    daySeries?.hourly?.find((entry) => entry.hour === selectedHour) ?? daySeries?.peak ?? null;
 
-    const Progress = ({ score, max, color }) => (
-      <div className="w-24 bg-gray-200 dark:bg-slate-600 h-2 rounded mt-1 overflow-hidden">
-        <div
-          className={`${color} h-2 rounded`}
-          style={{ width: `${Math.min(100, (score / max) * 100)}%` }}
-        ></div>
-      </div>
-    );
-
-    return (
-      <div className="bg-white p-5 rounded-lg mt-4 shadow-sm border dark:bg-slate-800 dark:border-slate-700">
-        <h4 className="font-medium mb-4 flex items-center text-gray-800 dark:text-slate-100">
-          <Info className="h-5 w-5 mr-2 text-blue-600" />
-          Score Breakdown
-        </h4>
-
-        <p className="text-sm text-gray-600 mb-3 dark:text-slate-300">
-          Each factor contributes a set number of points to the final score – shown in parentheses below.
-          The progress bar indicates how many of those points were earned. See the FAQ for details.
-        </p>
-
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-600">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-600">
-            <thead className="bg-gray-50 dark:bg-slate-700">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">Factor</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">Value</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-slate-300">Points</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-800 dark:divide-slate-600">
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Wind Speed</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(37 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.windSpeed.raw.toFixed(1)} km/h
-                  <span className="text-xs text-gray-400 dark:text-slate-500 ml-1">
-                    (Protected: {scoreBreakdown.windSpeed.protected.toFixed(1)})
-                  </span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.windSpeed.score > 30 ? 'text-green-600' :
-                    scoreBreakdown.windSpeed.score > 20 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.windSpeed.score}/{scoreBreakdown.windSpeed.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.windSpeed.score}
-                      max={scoreBreakdown.windSpeed.maxPossible}
-                      color={
-                        scoreBreakdown.windSpeed.score > 30 ? 'bg-green-500' :
-                        scoreBreakdown.windSpeed.score > 20 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Wave Height</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(17 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.waveHeight.raw.toFixed(2)} m
-                  <span className="text-xs text-gray-400 dark:text-slate-500 ml-1">
-                    (Protected: {scoreBreakdown.waveHeight.protected.toFixed(2)})
-                  </span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.waveHeight.score > 15 ? 'text-green-600' :
-                    scoreBreakdown.waveHeight.score > 10 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.waveHeight.score}/{scoreBreakdown.waveHeight.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.waveHeight.score}
-                      max={scoreBreakdown.waveHeight.maxPossible}
-                      color={
-                        scoreBreakdown.waveHeight.score > 15 ? 'bg-green-500' :
-                        scoreBreakdown.waveHeight.score > 10 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Swell Height</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(8 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.swellHeight.raw.toFixed(2)} m
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.swellHeight.score > 7 ? 'text-green-600' :
-                    scoreBreakdown.swellHeight.score > 5 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.swellHeight.score}/{scoreBreakdown.swellHeight.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.swellHeight.score}
-                      max={scoreBreakdown.swellHeight.maxPossible}
-                      color={
-                        scoreBreakdown.swellHeight.score > 7 ? 'bg-green-500' :
-                        scoreBreakdown.swellHeight.score > 5 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Precipitation</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(5 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.precipitation.value.toFixed(1)} mm
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.precipitation.value < 1 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.precipitation.score}/{scoreBreakdown.precipitation.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.precipitation.score}
-                      max={scoreBreakdown.precipitation.maxPossible}
-                      color={scoreBreakdown.precipitation.value < 1 ? 'bg-green-500' : 'bg-red-500'}
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Air Temperature</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(8 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.temperature.value.toFixed(1)} °C
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.temperature.score > 4 ? 'text-green-600' : 'text-yellow-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.temperature.score}/{scoreBreakdown.temperature.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.temperature.score}
-                      max={scoreBreakdown.temperature.maxPossible}
-                      color={scoreBreakdown.temperature.score > 4 ? 'bg-green-500' : 'bg-yellow-500'}
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Water Temperature</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(10 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.waterTemperature?.value != null
-                    ? `${scoreBreakdown.waterTemperature.value.toFixed(1)} °C`
-                    : 'N/A'}
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    (scoreBreakdown.waterTemperature?.score ?? 0) > 6 ? 'text-green-600' :
-                    (scoreBreakdown.waterTemperature?.score ?? 0) > 3 ? 'text-yellow-600' : 'text-blue-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.waterTemperature?.score ?? 0}/{scoreBreakdown.waterTemperature?.maxPossible ?? 8}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.waterTemperature?.score ?? 0}
-                      max={scoreBreakdown.waterTemperature?.maxPossible ?? 8}
-                      color={
-                        (scoreBreakdown.waterTemperature?.score ?? 0) > 6 ? 'bg-green-500' :
-                        (scoreBreakdown.waterTemperature?.score ?? 0) > 3 ? 'bg-yellow-500' : 'bg-blue-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Cloud Cover</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(4 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.cloudCover.value.toFixed(0)}%
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.cloudCover.score > 3 ? 'text-green-600' :
-                    scoreBreakdown.cloudCover.score > 2 ? 'text-yellow-600' : 'text-gray-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.cloudCover.score}/{scoreBreakdown.cloudCover.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.cloudCover.score}
-                      max={scoreBreakdown.cloudCover.maxPossible}
-                      color={
-                        scoreBreakdown.cloudCover.score > 3 ? 'bg-green-500' :
-                        scoreBreakdown.cloudCover.score > 2 ? 'bg-yellow-500' : 'bg-gray-400'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-slate-200">
-                  <span className="font-medium">Geographic Protection</span>
-                  <span className="ml-1 text-xs text-gray-400 dark:text-slate-500">(9 pts)</span>
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right dark:text-slate-400">
-                  {scoreBreakdown.geoProtection.value.toFixed(0)}/100
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.geoProtection.score > 7 ? 'text-green-600' :
-                    scoreBreakdown.geoProtection.score > 4 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.geoProtection.score}/{scoreBreakdown.geoProtection.maxPossible}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.geoProtection.score}
-                      max={scoreBreakdown.geoProtection.maxPossible}
-                      color={
-                        scoreBreakdown.geoProtection.score > 7 ? 'bg-green-500' :
-                        scoreBreakdown.geoProtection.score > 4 ? 'bg-yellow-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-              <tr className="bg-blue-50 dark:bg-slate-700">
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-slate-100">
-                  TOTAL SCORE
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap"></td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-right">
-                  <div className={`flex flex-col items-end ${
-                    scoreBreakdown.total.score >= 85 ? 'text-green-600' :
-                    scoreBreakdown.total.score >= 70 ? 'text-yellow-600' :
-                    scoreBreakdown.total.score >= 50 ? 'text-orange-600' : 'text-red-600'
-                  }`}>
-                    <span>
-                      {scoreBreakdown.total.score}/{scoreBreakdown.total.maxPossible}
-                      {scoreBreakdown.total.rawScore > scoreBreakdown.total.maxPossible && (
-                        <span className="text-xs text-gray-500 ml-1">
-                          (raw {scoreBreakdown.total.rawScore})
-                        </span>
-                      )}
-                    </span>
-                    <Progress
-                      score={scoreBreakdown.total.score}
-                      max={scoreBreakdown.total.maxPossible}
-                      color={
-                        scoreBreakdown.total.score >= 85 ? 'bg-green-500' :
-                        scoreBreakdown.total.score >= 70 ? 'bg-yellow-500' :
-                        scoreBreakdown.total.score >= 50 ? 'bg-orange-500' : 'bg-red-500'
-                      }
-                    />
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
-
-  // Render hourly wind speed visualization (FIXED VERSION)
-  const renderHourlyWind = () => {
-    if (!weatherData || !weatherData.hourly) return null;
-    
-    const startHour = parseInt(timeRange.startTime.split(":")[0]);
-    const endHour = parseInt(timeRange.endTime.split(":")[0]);
-    
-    // Initialize arrays to store hourly data for each day
-    const todayHours = [];
-    const tomorrowHours = [];
-    
-    // Get the selected date and calculate tomorrow's date
-    const todayDate = new Date(timeRange.date);
-    const tomorrowDate = new Date(timeRange.date);
-    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-    
-    // Format dates for comparison
-    const todayStr = todayDate.toISOString().split('T')[0];
-    const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
-
-    // Process hourly data
-    for (let i = 0; i < weatherData.hourly.time.length; i++) {
-      const hourTime = new Date(weatherData.hourly.time[i]);
-      const hour = hourTime.getHours();
-      const dateStr = hourTime.toISOString().split('T')[0];
-      
-      // Only include hours within our time range
-      if (hour >= startHour && hour <= endHour) {
-        const hourData = {
-          hour,
-          index: i,
-          windSpeed: Math.round(weatherData.hourly.windspeed_10m[i]),
-          time: weatherData.hourly.time[i],
-          date: dateStr
-        };
-        
-        // Sort into today or tomorrow
-        if (dateStr === todayStr) {
-          todayHours.push(hourData);
-        } else if (dateStr === tomorrowStr) {
-          tomorrowHours.push(hourData);
-        }
-      }
-    }
-    
-    // Combine the hours, clearly labeled
-    const allHours = [
-      ...todayHours.map(h => ({ ...h, label: "Today" })),
-      ...tomorrowHours.map(h => ({ ...h, label: "Tomorrow" }))
-    ];
-    
-    // Exit gracefully if no hours to display
-    if (allHours.length === 0) {
-      return (
-        <div className="bg-white rounded-lg p-5 border shadow-sm mt-4 dark:bg-slate-800 dark:border-slate-700">
-          <h4 className="font-medium mb-4 flex items-center text-gray-800 dark:text-slate-100">
-            <Clock className="h-5 w-5 mr-2 text-blue-600" />
-            Hourly Wind Speed
-          </h4>
-          <p className="text-gray-600 dark:text-slate-300">No wind data available for this period.</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="bg-white rounded-lg p-5 border shadow-sm mt-4 dark:bg-slate-800 dark:border-slate-700">
-        <h4 className="font-medium mb-4 flex items-center text-gray-800 dark:text-slate-100">
-          <Clock className="h-5 w-5 mr-2 text-blue-600" />
-          Hourly Wind Speed
-        </h4>
-
-        <div className="space-y-3">
-          {allHours.map(hour => {
-            const windSpeed = hour.windSpeed;
-            const barWidth = Math.min(80, windSpeed * 6); // Cap at 80% width
-
-            let barColor = "bg-green-500";
-            let textColor = "text-green-800";
-            let bgColor = "bg-green-100";
-
-            if (windSpeed >= 12) {
-              barColor = "bg-red-500";
-              textColor = "text-red-800";
-              bgColor = "bg-red-100";
-            } else if (windSpeed >= 8) {
-              barColor = "bg-yellow-500";
-              textColor = "text-yellow-800";
-              bgColor = "bg-yellow-100";
-            }
-
-            return (
-              <div key={`${hour.date}-${hour.hour}`} className="flex items-center">
-                <div className="w-32 text-gray-600 font-medium dark:text-slate-300">
-                  {new Date(hour.time).toLocaleString([], {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
-                  })}
-                </div>
-                <div className="flex-grow mx-3 bg-gray-200 h-6 rounded-full overflow-hidden dark:bg-slate-600">
-                  <div 
-                    className={`h-full ${barColor} rounded-l-full`} 
-                    style={{ width: `${barWidth}%` }} 
-                  ></div>
-                </div>
-                <div className={`px-2 py-1 rounded-md ${bgColor} ${textColor} font-medium text-sm min-w-[70px] text-center`}>
-                  {windSpeed} km/h
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  // Get current condition with improved logic
-  const condition = paddleScore !== null && weatherData ? getCondition(paddleScore) : { 
-    label: "Loading", 
-    emoji: "⏳", 
-    message: "Calculating conditions...",
-    color: "text-gray-500"
-  };
+  // Label and message must describe the score actually on screen, so both
+  // read from the headline score rather than the legacy per-range one.
+  const condition = Number.isFinite(headlineScore) && weatherData
+    ? getCondition(headlineScore)
+    : { label: "Loading", message: "Calculating conditions…", color: "text-gray-500" };
 
   // Get condition details for tooltip
-  const conditionDetails = getConditionDetails();
-  const readiness = getPaddleReadiness();
-
-  const breakdownMetrics = scoreBreakdown
-    ? {
-        windRaw: toNumberOr(scoreBreakdown.windSpeed?.raw, 0),
-        windProtected: toNumberOr(scoreBreakdown.windSpeed?.protected, 0),
-        waveRaw: toNumberOr(scoreBreakdown.waveHeight?.raw, 0),
-        waveProtected: toNumberOr(scoreBreakdown.waveHeight?.protected, 0),
-        swellProtected: toNumberOr(scoreBreakdown.swellHeight?.protected, 0),
-        temperature: toNumberOr(scoreBreakdown.temperature?.value, 0),
-        waterTemperature: toNumberOr(scoreBreakdown.waterTemperature?.value, null),
-        precipitation: toNumberOr(scoreBreakdown.precipitation?.value, 0),
-        cloudCover: toNumberOr(scoreBreakdown.cloudCover?.value, 0)
-      }
-    : null;
+  // Metric tiles follow the hour you have selected on the strip, so the
+  // numbers beside the chart always describe the same moment it does.
+  const breakdownMetrics = (() => {
+    const b = selectedEntry?.breakdown;
+    if (b) {
+      const windShelter = 1 - toNumberOr(daySeries?.protection?.windProtection, 0);
+      const waveShelter = 1 - toNumberOr(daySeries?.protection?.waveProtection, 0);
+      const windProtected = toNumberOr(b.wind?.value, 0);
+      const waveProtected = toNumberOr(b.waves?.value, 0);
+      return {
+        windRaw: windShelter > 0 ? windProtected / windShelter : windProtected,
+        windProtected,
+        waveRaw: waveShelter > 0 ? waveProtected / waveShelter : waveProtected,
+        waveProtected,
+        swellProtected: toNumberOr(b.swell?.value, 0),
+        temperature: toNumberOr(b.temperature?.value, 0),
+        waterTemperature: toNumberOr(b.waterTemperature?.value, null),
+        precipitation: toNumberOr(b.precipitation?.value, 0),
+        cloudCover: toNumberOr(b.cloudcover?.value, 0)
+      };
+    }
+    if (!scoreBreakdown) return null;
+    return {
+      windRaw: toNumberOr(scoreBreakdown.windSpeed?.raw, 0),
+      windProtected: toNumberOr(scoreBreakdown.windSpeed?.protected, 0),
+      waveRaw: toNumberOr(scoreBreakdown.waveHeight?.raw, 0),
+      waveProtected: toNumberOr(scoreBreakdown.waveHeight?.protected, 0),
+      swellProtected: toNumberOr(scoreBreakdown.swellHeight?.protected, 0),
+      temperature: toNumberOr(scoreBreakdown.temperature?.value, 0),
+      waterTemperature: toNumberOr(scoreBreakdown.waterTemperature?.value, null),
+      precipitation: toNumberOr(scoreBreakdown.precipitation?.value, 0),
+      cloudCover: toNumberOr(scoreBreakdown.cloudCover?.value, 0)
+    };
+  })();
 
   return (
     <>
@@ -1158,7 +634,7 @@ const FixedBeachView = ({
       {/* Header with beach info */}
       <div className="p-4 border-b flex justify-between items-center dark:border-slate-800">
         <div>
-          <h2 className="text-2xl font-semibold flex items-center">
+          <h2 className="flex items-center text-xl font-semibold sm:text-2xl">
             {beach?.id === homeBeach?.id && (
               <Home className="h-5 w-5 text-orange-500 mr-2" />
             )}
@@ -1248,7 +724,7 @@ const FixedBeachView = ({
 
       {/* Time range selector */}
       <div className="p-4 border-b bg-gray-50 dark:bg-slate-800 dark:border-slate-700">
-        <h3 className="text-lg font-medium mb-4 dark:text-slate-100">Choose Date & Time Window</h3>
+        <h3 className="text-lg font-medium mb-4 dark:text-slate-100">Choose a day</h3>
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">Date</label>
@@ -1284,63 +760,12 @@ const FixedBeachView = ({
           </button>
         </div>
         
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
-              Start Time
-            </label>
-            <select
-              value={timeRange.startTime}
-              onChange={(e) => onTimeRangeChange?.('startTime', e.target.value)}
-              className="w-full p-2 border dark:border-slate-600 rounded appearance-none bg-white dark:bg-slate-700 dark:text-slate-100 text-lg"
-            >
-              {Array.from({ length: 24 }, (_, i) => {
-                const hourLabel = `${String(i).padStart(2, '0')}:00`;
-                const endHour = parseInt(timeRange.endTime.split(':')[0], 10);
-                return (
-                  <option
-                    key={i}
-                    value={hourLabel}
-                    disabled={i > endHour}
-                  >
-                    {hourLabel}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
-              End Time
-            </label>
-            <select
-              value={timeRange.endTime}
-              onChange={(e) => onTimeRangeChange?.('endTime', e.target.value)}
-              className="w-full p-2 border dark:border-slate-600 rounded appearance-none bg-white dark:bg-slate-700 dark:text-slate-100 text-lg"
-            >
-              {Array.from({ length: 24 }, (_, i) => {
-                const hourLabel = `${String(i).padStart(2, '0')}:00`;
-                const startHour = parseInt(timeRange.startTime.split(':')[0], 10);
-                return (
-                  <option
-                    key={i}
-                    value={hourLabel}
-                    disabled={i < startHour}
-                  >
-                    {hourLabel}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-        </div>
-        
         <button 
           onClick={fetchWeatherData}
           className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center text-lg"
         >
           <RefreshCw className="h-5 w-5 mr-2" />
-          Update Forecast
+          Refresh forecast
         </button>
       </div>
       
@@ -1375,58 +800,68 @@ const FixedBeachView = ({
           {/* Score display */}
           {paddleScore !== null && (
             <div className="flex flex-col md:flex-row gap-6 mb-6">
-              {/* Score card - LEFT SIDE */}
-              <div className="md:w-1/3 bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 text-center flex flex-col justify-center relative">
-                <div
-                  className={`text-6xl mb-3 ${condition.color}`}
-                >
-                  {condition.emoji}
-                </div>
-                <h3 className="text-3xl font-bold mb-2 flex items-center justify-center dark:text-slate-100">
-                  {condition.label}
-                  <div className="group relative ml-2">
-                    <div className="cursor-help">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                          className="text-gray-400 dark:text-slate-500">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                      </svg>
-                    </div>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                                  absolute z-10 w-64 p-3 -left-24 bottom-8 bg-white dark:bg-slate-700
-                                  border border-gray-200 dark:border-slate-600 rounded-lg shadow-lg text-sm text-left dark:text-slate-200">
-                      {conditionDetails}
-                    </div>
+              {/* Score, window and the shape of the day */}
+              <div className="md:w-1/3 flex flex-col gap-3">
+                <div className="flex items-center gap-4 rounded-lg border bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                  <ScoreRing
+                    score={headlineScore}
+                    size={92}
+                    caption="OF 100"
+                    isDark={isDark}
+                    numeralColor={isDark ? "#f1f5f9" : "#111827"}
+                  />
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <h3
+                      className="text-2xl font-bold leading-tight"
+                      style={{ color: headlineTier?.ink && (isDark ? headlineTier.darkInk : headlineTier.ink) }}
+                    >
+                      {condition.label}
+                    </h3>
+                    <p className="text-[13px] leading-snug text-gray-600 dark:text-slate-300">
+                      {condition.message}
+                    </p>
+                    <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">
+                      Data quality {selectedEntry?.dataQuality ?? scoreBreakdown?.dataQuality ?? 100}%
+                    </p>
                   </div>
-                </h3>
-                <p className="text-gray-600 dark:text-slate-300 text-lg mb-4">{condition.message}</p>
-                <div className="mt-2 bg-gray-100 dark:bg-slate-700 rounded-full h-5 overflow-hidden">
-                  <div
-                    className={`h-full ${condition.color}`}
-                    style={{ width: `${paddleScore}%` }}
-                  ></div>
                 </div>
-                <p className="mt-2 text-lg font-medium text-gray-700 dark:text-slate-200">
-                  Score: {paddleScore}/100
-                </p>
-                <div className="mt-1 text-xs text-gray-500 dark:text-slate-400 flex items-center justify-center gap-2">
-                  <span>Data quality:</span>
-                  <span className={`font-medium ${
-                    scoreBreakdown?.dataQuality >= 90 ? 'text-green-600' :
-                    scoreBreakdown?.dataQuality >= 70 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    {scoreBreakdown?.dataQuality ?? 100}%
-                  </span>
-                  {scoreBreakdown?.dataQuality < 70 && (
-                    <span className="text-red-500" title="Some weather data is missing - score may be less accurate">
-                      ⚠️
+
+                <div
+                  className={`flex items-center gap-3 rounded-lg border p-3 ${
+                    bestWindowText
+                      ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-900/20"
+                      : "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-900/20"
+                  }`}
+                >
+                  <Sunrise
+                    className={`h-5 w-5 flex-shrink-0 ${
+                      bestWindowText ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                    }`}
+                    aria-hidden
+                  />
+                  <div className="flex flex-col gap-0.5">
+                    <span
+                      className={`text-sm font-bold ${
+                        bestWindowText ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"
+                      }`}
+                    >
+                      {bestWindowText ? `Go between ${bestWindowText}` : "No usable window today"}
                     </span>
-                  )}
+                    <span
+                      className={`text-[11px] ${
+                        bestWindowText ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {daySeries?.peak
+                        ? `Glassiest at ${formatHour(daySeries.peak.hour)}${
+                            daySeries.window ? ` · ${daySeries.window.length} usable hours` : ""
+                          }`
+                        : "Building the hourly outlook…"}
+                    </span>
+                  </div>
                 </div>
               </div>
-              
+
               {/* Weather Factors - RIGHT SIDE */}
               <div className="md:w-2/3">
                 <div className="grid grid-cols-2 gap-3">
@@ -1534,77 +969,44 @@ const FixedBeachView = ({
             </div>
           )}
 
-          {readiness && (
-            <div className="mt-6 space-y-4">
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-sky-500 to-cyan-500 p-6 text-white shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="text-4xl">{readiness.icon}</div>
-                      <div>
-                        <p className="text-xs uppercase tracking-widest text-blue-100">Paddle readiness</p>
-                        <h4 className="text-2xl font-semibold">{readiness.headline}</h4>
-                      </div>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${readiness.badgeClass}`}>
-                      {readiness.skillLevel}
+          {daySeries?.hourly?.length > 0 && (
+            <div className="mb-6 rounded-lg border bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="mb-3 flex items-end gap-3">
+                <div className="flex flex-grow flex-col gap-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 dark:text-slate-500">
+                    Hour by hour · tap to scrub
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-bold tabular-nums text-gray-900 dark:text-slate-100">
+                      {selectedEntry ? formatHour(selectedEntry.hour) : "–"}
+                    </span>
+                    <span
+                      className="text-sm font-semibold"
+                      style={{ color: selectedEntry ? tierInk(selectedEntry.score, isDark) : undefined }}
+                    >
+                      {selectedEntry ? getTier(selectedEntry.score).label : ""}
                     </span>
                   </div>
-
-                  <p className="mt-4 text-sm leading-relaxed text-blue-50">{readiness.message}</p>
-
-                  <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                    <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
-                      <div className="text-xs uppercase text-blue-100">Wind</div>
-                      <div className="text-lg font-semibold">{Math.round(readiness.wind)} km/h</div>
-                    </div>
-                    <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
-                      <div className="text-xs uppercase text-blue-100">Waves</div>
-                      <div className="text-lg font-semibold">{readiness.wave.toFixed(2)} m</div>
-                    </div>
-                    <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
-                      <div className="text-xs uppercase text-blue-100">Air temp</div>
-                      <div className="text-lg font-semibold">{Math.round(readiness.temperature)}°C</div>
-                    </div>
-                    <div className="rounded-lg bg-white/20 p-3 backdrop-blur">
-                      <div className="text-xs uppercase text-blue-100">Water temp</div>
-                      <div className="text-lg font-semibold">
-                        {readiness.waterTemperature !== null
-                          ? `${Math.round(readiness.waterTemperature)}°C`
-                          : 'N/A'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {readiness.bestHour && (
-                    <div className="mt-6 flex items-center rounded-xl bg-white/15 px-4 py-3 text-sm backdrop-blur">
-                      <Clock className="mr-3 h-5 w-5 text-white" />
-                      <div>
-                        <p className="font-semibold">Sweet spot timing</p>
-                        <p className="text-blue-100">
-                          {readiness.bestHour.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — wind {Math.round(readiness.bestHour.wind)} km/h
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
-
-                <div className="rounded-2xl border dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
-                  <h4 className="flex items-center text-lg font-semibold text-gray-800 dark:text-slate-100">
-                    <LifeBuoy className="mr-2 h-5 w-5 text-blue-500" /> Session game plan
-                  </h4>
-                  <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">Forecast window: {readiness.windowLabel}</p>
-                  <ul className="mt-4 space-y-3">
-                    {readiness.suggestions.map((tip, index) => (
-                      <li key={index} className="flex items-start text-sm text-gray-600 dark:text-slate-300">
-                        <CheckCircle2 className="mr-2 h-5 w-5 flex-shrink-0 text-blue-500" />
-                        <span>{tip}</span>
-                      </li>
-                    ))}
-                  </ul>
+                <div className="flex items-baseline gap-1">
+                  <span
+                    className="text-2xl font-bold tabular-nums"
+                    style={{ color: selectedEntry ? tierInk(selectedEntry.score, isDark) : undefined }}
+                  >
+                    {selectedEntry?.score ?? "–"}
+                  </span>
+                  <span className="text-xs font-semibold text-gray-400 dark:text-slate-500">/100</span>
                 </div>
               </div>
 
+              <HourStrip
+                hourly={daySeries.hourly}
+                selectedHour={selectedHour}
+                onSelectHour={setSelectedHour}
+                window={daySeries.window}
+                isDark={isDark}
+                height={104}
+              />
             </div>
           )}
 
@@ -1622,13 +1024,23 @@ const FixedBeachView = ({
           )}
           
           {/* Score Breakdown */}
-          {renderScoreBreakdown()}
+          {selectedEntry?.breakdown && (
+            <div className="mb-6 rounded-lg border bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <h4 className="mb-1 flex items-center font-medium text-gray-800 dark:text-slate-100">
+                <Info className="mr-2 h-5 w-5 text-blue-600" />
+                How this score was built
+              </h4>
+              <p className="mb-4 text-sm text-gray-600 dark:text-slate-300">
+                Conditions at {formatHour(selectedEntry.hour)}. Track length is the factor's
+                share of the score, so the biggest levers read first.
+              </p>
+              <FactorBars breakdown={selectedEntry.breakdown} protection={daySeries?.protection} />
+            </div>
+          )}
           
           {/* Geographic Protection */}
           {renderGeoProtectionInfo()}
           
-          {/* Hourly Wind */}
-          {renderHourlyWind()}
           
           <div className="text-center mt-6">
             <p className="text-sm text-gray-600 dark:text-slate-400">

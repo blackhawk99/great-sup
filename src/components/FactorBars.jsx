@@ -23,7 +23,6 @@ const FACTORS = [
   { key: "cloudcover", label: "Cloud", format: (f) => `${Math.round(f.value)}% cover` }
 ];
 
-const MAX_TRACK_PX = 138;
 const HEAVIEST = Math.max(...Object.values(FACTOR_WEIGHTS));
 
 /**
@@ -71,15 +70,15 @@ const FactorBars = ({ breakdown, protection }) => {
             key={row.key}
             className="flex items-center gap-3 border-b border-gray-100 py-2 last:border-b-0 dark:border-slate-700"
           >
-            <div className="flex w-28 flex-shrink-0 flex-col gap-0.5">
+            <div className="flex w-24 flex-shrink-0 flex-col gap-0.5 sm:w-28">
               <span className="text-[13px] font-semibold text-gray-800 dark:text-slate-200">{row.label}</span>
               <span className="text-[10px] tabular-nums text-gray-500 dark:text-slate-400">{row.value}</span>
             </div>
 
-            <div className="flex flex-grow items-center">
+            <div className="flex min-w-0 flex-grow items-center">
               <div
                 className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-slate-600"
-                style={{ width: Math.round((MAX_TRACK_PX * row.weight) / HEAVIEST) }}
+                style={{ width: `${(row.weight / HEAVIEST) * 100}%` }}
                 role="img"
                 aria-label={`${row.label}: ${row.earned} of ${row.weight} points`}
               >
@@ -90,7 +89,7 @@ const FactorBars = ({ breakdown, protection }) => {
               </div>
             </div>
 
-            <div className="flex w-14 flex-shrink-0 flex-col items-end gap-0.5">
+            <div className="flex w-16 flex-shrink-0 flex-col items-end gap-0.5">
               <span className="text-[13px] font-bold tabular-nums text-gray-900 dark:text-slate-100">
                 {row.earned}/{row.weight}
               </span>

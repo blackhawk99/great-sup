@@ -22,7 +22,10 @@ const hour = (h: number, over: Record<string, unknown> = {}) => ({
   ...over
 })
 
-const fullDay = (windByHour: (h: number) => number) =>
+// eslint-disable-next-line no-unused-vars -- parameter name in a type annotation
+type WindByHour = (hourOfDay: number) => number
+
+const fullDay = (windByHour: WindByHour) =>
   Array.from({ length: 24 }, (_, h) => hour(h, { windSpeed: windByHour(h), windGusts: windByHour(h) * 1.3 }))
 
 const beach = { id: 'b1', name: 'Test Bay', latitude: 37.3255, longitude: 23.4486 }
@@ -127,5 +130,22 @@ describe('rankSummaries', () => {
       { beach: { name: 'Gamma' }, summary: { score: 70 } }
     ])
     expect(ranked.map((r) => r.beach.name)).toEqual(['Delta', 'Beta', 'Gamma', 'Alpha'])
+  })
+})
+
+describe('data quality', () => {
+  it('never reports more than complete', async () => {
+    const { hourly } = await scoreHourlySeries(beach, fullDay(() => 12))
+    for (const entry of hourly) {
+      expect(entry.dataQuality).toBeGreaterThanOrEqual(0)
+      expect(entry.dataQuality).toBeLessThanOrEqual(100)
+    }
+  })
+
+  it('drops when fields are missing', async () => {
+    const gappy = Array.from({ length: 24 }, (_, index) =>
+      hour(index, { waterTemperature: undefined, tideHeight: undefined, currentSpeed: undefined }))
+    const { hourly } = await scoreHourlySeries(beach, gappy)
+    expect(hourly[0].dataQuality).toBeLessThan(100)
   })
 })
